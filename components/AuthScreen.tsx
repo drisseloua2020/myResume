@@ -122,7 +122,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                     <div className="w-[35%] bg-slate-900 text-white p-4 flex flex-col gap-4">
                         {/* Photo */}
                         <div className="w-20 h-20 mx-auto rounded-full border-2 border-slate-600 overflow-hidden bg-slate-800">
-                           <img src="https://i.pravatar.cc/300?img=11" alt="Profile" className="w-full h-full object-cover opacity-90" />
+                           <img src="../pictures/pic.png" alt="Profile" className="w-full h-full object-cover opacity-90" />
                         </div>
 
                         {/* Contact */}
@@ -131,7 +131,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                            <div className="text-[9px] space-y-1.5 font-light text-slate-300">
                               <div className="break-all font-medium text-white">user@example.com</div>
                               <div>+1 614-588-7414</div>
-                              <div className="leading-tight opacity-80">123 Test street, Columbus, OH 43202, United States</div>
+                              <div className="leading-tight opacity-80">123 Test street, New York, NY 10004, United States</div>
                            </div>
                         </div>
 
@@ -207,16 +207,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                               </div>
                            </div>
                         </div>
-                    </div>
-                    
-                    {/* Floating Badge */}
-                    <div className="absolute -right-4 top-10 bg-white rounded-lg shadow-lg p-3 flex items-center gap-3 border border-slate-50 animate-bounce-subtle z-30">
-                         <div className="bg-green-100 text-green-600 p-1.5 rounded-full">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
-                         </div>
-                         <div className="text-xs font-bold text-slate-700">
-                             Analysis Score: <span className="text-green-600">98/100</span>
-                         </div>
                     </div>
 
                 </div>
