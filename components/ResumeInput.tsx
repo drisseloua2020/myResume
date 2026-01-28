@@ -7,6 +7,7 @@ interface ResumeInputProps {
   onGenerate: (data: UserInputData, mode: AppMode) => void;
   onImport: (data: UserInputData) => void;
   onTemplateChange: (templateId: string) => void;
+  onDraftChange?: (draft: UserInputData) => void;
   isLoading: boolean;
   role: UserRole;
   userPlan: SubscriptionPlan;
@@ -22,6 +23,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   onGenerate, 
   onImport,
   onTemplateChange,
+  onDraftChange,
   isLoading, 
   role, 
   userPlan, 
@@ -209,6 +211,36 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     educationItems: educations,
     skillItems: skills
   };
+
+  // Autosave workspace draft while editing (debounced)
+  useEffect(() => {
+    if (!onDraftChange) return;
+    if (activeTab !== 'create') return;
+    if (isLoading) return;
+
+    const t = window.setTimeout(() => {
+      try {
+        onDraftChange({ ...currentData, templateId: selectedTemplateId });
+      } catch {
+        // ignore autosave errors at this layer
+      }
+    }, 1200);
+
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeTab,
+    isLoading,
+    selectedTemplateId,
+    targetRole,
+    jobDescription,
+    preferences,
+    profileImageData,
+    personalDetails,
+    experiences,
+    educations,
+    skills
+  ]);
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 relative items-start">

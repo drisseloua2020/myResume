@@ -18,16 +18,14 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onPlanUpdate })
     setLoading(true);
     setSuccessMsg(null);
     
-    // Calculate price (mock logic)
-    const price = PLAN_DETAILS[newPlan].price;
+    try {
+      const updated = await authService.updateMyPlan(newPlan);
+      onPlanUpdate(updated.plan);
+      setSuccessMsg(`Successfully switched to ${PLAN_DETAILS[newPlan].name}`);
+    } catch (e: any) {
+      setSuccessMsg(e?.message ? `Failed to update plan: ${e.message}` : 'Failed to update plan');
+    }
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    authService.updateUserPlan(user.id, newPlan, price);
-    onPlanUpdate(newPlan);
-    
-    setSuccessMsg(`Successfully switched to ${PLAN_DETAILS[newPlan].name}`);
     setLoading(false);
     
     // Clear message after 3 seconds

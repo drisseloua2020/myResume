@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { ParsedResponse } from '../types';
+import { saveResume } from '../services/resumeService';
+import { AVAILABLE_TEMPLATES } from '../constants';
 
 interface ResultsDisplayProps {
   results: ParsedResponse;
+  templateId?: string;
   onReset: () => void;
 }
 
-const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onReset }) => {
+const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, templateId, onReset }) => {
   const [activeTab, setActiveTab] = useState<string>('ats');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   // Order of tabs for the viewer
   const tabs = [
@@ -31,6 +36,26 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onReset }) => 
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleSaveToLibrary = async () => {
+    if (!templateId) {
+      alert('Select a template first');
+      return;
+    }
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const tName = AVAILABLE_TEMPLATES.find(t => t.id === templateId)?.name || templateId;
+      const title = results.json?.header?.title || `Resume (${tName})`;
+      await saveResume({ templateId, title, content: results });
+      setSaveMsg('Saved to your library');
+    } catch (e: any) {
+      setSaveMsg(e?.message ? `Save failed: ${e.message}` : 'Save failed');
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMsg(null), 3000);
+    }
   };
 
   return (
@@ -65,13 +90,24 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ results, onReset }) => 
            ))}
         </div>
 
-        <button 
-          onClick={downloadContent}
-          className="bg-[#1a91f0] hover:bg-[#1170cd] text-white px-5 py-2 rounded font-medium text-sm flex items-center gap-2 shadow"
-        >
-          Download TXT
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSaveToLibrary}
+            disabled={saving}
+            className="bg-[#16a34a] hover:bg-[#15803d] disabled:opacity-50 text-white px-4 py-2 rounded font-medium text-sm flex items-center gap-2 shadow"
+          >
+            {saving ? 'Saving…' : 'Save to Library'}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          </button>
+          <button
+            onClick={downloadContent}
+            className="bg-[#1a91f0] hover:bg-[#1170cd] text-white px-4 py-2 rounded font-medium text-sm flex items-center gap-2 shadow"
+          >
+            Download TXT
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          </button>
+          {saveMsg && <span className="text-xs text-slate-200 ml-2">{saveMsg}</span>}
+        </div>
       </div>
 
       {/* Document Viewer Area */}

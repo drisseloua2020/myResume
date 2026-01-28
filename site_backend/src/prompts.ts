@@ -1,51 +1,5 @@
-import { SubscriptionPlan, Template } from "./types";
-
-export const AVAILABLE_TEMPLATES: Template[] = [
-  {
-    id: 'classic_pro',
-    name: 'Classic Professional',
-    description: 'Clean, traditional layout perfect for corporate, legal, and finance roles.',
-    color: 'bg-slate-800',
-    tag: 'Conservative'
-  },
-  {
-    id: 'modern_tech',
-    name: 'Modern Tech',
-    description: 'Sleek, skill-focused design ideal for developers, designers, and startups.',
-    color: 'bg-blue-600',
-    tag: 'Modern'
-  },
-  {
-    id: 'creative_bold',
-    name: 'Creative Bold',
-    description: 'Unique layout with accent colors for marketing, art, and media positions.',
-    color: 'bg-purple-600',
-    tag: 'Creative'
-  },
-  {
-    id: 'executive_lead',
-    name: 'Executive Lead',
-    description: 'High-level hierarchy emphasizing leadership and results for management.',
-    color: 'bg-emerald-700',
-    tag: 'Leadership'
-  },
-  {
-    id: 'minimalist_clean',
-    name: 'Minimalist Clean',
-    description: 'Simple, elegant, and easy to read. Focuses on content with ample whitespace.',
-    color: 'bg-slate-400',
-    tag: 'Simple'
-  },
-  {
-    id: 'compact_grid',
-    name: 'Compact Grid',
-    description: 'Dense layout designed to fit maximum information on a single page.',
-    color: 'bg-orange-600',
-    tag: 'Technical'
-  }
-];
-
 export const RESUME_FORGE_SYSTEM_PROMPT = `
+
 You are “ResumeForge”, an expert ATS optimization specialist + recruiter + career copywriter.
 
 Your mission:
@@ -294,22 +248,5 @@ COLD_EMAIL:
 <text or “N/A - no job description provided”>
 
 Begin now. If resume text is provided, use Mode A. If not, use Mode B.
-`;
 
-export const PLAN_DETAILS = {
-  [SubscriptionPlan.FREE]: {
-    name: "Free",
-    price: "Free",
-    desc: "10 resumes/day + Ads"
-  },
-  [SubscriptionPlan.MONTHLY]: {
-    name: "Pro Monthly",
-    price: "$1.00 / month",
-    desc: "Full access, cancel anytime"
-  },
-  [SubscriptionPlan.YEARLY]: {
-    name: "Pro Yearly",
-    price: "$1.99 / year",
-    desc: "Best value"
-  }
-};
+`;

@@ -47,6 +47,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout, activeTab, set
           Account Settings
         </button>
 
+        <button
+          onClick={() => setActiveTab('contact')}
+          className={`w-full text-left px-4 py-2 rounded-md transition-colors ${
+            activeTab === 'contact' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          Contact Support
+        </button>
+
         {currentUser.role === UserRole.ADMIN && (
           <>
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-6 mb-2 px-2">

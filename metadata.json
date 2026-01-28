@@ -1,5 +1,5 @@
 {
-  "name": "ResumeForge AI",
+  "name": "MyResume",
   "description": "Advanced AI-powered resume builder and optimizer using Google Gemini. Features ATS analysis, targeted tailoring, and cover letter generation.",
   "requestFramePermissions": []
 }

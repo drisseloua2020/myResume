@@ -3,27 +3,61 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import ResumeInput from './components/ResumeInput';
 import ResultsDisplay from './components/ResultsDisplay';
-import AdminPanel from './components/AdminPanel';
+import ResumeLibraryPage from './components/ResumeLibraryPage';
+import CoverLettersPage from './components/CoverLettersPage';
+import CoverLetterExamplesPage from './components/CoverLetterExamplesPage';
+import ProfileSyncPage from './components/ProfileSyncPage';
+import AdminActivityLogsPage from './components/AdminActivityLogsPage';
+import AdminAgentUpdatesPage from './components/AdminAgentUpdatesPage';
+import AdminContactMessagesPage from './components/AdminContactMessagesPage';
+import AdminUsersPage from './components/AdminUsersPage';
+import AdminResumesPage from './components/AdminResumesPage';
 import AuthScreen from './components/AuthScreen';
+import ContactPage from './components/ContactPage';
 import AccountSettings from './components/AccountSettings';
 import TemplateSelector from './components/TemplateSelector';
+import CareerBlogPage from './components/CareerBlogPage';
+import ResumeGuidePage from './components/ResumeGuidePage';
+import ResumeExamplesPage from './components/ResumeExamplesPage';
 import AgentReviewModal from './components/AgentReviewModal';
 import { generateResumeContent } from './services/geminiService';
 import { authService } from './services/authService';
+import { setSession } from './services/apiClient';
 import { agentService } from './services/agentService';
+import { saveDraft, getLatestDraft } from './services/resumeService';
 import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, PersonalDetails } from './types';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeTab, setActiveTab] = useState<string>('workspace');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [results, setResults] = useState<ParsedResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [generatorTab, setGeneratorTab] = useState<'create' | 'upload' | 'cover_letter'>('create');
-  
+
   // State to hold imported data for the editor
   const [editorData, setEditorData] = useState<Partial<UserInputData> | null>(null);
+
+  // Load latest draft when opening the WorkSpace
+  useEffect(() => {
+    if (!currentUser) return;
+    if (activeTab !== 'workspace') return;
+    // If we already have editorData from an import in this session, don't overwrite it
+    if (editorData) return;
+
+    (async () => {
+      try {
+        const draft = await getLatestDraft(selectedTemplateId);
+        if (draft?.content) {
+          setEditorData(draft.content as any);
+        }
+      } catch {
+        // ignore load errors (workspace can start empty)
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, activeTab, selectedTemplateId]);
 
   // Agent State
   const [agentUpdates, setAgentUpdates] = useState<AgentUpdate[]>([]);
@@ -31,6 +65,31 @@ const App: React.FC = () => {
 
   // Check for existing session on load
   useEffect(() => {
+    // OAuth callback: backend redirects to frontend with ?token=JWT
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const templateIdFromOAuth = params.get('templateId') || undefined;
+    if (token) {
+      // cache token temporarily, then refresh user
+      setSession(token, { id: '', name: '', email: '', role: 'user', plan: 'free', paidAmount: '$0.00', status: 'Active' });
+      authService.refreshMe()
+        .then((u) => {
+          if (u) {
+            setCurrentUser(u);
+            if (templateIdFromOAuth) {
+              setSelectedTemplateId(templateIdFromOAuth);
+              setActiveTab('workspace');
+              setGeneratorTab('create');
+            }
+            checkAgentUpdates();
+          }
+        })
+        .finally(() => {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        });
+      return;
+    }
+
     const user = authService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
@@ -48,19 +107,26 @@ const App: React.FC = () => {
   const handleLogin = (user: User, initialTemplateId?: string) => {
     setCurrentUser(user);
     setResults(null);
+    if (user.role === 'admin') {
+      setActiveTab('admin_logs');
+      return;
+    }
     if (initialTemplateId) {
       setSelectedTemplateId(initialTemplateId);
-      setActiveTab('generator');
+      setActiveTab('workspace');
       setGeneratorTab('create');
-    } else {
-      setActiveTab('dashboard');
-      // Trigger agent check after login
-      checkAgentUpdates();
+      return;
     }
+
+    // Default landing for users is the WorkSpace
+    setActiveTab('workspace');
+    // Trigger agent check after login
+    checkAgentUpdates();
   };
 
   const handleLogout = () => {
-    authService.logout();
+    // Best-effort backend logout (audit), then clear local session.
+    void authService.logout();
     setCurrentUser(null);
     setSelectedTemplateId(undefined);
     setAgentUpdates([]);
@@ -78,6 +144,8 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
+      // Ensure workspace state is persisted before AI processing
+      await saveDraft({ templateId: data.templateId || selectedTemplateId, content: { ...data, templateId: data.templateId || selectedTemplateId } });
       authService.logActivity(currentUser.id, currentUser.name, 'RESUME_GENERATE', `Mode: ${mode}, Template: ${data.templateId || 'None'}`);
       const parsedResults = await generateResumeContent(data, mode);
       setResults(parsedResults);
@@ -163,6 +231,15 @@ const App: React.FC = () => {
         if (parsedResults.json) {
             const mappedData = mapJsonToState(parsedResults.json);
             setEditorData(mappedData);
+            // Persist imported result as the latest draft (workspace state)
+            await saveDraft({
+              templateId: selectedTemplateId,
+              content: {
+                ...data,
+                ...mappedData,
+                templateId: selectedTemplateId,
+              },
+            });
             // Switch to Create tab to show the editor
             setGeneratorTab('create');
             // Ensure no results overlay is showing
@@ -179,7 +256,7 @@ const App: React.FC = () => {
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplateId(templateId);
-    setActiveTab('generator');
+    setActiveTab('workspace');
     setGeneratorTab('create');
   };
 
@@ -201,18 +278,8 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
-    if (activeTab === 'dashboard') {
-        return (
-          <Dashboard 
-            onCreate={() => {
-                setActiveTab('templates');
-            }} 
-            userName={currentUser.name} 
-            onReviewUpdates={() => setShowAgentModal(true)}
-            pendingUpdateCount={agentUpdates.filter(u => u.status === 'pending').length}
-          />
-        );
-    }
+    // NOTE: The "WorkSpace" is the primary resume editor experience.
+    // Dashboard is kept for legacy/demo but not shown in user tabs.
 
     if (activeTab === 'templates') {
        return (
@@ -221,7 +288,7 @@ const App: React.FC = () => {
              <p className="text-slate-500 mb-12">Select a style for your new resume.</p>
              <TemplateSelector onSelect={handleTemplateSelect} selectedId={selectedTemplateId} />
              <button 
-               onClick={() => setActiveTab('dashboard')} 
+               onClick={() => setActiveTab('workspace')} 
                className="mt-12 text-slate-400 hover:text-slate-600 underline"
              >
                Cancel
@@ -230,38 +297,80 @@ const App: React.FC = () => {
        );
     }
 
-    if (activeTab === 'cover_letter_dashboard') {
-        return (
-             <div className="max-w-6xl mx-auto py-12 px-6">
-                <div className="text-center py-20 bg-white rounded-lg shadow-sm border border-slate-200">
-                    <h2 className="text-2xl font-bold text-slate-800 mb-2">Cover Letters</h2>
-                    <p className="text-slate-500 mb-6">Create tailored cover letters for every application.</p>
-                    <button 
-                        onClick={() => {
-                            setActiveTab('generator');
-                            setGeneratorTab('cover_letter');
-                        }}
-                        className="bg-[#1a91f0] text-white px-6 py-2 rounded-full font-medium"
-                    >
-                        Go to Generator
-                    </button>
-                </div>
-             </div>
-        );
+    if (activeTab === 'career_blog') {
+      return <CareerBlogPage onBack={() => setActiveTab('workspace')} />;
     }
 
-    if (activeTab === 'admin_users' || activeTab === 'admin_audit') {
-      if (currentUser.role !== UserRole.ADMIN) {
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
-             <h2 className="text-xl font-semibold">Access Denied</h2>
-          </div>
-        );
-      }
-      return <div className="max-w-6xl mx-auto py-8 px-6"><AdminPanel /></div>;
+    if (activeTab === 'resume_guide') {
+      return <ResumeGuidePage onBack={() => setActiveTab('workspace')} />;
     }
 
-    if (activeTab === 'settings') {
+    if (activeTab === 'resume_examples') {
+      return (
+        <ResumeExamplesPage
+          onBack={() => setActiveTab('workspace')}
+          onChooseTemplate={(templateId) => {
+            setSelectedTemplateId(templateId);
+            setActiveTab('workspace');
+            setGeneratorTab('create');
+          }}
+        />
+      );
+    }
+
+    if (activeTab === 'cover_letters') {
+      return (
+        <div className="max-w-6xl mx-auto py-8 px-6">
+          <CoverLettersPage onOpenExamples={() => setActiveTab('cover_letter_examples')} />
+        </div>
+      );
+    }
+
+    if (activeTab === 'cover_letter_examples') {
+      return (
+        <CoverLetterExamplesPage onBack={() => setActiveTab('cover_letters')} />
+      );
+    }
+
+    if (activeTab === 'resumes') {
+      return (
+        <div className="max-w-6xl mx-auto py-8 px-6">
+          <ResumeLibraryPage />
+        </div>
+      );
+    }
+
+    if (activeTab === 'profile_sync') {
+      return (
+        <div className="max-w-6xl mx-auto py-8 px-6">
+          <ProfileSyncPage />
+        </div>
+      );
+    }
+
+    if (activeTab === 'admin_logs') {
+      return <AdminActivityLogsPage />;
+    }
+    if (activeTab === 'admin_agents') {
+      return <AdminAgentUpdatesPage />;
+    }
+    if (activeTab === 'admin_contacts') {
+      return <AdminContactMessagesPage />;
+    }
+    if (activeTab === 'admin_users') {
+      return <AdminUsersPage />;
+    }
+    if (activeTab === 'admin_resumes') {
+      return <AdminResumesPage />;
+    }
+
+    if (activeTab === 'contact') {
+      return (
+        <ContactPage user={currentUser} />
+      );
+    }
+
+    if (activeTab === 'account') {
       return (
         <div className="max-w-4xl mx-auto py-8 px-6">
             <AccountSettings 
@@ -273,23 +382,46 @@ const App: React.FC = () => {
     }
 
     if (results) {
-      return <ResultsDisplay results={results} onReset={() => setResults(null)} />;
+      return <ResultsDisplay results={results} templateId={selectedTemplateId} onReset={() => setResults(null)} />;
     }
 
-    // Generator View - FULL WIDTH for Split Screen
+    if (activeTab !== 'workspace') {
+      // Fallback to WorkSpace
+      setActiveTab('workspace');
+      return null;
+    }
+
+    // WorkSpace View - FULL WIDTH for Split Screen
     return (
-      <div className="w-full px-4 lg:px-8 py-8">
+      <div className="w-full px-4 lg:px-8 py-8 space-y-4">
+        <div className="max-w-6xl mx-auto bg-white border border-slate-200 rounded p-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Sources</div>
+            <div className="text-xs text-slate-600">Connect & sync LinkedIn, GitHub, and Universal sources.</div>
+          </div>
+          <button
+            onClick={() => setActiveTab('profile_sync')}
+            className="px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800 text-sm"
+          >
+            Manage Sources
+          </button>
+        </div>
+
         <ResumeInput 
-            onGenerate={handleGenerate} 
-            onImport={handleImport}
-            onTemplateChange={setSelectedTemplateId}
-            prefilledData={editorData}
-            isLoading={isLoading} 
-            role={currentUser.role}
-            userPlan={currentUser.plan}
-            selectedTemplateId={selectedTemplateId}
-            user={currentUser}
-            initialTab={generatorTab}
+          onGenerate={handleGenerate} 
+          onImport={handleImport}
+          onTemplateChange={setSelectedTemplateId}
+          onDraftChange={async (draft) => {
+            // Persist workspace edits as the user types
+            await saveDraft({ templateId: draft.templateId ?? selectedTemplateId, content: draft });
+          }}
+          prefilledData={editorData}
+          isLoading={isLoading} 
+          role={currentUser.role}
+          userPlan={currentUser.plan}
+          selectedTemplateId={selectedTemplateId}
+          user={currentUser}
+          initialTab={generatorTab}
         />
       </div>
     );

@@ -1,17 +1,57 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { authService } from '../services/authService';
+import { API_URL } from '../services/apiClient';
 import { User, SubscriptionPlan } from '../types';
 import { PLAN_DETAILS } from '../constants';
 import TemplateSelector from './TemplateSelector';
+import ContactPage from './ContactPage'; // Reuse the form
+import CareerBlogPage from './CareerBlogPage';
+import ResumeGuidePage from './ResumeGuidePage';
+import ResumeExamplesPage from './ResumeExamplesPage';
+import CookiesPage from './CookiesPage';
+import CookiesPrivacyPolicyPage from './CookiesPrivacyPolicyPage';
+import CookiesTermsOfUsePage from './CookiesTermsOfUsePage';
 
 interface AuthScreenProps {
   onLogin: (user: User, initialTemplateId?: string) => void;
 }
 
 const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
-  const [activeModal, setActiveModal] = useState<'none' | 'login' | 'pricing' | 'signup'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'login' | 'pricing' | 'signup' | 'contact'>('none');
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>(SubscriptionPlan.FREE);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
+  const [publicPage, setPublicPage] = useState<
+    'home' |
+    'career_blog' |
+    'resume_guide' |
+    'resume_examples' |
+    'cookies' |
+    'cookies_privacy' |
+    'cookies_terms'
+  >('home');
+
+  const navigateToSection = (sectionId: 'templates' | 'pricing' | 'about') => {
+    // Ensure we're on the home public page, then scroll to the section.
+    setPublicPage('home');
+    window.location.hash = `#${sectionId}`;
+    window.setTimeout(() => {
+      const el = document.getElementById(sectionId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
+
+  useEffect(() => {
+    if (publicPage !== 'home') return;
+    const hash = window.location.hash || '';
+    const id = hash.startsWith('#') ? (hash.slice(1) as any) : '';
+    if (id === 'templates' || id === 'pricing' || id === 'about') {
+      window.setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  }, [publicPage]);
+
 
   const handleStartCreate = () => {
     setActiveModal('pricing');
@@ -32,33 +72,45 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setActiveModal('login');
   }
 
-  const handleAuthSuccess = (user: User) => {
-    onLogin(user, selectedTemplateId);
+  const handleAuthSuccess = (user: User, kind: 'login' | 'signup') => {
+    // Signup redirect rules:
+    // - No template selected: go to home/dashboard
+    // - Template selected: go directly to that template
+    if (kind === 'signup') {
+      if (selectedTemplateId) {
+        onLogin(user, selectedTemplateId);
+      } else {
+        onLogin(user);
+      }
+      return;
+    }
+
+    onLogin(user);
   };
 
-  const handleProviderLogin = async (provider: 'google' | 'linkedin' | 'microsoft' | 'github') => {
-      // In a real app this would trigger the SSO flow
-      // For this mock, we just use the internal auth simulation which is hooked up in the Modal. 
-      // But we can open the modal directly to "Login" mode if clicked from outside.
-      setActiveModal('login');
-  };
+  // SSO/OAuth is intentionally disabled in this build.
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">
       {/* --- Navigation --- */}
       <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer">
-             <div className="w-10 h-10 bg-[#1a91f0] rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">My</span>
-             </div>
-             <span className="font-bold text-xl tracking-tight text-slate-800">Resume</span>
-          </div>
-
+          <button onClick={() => setPublicPage('home')} className="flex items-center gap-2 cursor-pointer">
+                     <div className="w-10 h-10 bg-[#1a91f0] rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">My</span>
+                     </div>
+                     <span className="font-bold text-xl tracking-tight text-slate-800">Resume</span>
+          </button>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
-             <a href="#templates" className="hover:text-[#1a91f0] transition-colors">Resume Templates</a>
-             <a href="#pricing" className="hover:text-[#1a91f0] transition-colors">Pricing</a>
-             <a href="#about" className="hover:text-[#1a91f0] transition-colors">About Us</a>
+             <button onClick={() => navigateToSection('templates')} className="hover:text-[#1a91f0] transition-colors">Resume Templates</button>
+             <button onClick={() => navigateToSection('pricing')} className="hover:text-[#1a91f0] transition-colors">Pricing</button>
+             <button onClick={() => navigateToSection('about')} className="hover:text-[#1a91f0] transition-colors">About Us</button>
+             <button onClick={() => setPublicPage('career_blog')} className="hover:text-[#1a91f0] transition-colors">
+               Career Blog
+             </button>
+             <button onClick={() => setPublicPage('resume_guide')} className="hover:text-[#1a91f0] transition-colors">
+               Resume Guide
+             </button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -78,6 +130,37 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         </div>
       </nav>
 
+      {publicPage !== 'home' && (
+        <>
+          {publicPage === 'career_blog' && <CareerBlogPage onBack={() => setPublicPage('home')} />}
+          {publicPage === 'resume_guide' && <ResumeGuidePage onBack={() => setPublicPage('home')} />}
+          {publicPage === 'resume_examples' && (
+            <ResumeExamplesPage
+              onBack={() => setPublicPage('home')}
+              onChooseTemplate={(templateId) => {
+                setSelectedTemplateId(templateId);
+                handleStartCreate();
+              }}
+            />
+          )}
+          {publicPage === 'cookies' && (
+            <CookiesPage
+              onBack={() => setPublicPage('home')}
+              onOpenPrivacy={() => setPublicPage('cookies_privacy')}
+              onOpenTerms={() => setPublicPage('cookies_terms')}
+            />
+          )}
+          {publicPage === 'cookies_privacy' && (
+            <CookiesPrivacyPolicyPage onBack={() => setPublicPage('cookies')} />
+          )}
+          {publicPage === 'cookies_terms' && (
+            <CookiesTermsOfUsePage onBack={() => setPublicPage('cookies')} />
+          )}
+        </>
+      )}
+
+      {publicPage === 'home' && (
+        <>
       {/* --- Hero Section --- */}
       <header className="relative pt-16 pb-24 overflow-hidden bg-slate-50/50">
          <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col md:flex-row items-center gap-12">
@@ -166,7 +249,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                     {/* Main Content (White) */}
                     <div className="flex-1 p-5 bg-white flex flex-col">
                         <header className="border-b border-slate-100 pb-4 mb-4">
-                           <h1 className="text-2xl font-extrabold text-slate-900 uppercase tracking-tight leading-none mb-1">STEVE ARLOND</h1>
+                           <h1 className="text-2xl font-extrabold text-slate-900 uppercase tracking-tight leading-none mb-1">X MARS</h1>
                            <h2 className="text-sm font-bold text-[#1a91f0]">Chief Technical Officer</h2>
                         </header>
 
@@ -409,6 +492,39 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
          </div>
       </section>
 
+        </>
+      )}
+
+
+        {/* --- Auth Modals --- */}
+        {activeModal !== 'none' && (
+          activeModal === 'contact' ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setActiveModal('none')}></div>
+               <div className="relative z-10 w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+                 <button onClick={() => setActiveModal('none')} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                 </button>
+                 <ContactPage user={{ name: '', email: '', id: '', role: 'user' } as any} />
+               </div>
+            </div>
+          ) : (
+            <AuthModal
+              mode={activeModal === 'login' ? 'login' : 'signup'}
+              selectedPlan={selectedPlan}
+              onClose={() => setActiveModal('none')}
+              onSwitchMode={(mode) => {
+                if (mode === 'signup') {
+                  setSelectedPlan(SubscriptionPlan.FREE);
+                  setSelectedTemplateId(undefined);
+                }
+                setActiveModal(mode);
+              }}
+              onAuthSuccess={handleAuthSuccess}
+            />
+          )
+        )}
+
       {/* --- Footer --- */}
       <footer className="bg-[#2e3d50] text-slate-300 py-16">
           <div className="max-w-6xl mx-auto px-6">
@@ -424,25 +540,23 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 <div>
                    <h4 className="font-bold text-white mb-4">Learn</h4>
                    <ul className="space-y-2 text-sm">
-                      <li><a href="#" className="hover:text-white">Career Blog</a></li>
-                      <li><a href="#" className="hover:text-white">How to write a resume</a></li>
-                      <li><a href="#" className="hover:text-white">Resume Examples</a></li>
+                      <li><button onClick={() => setPublicPage('career_blog')} className="hover:text-white">Career Blog</button></li>
+                      <li><button onClick={() => setPublicPage('resume_guide')} className="hover:text-white">How to write a resume</button></li>
+                      <li><button onClick={() => setPublicPage('resume_examples')} className="hover:text-white">Resume Examples</button></li>
                    </ul>
                 </div>
                 <div>
                    <h4 className="font-bold text-white mb-4">Company</h4>
                    <ul className="space-y-2 text-sm">
                       <li><a href="#about" className="hover:text-white">About Us</a></li>
-                      <li><a href="#pricing" className="hover:text-white">Pricing</a></li>
-                      <li><a href="#" className="hover:text-white">Sponsorship Program</a></li>
                    </ul>
                 </div>
                 <div>
                    <h4 className="font-bold text-white mb-4">Support</h4>
                    <ul className="space-y-2 text-sm">
-                      <li><a href="#" className="hover:text-white">Help Center</a></li>
-                      <li><a href="#" className="hover:text-white">Contact Us</a></li>
-                      <li><a href="#" className="hover:text-white">Forgot Password</a></li>
+                      <li>
+                        <button onClick={() => setActiveModal('contact')} className="hover:text-white">Contact Us</button>
+                      </li>
                    </ul>
                 </div>
              </div>
@@ -452,9 +566,9 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                    2026, MyResume. All rights reserved
                 </div>
                 <div className="flex gap-6">
-                   <a href="#" className="hover:text-white">Privacy policy</a>
-                   <a href="#" className="hover:text-white">Terms of use</a>
-                   <a href="#" className="hover:text-white">Cookies</a>
+                   <button onClick={() => setPublicPage('cookies_privacy')} className="hover:text-white">Privacy policy</button>
+                   <button onClick={() => setPublicPage('cookies_terms')} className="hover:text-white">Terms of use</button>
+                   <button onClick={() => setPublicPage('cookies')} className="hover:text-white">Cookies</button>
                 </div>
              </div>
           </div>
@@ -474,7 +588,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
            selectedPlan={selectedPlan}
            onClose={() => setActiveModal('none')} 
            onSwitchMode={(m) => setActiveModal(m)}
-           onLogin={handleAuthSuccess} 
+           onAuthSuccess={handleAuthSuccess} 
         />
       )}
     </div>
@@ -601,10 +715,10 @@ interface AuthModalProps {
   selectedPlan: SubscriptionPlan;
   onClose: () => void;
   onSwitchMode: (mode: 'login' | 'signup') => void;
-  onLogin: (user: User) => void;
+  onAuthSuccess: (user: User, kind: 'login' | 'signup') => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSwitchMode, onLogin }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSwitchMode, onAuthSuccess }) => {
   const isLogin = mode === 'login';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -627,7 +741,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSw
       } else {
         user = await authService.signup(formData.name, formData.email, formData.password, selectedPlan);
       }
-      onLogin(user);
+      onAuthSuccess(user, isLogin ? 'login' : 'signup');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -635,19 +749,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSw
     }
   };
 
-  const handleProviderLogin = async (provider: 'google' | 'linkedin' | 'microsoft' | 'github') => {
-      setLoading(true);
-      setError(null);
-      try {
-        // If signing up, we pass the selected plan. If logging in, we default to whatever the mock service decides (usually just login)
-        const user = await authService.loginWithProvider(provider, isLogin ? undefined : selectedPlan);
-        onLogin(user);
-      } catch (err: any) {
-        setError(err.message || 'Authentication failed');
-      } finally {
-        setLoading(false);
-      }
-  };
+  // SSO/OAuth intentionally disabled in this build.
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -672,64 +774,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSw
         </div>
 
         <div className="p-8">
-           {/* SSO Buttons */}
-           <div className="grid grid-cols-4 gap-3 mb-6">
-              <button 
-                type="button" 
-                onClick={() => handleProviderLogin('linkedin')}
-                disabled={loading}
-                className="flex items-center justify-center p-3 border border-slate-200 rounded hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                title="Sign in with LinkedIn"
-              >
-                  <svg className="w-5 h-5 text-[#0077b5]" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-              </button>
-              <button 
-                type="button" 
-                onClick={() => handleProviderLogin('google')}
-                disabled={loading}
-                className="flex items-center justify-center p-3 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
-                title="Sign in with Google"
-              >
-                 <svg className="w-5 h-5" viewBox="0 0 24 24">
-                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.84z" fill="#FBBC05" />
-                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                 </svg>
-              </button>
-              <button 
-                type="button" 
-                onClick={() => handleProviderLogin('microsoft')}
-                disabled={loading}
-                className="flex items-center justify-center p-3 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
-                title="Sign in with Microsoft"
-              >
-                  <svg className="w-5 h-5" viewBox="0 0 23 23">
-                    <path fill="#f3f3f3" d="M0 0h23v23H0z"/>
-                    <path fill="#f35325" d="M1 1h10v10H1z"/>
-                    <path fill="#81bc06" d="M12 1h10v10H12z"/>
-                    <path fill="#05a6f0" d="M1 12h10v10H1z"/>
-                    <path fill="#ffba08" d="M12 12h10v10H12z"/>
-                  </svg>
-              </button>
-              <button 
-                type="button" 
-                onClick={() => handleProviderLogin('github')}
-                disabled={loading}
-                className="flex items-center justify-center p-3 border border-slate-200 rounded hover:bg-slate-800 hover:text-white hover:border-slate-800 text-slate-800 transition-colors"
-                title="Sign in with GitHub"
-              >
-                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-              </button>
-           </div>
-
-           <div className="relative mb-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-slate-500">Or continue with email</span>
-              </div>
+           {/* SSO intentionally disabled */}
+           <div className="bg-slate-50 border border-slate-200 text-slate-700 p-3 rounded mb-6 text-sm">
+             Single Sign-On (Google/Microsoft/GitHub/LinkedIn) is disabled in this build. Please continue with email.
            </div>
 
           {error && (
