@@ -9,7 +9,13 @@ const router = Router();
 const createSchema = z.object({
   templateId: z.string().min(1),
   title: z.string().min(1).max(200),
-  content: z.any(), // ParsedResponse payload from frontend
+  content: z.any(), // JSON payload from frontend
+});
+
+const updateSchema = z.object({
+  templateId: z.string().min(1).optional(),
+  title: z.string().min(1).max(200).optional(),
+  content: z.any().optional(),
 });
 
 // Workspace autosave draft (UserInputData/editor state)
@@ -50,10 +56,10 @@ router.post('/', authMiddleware, async (req: any, res) => {
 router.get('/', authMiddleware, async (req: any, res) => {
   const userId = req.user.userId as string;
   const rows = await query(
-    `SELECT id, template_id AS "templateId", title, created_at AS "createdAt"
+    `SELECT id, template_id AS "templateId", title, updated_at AS "createdAt"
      FROM resumes
      WHERE user_id = $1
-     ORDER BY created_at DESC`,
+     ORDER BY updated_at DESC`,
     [userId]
   );
   return res.json({ resumes: rows });
@@ -118,6 +124,51 @@ router.get('/latest-draft', authMiddleware, async (req: any, res) => {
 });
 
 // Fetch a single resume (for JSON download)
+// Update an existing saved resume (overwrite JSON content)
+router.put('/:id', authMiddleware, async (req: any, res) => {
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten() });
+  }
+
+  const userId = req.user.userId as string;
+  const id = req.params.id as string;
+  const { templateId, title, content } = parsed.data;
+
+  if (!templateId && !title && typeof content === 'undefined') {
+    return res.status(400).json({ error: 'Nothing to update' });
+  }
+
+  const rows = await query(
+    `UPDATE resumes
+     SET template_id = COALESCE($1, template_id),
+         title = COALESCE($2, title),
+         content = COALESCE($3::jsonb, content),
+         updated_at = now()
+     WHERE user_id = $4 AND id = $5
+     RETURNING id`,
+    [
+      templateId ?? null,
+      title ?? null,
+      typeof content === 'undefined' ? null : JSON.stringify(content ?? {}),
+      userId,
+      id
+    ]
+  );
+
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+
+  // audit
+  await query(
+    `INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp)
+     SELECT $1, u.id, u.name, 'RESUME_UPDATE', $2, now()
+     FROM users u WHERE u.id = $3`,
+    [`log-${uuidv4()}`, `Resume: ${id}`, userId]
+  );
+
+  return res.json({ ok: true });
+});
+
 router.get('/:id', authMiddleware, async (req: any, res) => {
   const userId = req.user.userId as string;
   const id = req.params.id as string;

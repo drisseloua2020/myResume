@@ -23,6 +23,10 @@ export async function saveResume(payload: { templateId: string; title: string; c
   return api.post<{ id: string }>('/resumes', payload);
 }
 
+export async function updateResume(id: string, payload: { templateId?: string; title?: string; content?: any }): Promise<void> {
+  await api.put(`/resumes/${id}`, payload);
+}
+
 export async function listResumes(): Promise<ResumeListItem[]> {
   const res = await api.get<{ resumes: ResumeListItem[] }>('/resumes');
   return res.resumes;
