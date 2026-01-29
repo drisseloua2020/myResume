@@ -300,16 +300,21 @@ export const PLAN_DETAILS = {
   [SubscriptionPlan.FREE]: {
     name: "Free",
     price: "Free",
-    desc: "10 resumes/day + Ads"
+    desc: "10 resumes/day + Ads",
+    available: true
   },
   [SubscriptionPlan.MONTHLY]: {
     name: "Pro Monthly",
     price: "$1.00 / month",
-    desc: "Full access, cancel anytime"
+    desc: "Full access, cancel anytime",
+    available: false,
+    badge: "Coming soon"
   },
   [SubscriptionPlan.YEARLY]: {
     name: "Pro Yearly",
     price: "$1.99 / year",
-    desc: "Best value"
+    desc: "Best value",
+    available: false,
+    badge: "Coming soon"
   }
 };

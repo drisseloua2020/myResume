@@ -77,14 +77,16 @@ router.post('/signup', async (req, res) => {
     return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten() });
   }
 
-  const { name, email, password, plan } = parsed.data;
+  const { name, email, password, plan: requestedPlan } = parsed.data;
+  // Pro plans are disabled (coming soon). Force everyone to FREE.
+  const plan: 'free' = 'free';
 
   const existing = await findUserByEmail(email);
   if (existing) return res.status(409).json({ error: 'Email already exists' });
 
   const userId = `u-${uuidv4()}`;
-  // Pricing (mock): keep aligned with frontend PLAN_DETAILS
-  const paid = plan === 'monthly' ? 1.0 : plan === 'yearly' ? 1.99 : 0.0;
+  // Pro plans are disabled.
+  const paid = 0.0;
 
   const hashed = await hashPassword(password);
 
@@ -98,16 +100,8 @@ router.post('/signup', async (req, res) => {
     await client.query(
       `INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp)
        VALUES ($1, $2, $3, 'USER_SIGNUP', $4, now())`,
-      [`log-${uuidv4()}`, userId, name.trim(), `Plan: ${plan}`]
+      [`log-${uuidv4()}`, userId, name.trim(), `Plan: ${plan}${requestedPlan !== 'free' ? ' (requested upgrade: coming soon)' : ''}`]
     );
-
-    if (plan !== 'free') {
-      await client.query(
-        `INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp)
-         VALUES ($1, $2, $3, 'PAYMENT_SUCCEEDED', $4, now())`,
-        [`log-${uuidv4()}`, userId, name.trim(), `Amount: $${paid.toFixed(2)}`]
-      );
-    }
   });
 
   const created = await findUserById(userId);
@@ -129,7 +123,9 @@ router.post('/provider', async (req, res) => {
     return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten() });
   }
 
-  const { provider, plan } = parsed.data;
+  const { provider, plan: requestedPlan } = parsed.data;
+  // Pro plans are disabled (coming soon). Force everyone to FREE.
+  const plan: 'free' = 'free';
   const email = `user@${provider}.com`;
 
   const existing = await findUserByEmail(email);
@@ -141,7 +137,7 @@ router.post('/provider', async (req, res) => {
 
   const userId = `u-${uuidv4()}`;
   const name = `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`;
-  const paid = plan === 'monthly' ? 1.0 : plan === 'yearly' ? 1.99 : 0.0;
+  const paid = 0.0;
 
   await withTransaction(async (client) => {
     await client.query(
@@ -153,16 +149,8 @@ router.post('/provider', async (req, res) => {
     await client.query(
       `INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp)
        VALUES ($1, $2, $3, 'USER_SIGNUP', $4, now())`,
-      [`log-${uuidv4()}`, userId, name, `via ${provider} (Plan: ${plan})`]
+      [`log-${uuidv4()}`, userId, name, `via ${provider} (Plan: ${plan})${requestedPlan !== 'free' ? ' (requested upgrade: coming soon)' : ''}`]
     );
-
-    if (plan !== 'free') {
-      await client.query(
-        `INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp)
-         VALUES ($1, $2, $3, 'PAYMENT_SUCCEEDED', $4, now())`,
-        [`log-${uuidv4()}`, userId, name, `Amount: $${paid.toFixed(2)}`]
-      );
-    }
   });
 
   const created = await findUserById(userId);
@@ -192,7 +180,13 @@ router.patch('/me/plan', authMiddleware, async (req: any, res) => {
   }
 
   const userId = req.user.userId as string;
-  const { plan } = parsed.data;
+  const { plan: requestedPlan } = parsed.data;
+
+  if (requestedPlan !== 'free') {
+    return res.status(409).json({ error: 'Pro plans are coming soon. Your account remains on the Free plan.' });
+  }
+
+  const plan: 'free' = 'free';
 
   const user = await findUserById(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -201,8 +195,8 @@ router.patch('/me/plan', authMiddleware, async (req: any, res) => {
     return res.json({ user: publicUser(user) });
   }
 
-  // Mock pricing (should be verified via payment provider)
-  const planPrice = plan === 'monthly' ? 1.0 : plan === 'yearly' ? 1.99 : 0.0;
+  // Pro plans are disabled.
+  const planPrice = 0.0;
 
   await withTransaction(async (client) => {
     await client.query(
@@ -300,14 +294,19 @@ router.patch('/users/:id/plan', authMiddleware, requireRole(['admin']), async (r
     return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten() });
   }
   const userId = req.params.id as string;
-  const { plan, amount } = parsed.data;
+  const { plan: requestedPlan } = parsed.data;
+
+  if (requestedPlan !== 'free') {
+    return res.status(409).json({ error: 'Pro plans are coming soon. Only the Free plan is available.' });
+  }
+
+  const plan: 'free' = 'free';
 
   const user = await findUserById(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const cleaned = amount.replace('$', '').replace(/ \/ .*/, '');
-  const charge = parseFloat(cleaned);
-  const toAdd = Number.isFinite(charge) ? charge : 0;
+  // Pro plans are disabled.
+  const toAdd = 0;
 
   await withTransaction(async (client) => {
     await client.query(

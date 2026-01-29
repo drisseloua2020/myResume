@@ -64,7 +64,9 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   };
 
   const handlePlanSelected = (plan: SubscriptionPlan) => {
-    setSelectedPlan(plan);
+    // Pro plans are disabled (coming soon). Force FREE.
+    if (plan !== SubscriptionPlan.FREE) return;
+    setSelectedPlan(SubscriptionPlan.FREE);
     setActiveModal('signup');
   };
 
@@ -414,11 +416,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                      Premium Templates
                   </li>
                 </ul>
-                <button 
-                  onClick={() => handlePlanSelected(SubscriptionPlan.MONTHLY)}
-                  className="w-full py-3 rounded-lg bg-[#1a91f0] text-white font-bold hover:bg-[#1170cd] shadow-lg transition-colors"
+                <button
+                  disabled
+                  className="w-full py-3 rounded-lg bg-slate-200 text-slate-500 font-bold cursor-not-allowed"
+                  title="Coming soon"
                 >
-                  Choose Monthly
+                  Coming soon
                 </button>
              </div>
 
@@ -446,11 +449,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                      Save 25% vs Monthly
                   </li>
                 </ul>
-                <button 
-                   onClick={() => handlePlanSelected(SubscriptionPlan.YEARLY)}
-                   className="w-full py-3 rounded-lg border-2 border-purple-500 text-purple-600 font-bold hover:bg-purple-50 transition-colors"
+                <button
+                   disabled
+                   className="w-full py-3 rounded-lg border-2 border-slate-300 text-slate-500 bg-slate-100 font-bold cursor-not-allowed"
+                   title="Coming soon"
                 >
-                  Choose Yearly
+                  Coming soon
                 </button>
              </div>
 
@@ -602,7 +606,8 @@ interface PricingModalProps {
 }
 
 const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) => {
-  const [selected, setSelected] = useState<SubscriptionPlan>(SubscriptionPlan.MONTHLY);
+  // Pro plans are disabled (coming soon). Default to FREE.
+  const [selected, setSelected] = useState<SubscriptionPlan>(SubscriptionPlan.FREE);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -642,10 +647,10 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
                 </div>
              </div>
 
-             {/* Monthly Plan */}
-             <div 
-               onClick={() => setSelected(SubscriptionPlan.MONTHLY)}
-               className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all bg-white ${selected === SubscriptionPlan.MONTHLY ? 'border-[#1a91f0] shadow-xl ring-1 ring-[#1a91f0] transform scale-105 z-10' : 'border-slate-200 hover:border-blue-300'}`}
+             {/* Monthly Plan (Coming soon) */}
+             <div
+               className="relative p-6 rounded-xl border-2 transition-all bg-white opacity-60 cursor-not-allowed border-slate-200"
+               title="Coming soon"
              >
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#1a91f0] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Most Popular</div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{PLAN_DETAILS[SubscriptionPlan.MONTHLY].name}</h3>
@@ -670,10 +675,10 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
                 </div>
              </div>
 
-             {/* Yearly Plan */}
-             <div 
-               onClick={() => setSelected(SubscriptionPlan.YEARLY)}
-               className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all bg-white ${selected === SubscriptionPlan.YEARLY ? 'border-purple-500 shadow-lg ring-1 ring-purple-500' : 'border-slate-200 hover:border-slate-300'}`}
+             {/* Yearly Plan (Coming soon) */}
+             <div
+               className="relative p-6 rounded-xl border-2 transition-all bg-white opacity-60 cursor-not-allowed border-slate-200"
+               title="Coming soon"
              >
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{PLAN_DETAILS[SubscriptionPlan.YEARLY].name}</h3>
                 <div className="text-3xl font-extrabold text-purple-600 mb-1">$9.00 <span className="text-sm font-medium text-slate-400">/ yr</span></div>
@@ -697,7 +702,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
         
         <div className="p-6 border-t border-slate-100 flex justify-end">
              <button 
-               onClick={() => onSelectPlan(selected)}
+               onClick={() => onSelectPlan(SubscriptionPlan.FREE)}
                className="bg-[#1a91f0] hover:bg-[#1170cd] text-white text-lg font-bold px-12 py-3 rounded-full shadow-md transition-transform transform hover:-translate-y-0.5"
              >
                Continue

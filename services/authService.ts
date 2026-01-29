@@ -4,18 +4,9 @@ import { api, setSession, clearSession, getCachedUser, getToken } from "./apiCli
 
 import { SubscriptionPlan, User } from "../types";
 
-function toBackendPlan(plan: any): "free" | "monthly" | "yearly" {
-  if (plan === "free" || plan === "monthly" || plan === "yearly") return plan;
-  switch (plan) {
-    case SubscriptionPlan.FREE:
-      return "free";
-    case SubscriptionPlan.MONTHLY:
-      return "monthly";
-    case SubscriptionPlan.YEARLY:
-      return "yearly";
-    default:
-      return "free";
-  }
+function toBackendPlan(_plan: any): "free" | "monthly" | "yearly" {
+  // Pro plans are disabled (coming soon). Force FREE.
+  return "free";
 }
 
 function fromBackendPlan(plan: any): SubscriptionPlan {
@@ -62,7 +53,7 @@ class AuthService {
   }
 
   async loginWithProvider(provider: Provider, plan?: SubscriptionPlan): Promise<User> {
-    const res = await api.post<{ token: string; user: User }>("/auth/provider", { provider, plan });
+    const res = await api.post<{ token: string; user: User }>("/auth/provider", { provider, plan: toBackendPlan(plan) });
     const user = normalizeUser(res.user);
     setSession(res.token, user);
     return user;

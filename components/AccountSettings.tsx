@@ -14,6 +14,13 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onPlanUpdate })
 
   const handlePlanChange = async (newPlan: SubscriptionPlan) => {
     if (newPlan === user.plan) return;
+
+    // Pro plans are disabled (coming soon). Only FREE is selectable.
+    if (newPlan !== SubscriptionPlan.FREE) {
+      setSuccessMsg('Pro plans are coming soon. You are on the Free plan.');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      return;
+    }
     
     setLoading(true);
     setSuccessMsg(null);
@@ -75,6 +82,7 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onPlanUpdate })
               <div className="space-y-3">
                 {(Object.keys(PLAN_DETAILS) as SubscriptionPlan[]).map(planKey => {
                    const isCurrent = user.plan === planKey;
+                   const isAvailable = (PLAN_DETAILS as any)[planKey]?.available !== false;
                    return (
                      <div 
                         key={planKey}
@@ -93,13 +101,16 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onPlanUpdate })
                         </div>
                         <div className="text-right">
                            <div className="text-sm font-bold text-slate-900">{PLAN_DETAILS[planKey].price}</div>
-                           {!isCurrent && (
+                           {!isCurrent && isAvailable && (
                              <button 
                                onClick={() => handlePlanChange(planKey)}
                                className="mt-1 text-xs text-blue-600 hover:underline font-medium"
                              >
                                Switch
                              </button>
+                           )}
+                           {!isCurrent && !isAvailable && (
+                             <div className="mt-1 text-xs text-slate-500 font-medium">Coming soon</div>
                            )}
                         </div>
                      </div>
