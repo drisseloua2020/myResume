@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { AppMode, UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, SkillItem, User, PersonalDetails } from '../types';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import LivePreview from './LivePreview';
+import { saveResume, updateResume } from '../services/resumeService';
 
 interface ResumeInputProps {
   onGenerate: (data: UserInputData, mode: AppMode) => void;
@@ -37,6 +38,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   
+  // Saved resume (library) state
+  const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
+  const [isSavingResume, setIsSavingResume] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+
   // Sync activeTab if initialTab changes (e.g. from parent navigation)
   useEffect(() => {
     setActiveTab(initialTab);
@@ -169,32 +175,114 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     window.print();
   };
 
-  const handleAction = (e: React.FormEvent) => {
+  const computeResumeTitle = (data: UserInputData) => {
+    const fn = (data.personalDetails?.firstName || '').trim();
+    const ln = (data.personalDetails?.lastName || '').trim();
+    const name = [fn, ln].filter(Boolean).join(' ').trim();
+    const rolePart = (data.targetRole || '').trim();
+    const raw = name && rolePart ? `${name} - ${rolePart}` : name ? `${name} Resume` : rolePart ? `Resume - ${rolePart}` : 'Resume';
+    return raw.slice(0, 200);
+  };
+
+  const resetToNewResume = () => {
+    // Reset ALL fields to a blank state (start from scratch with the selected template)
+    setTargetRole('');
+    setJobDescription('');
+    setPreferences({
+      pages: '1-page',
+      tone: 'modern',
+      region: 'US',
+      photo: false,
+    });
+
+    setPersonalDetails({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      country: '',
+      summary: '',
+    });
+
+    // Clear profile photo
+    setProfileImageData(undefined);
+    setProfilePhotoName(null);
+    if (profilePhotoRef.current) profilePhotoRef.current.value = '';
+
+    // Reset structured sections to blank starter items
+    setExperiences([{ id: '1', role: '', company: '', dates: '', description: '' }]);
+    setEducations([{ id: '1', degree: '', school: '', dates: '' }]);
+    setSkills([{ id: '1', category: '', items: '' }]);
+
+    // Clear import state (if any)
+    setCurrentResumeText('');
+    setFileData(undefined);
+    setFileName(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    // Clear save pointer so next save creates a new record
+    setSavedResumeId(null);
+    setSaveMsg(null);
+  };
+
+  const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const payload: UserInputData = { 
-        role, 
-        plan: userPlan, 
-        targetRole, 
-        jobDescription, 
-        preferences, 
-        profileImageData,
-        templateId: selectedTemplateId,
-        personalDetails
+
+    const payload: UserInputData = {
+      role,
+      plan: userPlan,
+      targetRole,
+      jobDescription,
+      preferences,
+      profileImageData,
+      templateId: selectedTemplateId,
+      personalDetails
     };
 
     if (activeTab === 'upload') {
-        // For Import tab, we default to "Import to Editor"
-        payload.currentResumeText = currentResumeText;
-        payload.fileData = fileData;
-        onImport(payload);
-    } else {
-        // For Create & Cover Letter tabs, we Generate
-        payload.experienceItems = experiences;
-        payload.educationItems = educations;
-        payload.skillItems = skills;
-        const mode = AppMode.CREATE_SCRATCH; 
-        onGenerate(payload, mode);
+      // For Import tab, we default to "Import to Editor"
+      payload.currentResumeText = currentResumeText;
+      payload.fileData = fileData;
+      onImport(payload);
+      return;
+    }
+
+    // For Create & Cover Letter tabs, include structured blocks
+    payload.experienceItems = experiences;
+    payload.educationItems = educations;
+    payload.skillItems = skills;
+
+    if (activeTab === 'cover_letter') {
+      const mode = AppMode.CREATE_SCRATCH;
+      onGenerate(payload, mode);
+      return;
+    }
+
+    // Create tab => Save Resume (JSON) to library
+    if (!selectedTemplateId) {
+      alert('Select a template first.');
+      return;
+    }
+
+    setIsSavingResume(true);
+    setSaveMsg(null);
+    try {
+      const title = computeResumeTitle(payload);
+      if (!savedResumeId) {
+        const res = await saveResume({ templateId: selectedTemplateId, title, content: payload });
+        setSavedResumeId(res.id);
+      } else {
+        await updateResume(savedResumeId, { templateId: selectedTemplateId, title, content: payload });
+      }
+      setSaveMsg('Saved');
+      window.setTimeout(() => setSaveMsg(null), 2500);
+    } catch (err: any) {
+      setSaveMsg(err?.message ? `Save failed: ${err.message}` : 'Save failed');
+    } finally {
+      setIsSavingResume(false);
     }
   };
 
@@ -551,24 +639,45 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
               </div>
           )}
 
-          {/* Action Button */}
-          <div className="pt-4 pb-20">
+          {/* Action Buttons */}
+          <div className="pt-4 pb-20 space-y-3">
              <button
                type="submit"
-               disabled={isLoading}
-               className={`w-full bg-slate-800 text-white text-lg font-bold px-12 py-4 rounded-lg shadow-lg transform transition hover:-translate-y-1 hover:shadow-xl flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-700'}`}
+               disabled={isLoading || isSavingResume}
+               className={`w-full bg-slate-800 text-white text-lg font-bold px-12 py-4 rounded-lg shadow-lg transform transition hover:-translate-y-1 hover:shadow-xl flex items-center justify-center gap-2 ${(isLoading || isSavingResume) ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-700'}`}
              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-               {isLoading ? 'Processing...' : (
-                   activeTab === 'upload' ? 'Import to Live Editor' : 
-                   activeTab === 'cover_letter' ? 'Generate Cover Letter' : 
-                   'AI Enhance & Tailor Resume'
+               {activeTab === 'create' ? (isSavingResume ? 'Saving...' : 'Save Resume') : (
+                 isLoading ? 'Processing...' : (
+                    activeTab === 'upload' ? 'Import to Live Editor' :
+                    activeTab === 'cover_letter' ? 'Generate Cover Letter' :
+                    'Save Resume'
+                 )
                )}
              </button>
+
+             {activeTab === 'create' && (
+               <button
+                 type="button"
+                 onClick={() => {
+                   if (confirm('Start a new resume? This will clear your current editor data.')) resetToNewResume();
+                 }}
+                 disabled={isLoading || isSavingResume}
+                 className={`w-full bg-white border border-slate-300 text-slate-800 text-lg font-bold px-12 py-4 rounded-lg shadow-sm transition hover:-translate-y-1 hover:shadow-md flex items-center justify-center gap-2 ${(isLoading || isSavingResume) ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-50'}`}
+               >
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m7-7H5" /></svg>
+                 New Resume
+               </button>
+             )}
+
+             {activeTab === 'create' && saveMsg && (
+               <div className="text-sm text-center text-slate-600">{saveMsg}</div>
+             )}
+
              <p className="text-xs text-center text-slate-400 mt-2">
-                {activeTab === 'upload' ? 'Extracts text and fills the editor so you can verify and customize.' : 
-                 activeTab === 'cover_letter' ? 'Create a tailored cover letter and cold email based on your resume.' : 
-                 'Use AI to fix grammar, improve impact, and tailor to job description.'}
+                {activeTab === 'upload' ? 'Extracts text and fills the editor so you can verify and customize.' :
+                 activeTab === 'cover_letter' ? 'Create a tailored cover letter and cold email based on your resume.' :
+                 'Saves your resume JSON to your library. Click Save again to update the same record.'}
              </p>
           </div>
 
