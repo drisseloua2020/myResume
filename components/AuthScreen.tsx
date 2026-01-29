@@ -207,7 +207,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                     <div className="w-[35%] bg-slate-900 text-white p-4 flex flex-col gap-4">
                         {/* Photo */}
                         <div className="w-20 h-20 mx-auto rounded-full border-2 border-slate-600 overflow-hidden bg-slate-800">
-                           <img src="../pictures/pic.png" alt="Profile" className="w-full h-full object-cover opacity-90" />
+                           <img src="pic.png" alt="Profile" className="w-full h-full object-cover opacity-90" />
                         </div>
 
                         {/* Contact */}
