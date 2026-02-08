@@ -101,7 +101,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                      <div className="w-10 h-10 bg-[#1a91f0] rounded-full flex items-center justify-center">
                         <span className="text-white font-bold text-lg">My</span>
                      </div>
-                     <span className="font-bold text-xl tracking-tight text-slate-800">Resume</span>
+                     <span className="font-bold text-xl tracking-tight text-slate-800">Resumes</span>
           </button>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
              <button onClick={() => navigateToSection('templates')} className="hover:text-[#1a91f0] transition-colors">Resume Templates</button>
@@ -534,7 +534,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           <div className="max-w-6xl mx-auto px-6">
              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
                 <div>
-                   <h4 className="font-bold text-white mb-4">MyResume</h4>
+                   <h4 className="font-bold text-white mb-4">MyResumes</h4>
                    <ul className="space-y-2 text-sm">
                       <li><a href="#" className="hover:text-white">Homepage</a></li>
                       <li><a href="#templates" className="hover:text-white">Resume Templates</a></li>

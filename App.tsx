@@ -20,6 +20,7 @@ import CareerBlogPage from './components/CareerBlogPage';
 import ResumeGuidePage from './components/ResumeGuidePage';
 import ResumeExamplesPage from './components/ResumeExamplesPage';
 import AgentReviewModal from './components/AgentReviewModal';
+import ConfirmNewResumeModal from './components/ConfirmNewResumeModal';
 import { generateResumeContent } from './services/geminiService';
 import { authService } from './services/authService';
 import { setSession } from './services/apiClient';
@@ -62,6 +63,8 @@ const App: React.FC = () => {
   // Agent State
   const [agentUpdates, setAgentUpdates] = useState<AgentUpdate[]>([]);
   const [showAgentModal, setShowAgentModal] = useState<boolean>(false);
+  const [showNewResumeConfirm, setShowNewResumeConfirm] = useState(false);
+  const [workspaceResetKey, setWorkspaceResetKey] = useState(0);
 
   // Check for existing session on load
   useEffect(() => {
@@ -399,15 +402,24 @@ const App: React.FC = () => {
             <div className="text-sm font-semibold text-slate-900">Sources</div>
             <div className="text-xs text-slate-600">Connect & sync LinkedIn, GitHub, and Universal sources.</div>
           </div>
-          <button
-            onClick={() => setActiveTab('profile_sync')}
-            className="px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800 text-sm"
-          >
-            Manage Sources
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNewResumeConfirm(true)}
+              className="px-3 py-2 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-sm font-semibold"
+            >
+              New Resume
+            </button>
+            <button
+              onClick={() => setActiveTab('profile_sync')}
+              className="px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800 text-sm"
+            >
+              Manage Sources
+            </button>
+          </div>
         </div>
 
         <ResumeInput 
+          key={`resume-input-${workspaceResetKey}`}
           onGenerate={handleGenerate} 
           onImport={handleImport}
           onTemplateChange={setSelectedTemplateId}
@@ -445,6 +457,21 @@ const App: React.FC = () => {
         )}
         {renderContent()}
       </main>
+
+      {/* New Resume Confirmation Modal */}
+      {showNewResumeConfirm && (
+        <ConfirmNewResumeModal
+          onCancel={() => setShowNewResumeConfirm(false)}
+          onConfirm={() => {
+            setShowNewResumeConfirm(false);
+            // Clear current editor data and start fresh
+            setResults(null);
+            setEditorData(null);
+            setGeneratorTab('create');
+            setWorkspaceResetKey((k) => k + 1);
+          }}
+        />
+      )}
 
       {/* Agent Review Modal */}
       {showAgentModal && (

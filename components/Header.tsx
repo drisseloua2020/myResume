@@ -37,9 +37,9 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
       <div className="flex items-center gap-8">
         <div onClick={() => setActiveTab(tabs[0].key)} className="flex items-center gap-2 cursor-pointer">
           <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center font-bold text-lg">
-            R
+            My
           </div>
-          <span className="font-bold text-xl tracking-tight">MyResume</span>
+          <span className="font-bold text-xl tracking-tight">Resumes</span>
         </div>
 
         <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">

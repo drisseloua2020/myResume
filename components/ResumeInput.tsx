@@ -106,14 +106,13 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
   // Mode B State (Structured)
   const [experiences, setExperiences] = useState<ExperienceItem[]>([
-    { id: '1', role: 'Product Manager', company: 'Tech Corp', dates: '2020 - Present', description: 'Led a team of 5 engineers to launch...' }
+    { id: '1', role: '', company: '', dates: '', description: '' }
   ]);
   const [educations, setEducations] = useState<EducationItem[]>([
-    { id: '1', degree: 'BS Computer Science', school: 'University of Tech', dates: '2016 - 2020' }
+    { id: '1', degree: '', school: '', dates: '' }
   ]);
   const [skills, setSkills] = useState<SkillItem[]>([
-    { id: '1', category: 'Technical Skills', items: 'React, TypeScript, Node.js, Python' },
-    { id: '2', category: 'Languages', items: 'English (Native), Spanish (B2)' }
+    { id: '1', category: '', items: '' }
   ]);
 
   const activeTemplate = AVAILABLE_TEMPLATES.find(t => t.id === selectedTemplateId);
