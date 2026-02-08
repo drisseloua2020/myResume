@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { AppMode, UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, SkillItem, User, PersonalDetails } from '../types';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import LivePreview from './LivePreview';
+import ConfirmNewResumeModal from './ConfirmNewResumeModal';
 import { saveResume, updateResume } from '../services/resumeService';
 
 interface ResumeInputProps {
@@ -35,6 +36,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [showNewResumeConfirm, setShowNewResumeConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   
@@ -658,9 +660,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              {activeTab === 'create' && (
                <button
                  type="button"
-                 onClick={() => {
-                   if (confirm('Start a new resume? This will clear your current editor data.')) resetToNewResume();
-                 }}
+                 onClick={() => setShowNewResumeConfirm(true)}
                  disabled={isLoading || isSavingResume}
                  className={`w-full bg-white border border-slate-300 text-slate-800 text-lg font-bold px-12 py-4 rounded-lg shadow-sm transition hover:-translate-y-1 hover:shadow-md flex items-center justify-center gap-2 ${(isLoading || isSavingResume) ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-50'}`}
                >
@@ -717,6 +717,15 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
             <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
          </div>
       </div>
+    {showNewResumeConfirm && (
+      <ConfirmNewResumeModal
+        onCancel={() => setShowNewResumeConfirm(false)}
+        onConfirm={() => {
+          setShowNewResumeConfirm(false);
+          resetToNewResume();
+        }}
+      />
+    )}
 
     </div>
   );
