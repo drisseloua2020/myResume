@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import { deleteResume, getResume, listResumes, ResumeListItem } from '../services/resumeService';
+import ConfirmDeleteResumeModal from './ConfirmDeleteResumeModal';
 
 function templateName(id: string) {
   return AVAILABLE_TEMPLATES.find((t) => t.id === id)?.name || id;
@@ -10,6 +11,9 @@ export default function ResumeLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ResumeListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const itemsWithTemplate = useMemo(() => {
     return items.map((i) => ({ ...i, templateName: templateName(i.templateId) }));
@@ -51,12 +55,20 @@ export default function ResumeLibraryPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this saved resume?')) return;
+    setDeleteConfirmId(id);
+  }
+
+  async function confirmDelete() {
+    if (!deleteConfirmId) return;
+    setIsDeleting(true);
     try {
-      await deleteResume(id);
+      await deleteResume(deleteConfirmId);
       await refresh();
     } catch (e: any) {
       alert(e?.message || 'Delete failed');
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmId(null);
     }
   }
 
@@ -119,6 +131,16 @@ export default function ResumeLibraryPage() {
           ))}
         </div>
       )}
+    {deleteConfirmId && (
+      <ConfirmDeleteResumeModal
+        loading={isDeleting}
+        onCancel={() => {
+          if (!isDeleting) setDeleteConfirmId(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+    )}
+
     </div>
   );
 }
