@@ -23,7 +23,7 @@ import AgentReviewModal from './components/AgentReviewModal';
 import ConfirmNewResumeModal from './components/ConfirmNewResumeModal';
 import { generateResumeContent } from './services/geminiService';
 import { authService } from './services/authService';
-import { setSession } from './services/apiClient';
+import { setSession, clearSession, SESSION_EXPIRED_EVENT } from './services/apiClient';
 import { agentService } from './services/agentService';
 import { saveDraft, getLatestDraft } from './services/resumeService';
 import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, PersonalDetails } from './types';
@@ -39,6 +39,36 @@ const App: React.FC = () => {
 
   // State to hold imported data for the editor
   const [editorData, setEditorData] = useState<Partial<UserInputData> | null>(null);
+
+
+  // Global handler: if API returns 401, disconnect user and return to home page.
+  useEffect(() => {
+    const onSessionExpired = () => {
+      // Avoid calling backend logout here (token is invalid/expired). Just clear local state.
+      try {
+        clearSession();
+      } catch {
+        // ignore
+      }
+      setError(null);
+      setResults(null);
+      setEditorData(null);
+      setSelectedTemplateId(undefined);
+      setAgentUpdates([]);
+      setShowAgentModal(false);
+      setShowNewResumeConfirm(false);
+      setGeneratorTab('create');
+      setActiveTab('workspace');
+      // Force editor remount next time user logs in
+      setWorkspaceResetKey((k) => k + 1);
+      setCurrentUser(null);
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired as any);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired as any);
+    };
+  }, []);
 
   // Load latest draft when opening the WorkSpace
   useEffect(() => {

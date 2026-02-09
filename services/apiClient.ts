@@ -1,5 +1,7 @@
 export const API_URL = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:3000";
 
+export const SESSION_EXPIRED_EVENT = "rf:session-expired";
+
 const TOKEN_KEY = "rf_token";
 const SESSION_KEY = "rf_session";
 
@@ -45,10 +47,22 @@ async function request<T>(
     headers,
   });
 
+  if (res.status === 401) {
+    // Token expired or invalid. Clear local session and notify the app so it can redirect.
+    try {
+      clearSession();
+    } catch {
+      // ignore
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    }
+  }
+
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const message = data?.error || `Request failed (${res.status})`;
+    const message = res.status === 401 ? "Session expired. Please log in again." : (data?.error || `Request failed (${res.status})`);
     throw new Error(message);
   }
 
