@@ -853,10 +853,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSw
               {isLogin ? "Sign up" : "Log in"}
             </button>
           </div>
-          
-           <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-             <p className="text-xs text-slate-400">Demo Credentials: user@example.com / password</p>
-           </div>
+
         </div>
       </div>
     </div>

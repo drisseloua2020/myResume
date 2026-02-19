@@ -26,7 +26,7 @@ for (const k of required) {
 app.use(helmet());
 
 // Allow local dev frontend (Vite) + configurable origins for prod.
-const defaultOrigins = ['http://localhost:4000', 'http://127.0.0.1:4000'];
+const defaultOrigins = ['http://localhost:4000', 'http://127.0.0.1:4000', 'https://cute-cobbler-e30874.netlify.app', 'http://myresumes.net'];
 const extra = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(s => s.trim())

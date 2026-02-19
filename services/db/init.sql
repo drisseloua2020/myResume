@@ -53,8 +53,8 @@ CREATE TABLE agent_updates (
 -- Seed users (NOTE: password_hash contains legacy plaintext 'password' to allow first login; it will be upgraded to argon2 on first successful login)
 INSERT INTO users (id, name, email, password_hash, role, plan, status, paid_amount, auth_provider, created_at, updated_at)
 VALUES
-  ('1', 'Admin User', 'admin@resumeforge.com', 'password', 'admin', 'yearly', 'Active', 0.00, 'email', '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z'),
-  ('2', 'Demo User',  'user@example.com',     'password', 'user',  'free',   'Active', 0.00, 'email', '2024-01-02T00:00:00Z', '2024-01-02T00:00:00Z');
+  ('1', 'Admin User', 'admin@resumeforge.com', '$argon2id$v=19$m=19456,t=2,p=1$MmFjMTc4MWUzNTZhODAzYWMxYmEyMTQ1NmY4NmMyZjA$O/42b/OY3SOT01b81XB3nBrqkwcmF1vC7XadXiRAg24', 'admin', 'yearly', 'Active', 0.00, 'email', '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z'),
+  ('2', 'Demo User',  'user@example.com',     '$argon2id$v=19$m=19456,t=2,p=1$MmFjMTc4MWUzNTZhODAzYWMxYmEyMTQ1NmY4NmMyZjA$O/42b/OY3SOT01b81XB3nBrqkwcmF1vC7XadXiRAg24', 'user',  'free',   'Active', 0.00, 'email', '2024-01-02T00:00:00Z', '2024-01-02T00:00:00Z');
 
 INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp)
 VALUES
