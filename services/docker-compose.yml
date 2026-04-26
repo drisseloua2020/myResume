@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: resume-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://adminos:AA1aXFiC5zi1txeU6w7BDHDCbexWmVA2@dpg-d7grbljbc2fs738kj5r0-a/myresumes
+      PORT: 8000
+    depends_on:
+      - db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  db:
+    image: postgres:16
+    container_name: resume-db
+    environment:
+      POSTGRES_DB: myresumes
+      POSTGRES_USER: adminos
+      POSTGRES_PASSWORD: AA1aXFiC5zi1txeU6w7BDHDCbexWmVA2
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

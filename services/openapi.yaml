@@ -1,0 +1,69 @@
+openapi: 3.0.3
+info:
+  title: ResumeForge API (Refactored)
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /auth/login:
+    post:
+      summary: Login with email/password
+      responses:
+        '200': { description: OK }
+  /auth/signup:
+    post:
+      summary: Signup with email/password
+      responses:
+        '201': { description: Created }
+  /auth/provider:
+    post:
+      summary: Mock SSO login/signup
+      responses:
+        '200': { description: OK }
+        '201': { description: Created }
+  /auth/me:
+    get:
+      summary: Current user
+      responses:
+        '200': { description: OK }
+  /auth/users:
+    get:
+      summary: List users (admin)
+      responses:
+        '200': { description: OK }
+  /auth/logs:
+    get:
+      summary: List activity logs (admin)
+      responses:
+        '200': { description: OK }
+  /auth/users/{id}/plan:
+    patch:
+      summary: Update user plan (admin)
+      responses:
+        '200': { description: OK }
+  /agent/sources:
+    get:
+      summary: Get connected sources
+      responses:
+        '200': { description: OK }
+  /agent/sources/{id}/toggle:
+    post:
+      summary: Toggle a source connection
+      responses:
+        '200': { description: OK }
+  /agent/check:
+    post:
+      summary: Check for agent updates (mock)
+      responses:
+        '200': { description: OK }
+  /agent/updates:
+    get:
+      summary: List agent updates
+      responses:
+        '200': { description: OK }
