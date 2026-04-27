@@ -4,10 +4,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import settings
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 _ENGINE: Engine | None = None
 _SESSION_FACTORY: sessionmaker[Session] | None = None
 
+def _normalize_database_url(database_url: str) -> str:
+    # Render/Heroku often provide postgres:// or postgresql://
+    if database_url.startswith("postgres://"):
+        return "postgresql+psycopg://" + database_url[len("postgres://"):]
+    if database_url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + database_url[len("postgresql://"):]
+    return database_url
+
 def _build_engine(database_url: str) -> Engine:
+    database_url = _normalize_database_url(database_url)
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     return create_engine(database_url, pool_pre_ping=True, future=True, connect_args=connect_args)
 
