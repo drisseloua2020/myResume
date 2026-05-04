@@ -118,7 +118,7 @@ jobs:
       - name: SCA - Python dependency audit
         run: |
           cd services
-          pip-audit -r requirements.txt
+          python -m pip_audit -r requirements.txt
 
       - name: SCA - npm dependency audit
         run: |
