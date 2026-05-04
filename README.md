@@ -15,7 +15,6 @@ It consists of:
 ##  Architecture
 
 [ React UI ]  --->  [ FastAPI Backend ]  --->  [ PostgreSQL ]
-
 ---
 
 ##  Project Structure
