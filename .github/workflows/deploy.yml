@@ -4,6 +4,9 @@ on:
   push:
     branches: [main, stage]
 
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -17,34 +20,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: services/requirements.txt
 
       - name: Install backend deps
         run: |
           cd services
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
-      - name: Run backend tests
+      - name: Run backend API E2E tests
         run: |
           cd services
-          pytest || echo "No tests yet"
-
-      # ---------- Frontend ----------
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-
-      - name: Build UI
-        run: |
-          cd ui
-          npm install
-          npm run build
-
-      - name: Deploy Backend to Render
-        run: curl -X POST ${{ secrets.RENDER_API_DEPLOY_HOOK }}
-
-      - name: Deploy UI to Render
-        run: curl -X POST ${{ secrets.RENDER_UI_DEPLOY_HOOK }}
+          python -m pytest
 
       # ---------- Frontend ----------
       - name: Setup Node
@@ -59,7 +46,7 @@ jobs:
           cd ui
           npm ci
 
-      - name: Run UI tests
+      - name: Run UI unit tests
         run: |
           cd ui
           npm test
@@ -68,3 +55,10 @@ jobs:
         run: |
           cd ui
           npm run build
+
+      # ---------- Deploy ----------
+      - name: Deploy Backend to Render
+        run: curl -X POST ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+
+      - name: Deploy UI to Render
+        run: curl -X POST ${{ secrets.RENDER_UI_DEPLOY_HOOK }}
