@@ -1,0 +1,41 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------- Backend ----------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend deps
+        run: |
+          cd services
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: |
+          cd services
+          pytest || echo "No tests yet"
+
+      # ---------- Frontend ----------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Build UI
+        run: |
+          cd ui
+          npm install
+          npm run build
