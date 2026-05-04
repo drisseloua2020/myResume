@@ -39,3 +39,9 @@ jobs:
           cd ui
           npm install
           npm run build
+
+      - name: Deploy Backend to Render
+        run: curl -X POST ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+
+      - name: Deploy UI to Render
+        run: curl -X POST ${{ secrets.RENDER_UI_DEPLOY_HOOK }}
