@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-flash-preview"
     gemini_temperature: float = 0.4
-    cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000")
+    cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000,https://myresume-rrcy.onrender.com")
     smtp_host: str = ""
     smtp_port: int | None = None
     smtp_secure: bool = False
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     smtp_from: str = "myresume_team@myresume.ai"
     @property
     def allowed_origins(self) -> list[str]:
-        defaults = ["http://localhost:4000", "http://127.0.0.1:4000"]
+        defaults = ["http://localhost:4000", "http://127.0.0.1:4000", "https://myresume-rrcy.onrender.com"]
         extras = [item.strip() for item in self.cors_origins.split(",") if item.strip()]
         seen: list[str] = []
         for origin in defaults + extras:
