@@ -70,3 +70,5 @@ VITE_API_URL=https://your-backend-url
 
 ##  Summary
 Modern full-stack app ready for cloud deployment and scaling.
+
+
