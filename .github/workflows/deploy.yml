@@ -8,14 +8,30 @@ permissions:
   contents: read
 
 jobs:
-  build-test:
+  setup:
+    name: Setup
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---------- Backend ----------
+      - name: Verify project layout
+        run: |
+          test -f services/requirements.txt
+          test -f services/pytest.ini
+          test -f ui/package.json
+          test -f ui/package-lock.json
+
+  backend-e2e-test:
+    name: Backend E2E Test
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -33,7 +49,15 @@ jobs:
           cd services
           python -m pytest
 
-      # ---------- Frontend ----------
+  ui-test:
+    name: UI Test
+    runs-on: ubuntu-latest
+    needs: backend-e2e-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -56,7 +80,12 @@ jobs:
           cd ui
           npm run build
 
-      # ---------- Deploy ----------
+  deployment:
+    name: Deployment
+    runs-on: ubuntu-latest
+    needs: ui-test
+
+    steps:
       - name: Deploy Backend to Render
         run: curl -X POST ${{ secrets.RENDER_API_DEPLOY_HOOK }}
 
