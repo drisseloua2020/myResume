@@ -336,26 +336,26 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       
       {/* --- LEFT COLUMN: EDITOR FORM --- */}
       <div className="w-full lg:w-5/12 xl:w-[450px] 2xl:w-[500px] flex-shrink-0 no-print">
-        <div className="flex justify-between items-center mb-6 relative">
-          <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 inline-flex overflow-x-auto max-w-full">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-10 relative">
+          <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 flex overflow-x-auto w-full sm:flex-1">
              <button
                type="button"
                onClick={() => setActiveTab('create')}
-               className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'create' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+               className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-center ${activeTab === 'create' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
              >
                Live Editor
              </button>
              <button
                type="button"
                onClick={() => setActiveTab('upload')}
-               className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${activeTab === 'upload' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+               className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-center ${activeTab === 'upload' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
              >
                Import PDF
              </button>
              <button
                type="button"
                onClick={() => setActiveTab('cover_letter')}
-               className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex items-center gap-1 ${activeTab === 'cover_letter' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+               className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex items-center justify-center gap-1 text-center ${activeTab === 'cover_letter' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
              >
                <span>Cover Letter</span>
              </button>
@@ -404,7 +404,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleAction} className="space-y-6">
+        <form onSubmit={handleAction} className="space-y-6 pt-2">
           
           {/* Target Role - Always visible */}
           <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
