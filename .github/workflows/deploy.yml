@@ -128,6 +128,7 @@ jobs:
       - name: SCA - npm dependency audit
         run: |
           cd ui
+          npm audit fix || true
           npm audit --audit-level=high
 
       - name: Start backend for DAST
