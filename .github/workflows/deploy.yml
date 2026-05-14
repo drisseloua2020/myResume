@@ -202,6 +202,8 @@ jobs:
           push: true
           tags: ${{ steps.api-meta.outputs.tags }}
           labels: ${{ steps.api-meta.outputs.labels }}
+          sbom: true
+          provenance: mode=max
 
       - name: UI image metadata
         id: ui-meta
@@ -223,6 +225,8 @@ jobs:
           push: true
           tags: ${{ steps.ui-meta.outputs.tags }}
           labels: ${{ steps.ui-meta.outputs.labels }}
+          sbom: true
+          provenance: mode=max
 
       - name: Published image tags
         run: |
