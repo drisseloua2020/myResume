@@ -240,6 +240,7 @@ const App: React.FC = () => {
           city: city,
           state: state,
           country: '',
+          postalCode: '',
           summary: json.summary || ''
       };
 

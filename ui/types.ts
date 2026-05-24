@@ -75,6 +75,7 @@ export interface PersonalDetails {
   city: string;
   state: string;
   country: string;
+  postalCode: string;
   summary: string;
 }
 

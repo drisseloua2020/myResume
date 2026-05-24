@@ -15,6 +15,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
       personalDetails?.address, 
       personalDetails?.city, 
       personalDetails?.state,
+      personalDetails?.postalCode,
       personalDetails?.country
   ].filter(Boolean).join(', ');
 
