@@ -336,8 +336,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       
       {/* --- LEFT COLUMN: EDITOR FORM --- */}
       <div className="w-full lg:w-5/12 xl:w-[450px] 2xl:w-[500px] flex-shrink-0 no-print">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-10 relative">
-          <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 flex overflow-x-auto w-full sm:flex-1">
+        <div className="w-full max-w-full min-w-0 flex flex-col sm:flex-row sm:flex-wrap xl:flex-nowrap sm:justify-between sm:items-stretch gap-3 mb-10 relative">
+          <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 flex overflow-x-auto w-full min-w-0 sm:flex-[1_1_28rem]">
              <button
                type="button"
                onClick={() => setActiveTab('create')}
@@ -361,7 +361,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              </button>
           </div>
 
-          <div className="relative z-20">
+          <div className="relative z-20 w-full sm:w-auto sm:flex-shrink-0">
              <button 
                 type="button"
                 onClick={() => setShowTemplateSelector(!showTemplateSelector)}
