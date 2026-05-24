@@ -1,5 +1,6 @@
 from __future__ import annotations
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +21,13 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_pass: str = ""
     smtp_from: str = "myresume_team@myresume.ai"
+    upload_dir: str = "uploads"
+    upload_url_prefix: str = "/uploads"
+    max_profile_photo_bytes: int = 5 * 1024 * 1024
+    @property
+    def upload_root(self) -> Path:
+        path = Path(self.upload_dir)
+        return path if path.is_absolute() else Path.cwd() / path
     @property
     def allowed_origins(self) -> list[str]:
         defaults = ["http://localhost:4000", "http://127.0.0.1:4000", "https://myresume-rrcy.onrender.com"]

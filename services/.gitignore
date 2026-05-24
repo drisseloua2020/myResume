@@ -7,3 +7,13 @@
 .terraform/
 *.exe
 terraform.tfstate*
+
+# Python/test runtime artifacts.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+test.db
+pytest-cache-files-*/
+
+# User-uploaded files are runtime artifacts.
+uploads/

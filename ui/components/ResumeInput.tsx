@@ -5,6 +5,8 @@ import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
 import { saveResume, updateResume } from '../services/resumeService';
 import { locationService } from '../services/locationService';
+import { apiAssetUrl } from '../services/apiClient';
+import { uploadProfilePhoto } from '../services/uploadService';
 
 interface ResumeInputProps {
   onGenerate: (data: UserInputData, mode: AppMode) => void;
@@ -95,6 +97,9 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              ...prefilledData.personalDetails
          }));
       }
+      if (prefilledData.profileImageUrl) setProfileImageUrl(prefilledData.profileImageUrl);
+      if (prefilledData.profileImageName) setProfilePhotoName(prefilledData.profileImageName);
+      if (prefilledData.profileImageData) setLegacyProfileImageData(prefilledData.profileImageData);
     }
   }, [prefilledData]);
   
@@ -114,8 +119,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const [fileName, setFileName] = useState<string | null>(null);
 
   // Profile Photo State
-  const [profileImageData, setProfileImageData] = useState<{ mimeType: string, data: string } | undefined>(undefined);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | undefined>(undefined);
+  const [legacyProfileImageData, setLegacyProfileImageData] = useState<{ mimeType: string, data: string } | undefined>(undefined);
   const [profilePhotoName, setProfilePhotoName] = useState<string | null>(null);
+  const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
+  const [profilePhotoError, setProfilePhotoError] = useState<string | null>(null);
 
   // Mode B State (Structured)
   const [experiences, setExperiences] = useState<ExperienceItem[]>([
@@ -231,7 +239,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     }
   };
 
-  const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/heic'];
@@ -239,12 +247,20 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
         alert("Please upload a valid image file.");
         return;
       }
-      setProfilePhotoName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImageData({ mimeType: file.type, data: (reader.result as string).split(',')[1] });
-      };
-      reader.readAsDataURL(file);
+
+      setProfilePhotoError(null);
+      setIsUploadingProfilePhoto(true);
+      try {
+        const uploaded = await uploadProfilePhoto(file);
+        setProfileImageUrl(uploaded.url);
+        setLegacyProfileImageData(undefined);
+        setProfilePhotoName(file.name || uploaded.filename);
+      } catch (err: any) {
+        setProfilePhotoError(err?.message || 'Failed to upload photo.');
+        if (profilePhotoRef.current) profilePhotoRef.current.value = '';
+      } finally {
+        setIsUploadingProfilePhoto(false);
+      }
     }
   };
 
@@ -314,8 +330,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     });
 
     // Clear profile photo
-    setProfileImageData(undefined);
+    setProfileImageUrl(undefined);
+    setLegacyProfileImageData(undefined);
     setProfilePhotoName(null);
+    setProfilePhotoError(null);
+    setIsUploadingProfilePhoto(false);
     if (profilePhotoRef.current) profilePhotoRef.current.value = '';
 
     // Reset structured sections to blank starter items
@@ -372,7 +391,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       if (!hasText(personalDetails[field])) missing.push(label);
     });
 
-    if (preferences?.photo && !profileImageData) {
+    if (preferences?.photo && !profileImageUrl && !legacyProfileImageData) {
       missing.push('Profile photo');
     }
 
@@ -429,7 +448,9 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       targetRole,
       jobDescription,
       preferences,
-      profileImageData,
+      profileImageUrl,
+      profileImageName: profilePhotoName || undefined,
+      profileImageData: legacyProfileImageData,
       templateId: selectedTemplateId,
       personalDetails
     };
@@ -485,12 +506,19 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     targetRole,
     jobDescription,
     preferences,
-    profileImageData,
+    profileImageUrl,
+    profileImageName: profilePhotoName || undefined,
+    profileImageData: legacyProfileImageData,
     personalDetails,
     experienceItems: experiences,
     educationItems: educations,
     skillItems: skills
   };
+  const profilePhotoSrc = apiAssetUrl(profileImageUrl) || (
+    legacyProfileImageData
+      ? `data:${legacyProfileImageData.mimeType};base64,${legacyProfileImageData.data}`
+      : undefined
+  );
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
@@ -515,7 +543,9 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     targetRole,
     jobDescription,
     preferences,
-    profileImageData,
+    profileImageUrl,
+    profilePhotoName,
+    legacyProfileImageData,
     personalDetails,
     experiences,
     educations,
@@ -649,8 +679,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                       <div className="flex items-center gap-6 mb-2">
                           <div className="flex-shrink-0">
                              <div className="w-20 h-20 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden relative">
-                                {profileImageData ? (
-                                  <img src={`data:${profileImageData.mimeType};base64,${profileImageData.data}`} className="w-full h-full object-cover" alt="Profile" />
+                                {profilePhotoSrc ? (
+                                  <img src={profilePhotoSrc} className="w-full h-full object-cover" alt="Profile" />
                                 ) : (
                                   <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                 )}
@@ -658,9 +688,15 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                           </div>
                           <div>
                               <input type="file" ref={profilePhotoRef} onChange={handleProfilePhotoUpload} className="hidden" accept="image/*"/>
-                              <button type="button" onClick={() => profilePhotoRef.current?.click()} className="text-[#1a91f0] font-medium text-sm hover:underline">
-                                  {profileImageData ? 'Change Photo' : 'Upload Photo'}
+                              <button type="button" onClick={() => profilePhotoRef.current?.click()} disabled={isUploadingProfilePhoto} className="text-[#1a91f0] font-medium text-sm hover:underline disabled:text-slate-400 disabled:no-underline">
+                                  {isUploadingProfilePhoto ? 'Uploading...' : profilePhotoSrc ? 'Change Photo' : 'Upload Photo'}
                               </button>
+                              {profilePhotoName && (
+                                <div className="text-xs text-slate-400 mt-1 truncate max-w-[180px]">{profilePhotoName}</div>
+                              )}
+                              {profilePhotoError && (
+                                <div className="text-xs text-red-500 mt-1 max-w-[220px]">{profilePhotoError}</div>
+                              )}
                               <div className="mt-2 flex items-center gap-2">
                                  <input 
                                     type="checkbox" 

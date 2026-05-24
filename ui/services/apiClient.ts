@@ -9,6 +9,14 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+export function apiAssetUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
+  const baseUrl = API_URL.replace(/\/$/, "");
+  const assetPath = url.startsWith("/") ? url : `/${url}`;
+  return `${baseUrl}${assetPath}`;
+}
+
 export function setSession(token: string, user: any) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
@@ -34,9 +42,10 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken();
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
 
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers as any),
   };
 
@@ -73,6 +82,8 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: any) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body ?? {}) }),
+  postForm: <T>(path: string, body: FormData) =>
+    request<T>(path, { method: "POST", body }),
   put: <T>(path: string, body?: any) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body ?? {}) }),
   patch: <T>(path: string, body?: any) =>

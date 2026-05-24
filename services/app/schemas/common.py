@@ -6,3 +6,8 @@ class IdResponse(StrictModel):
     id: str
 class HealthResponse(StrictModel):
     status: str
+class UploadResponse(StrictModel):
+    url: str
+    filename: str
+    contentType: str
+    size: int
