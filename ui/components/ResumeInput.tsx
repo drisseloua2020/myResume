@@ -4,6 +4,7 @@ import { AVAILABLE_TEMPLATES } from '../constants';
 import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
 import { saveResume, updateResume } from '../services/resumeService';
+import { locationService } from '../services/locationService';
 
 interface ResumeInputProps {
   onGenerate: (data: UserInputData, mode: AppMode) => void;
@@ -37,6 +38,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showNewResumeConfirm, setShowNewResumeConfirm] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   
@@ -44,6 +46,14 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
   const [isSavingResume, setIsSavingResume] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [validationMsg, setValidationMsg] = useState<string | null>(null);
+  const [countries, setCountries] = useState<string[]>([]);
+  const [states, setStates] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [loadingCountries, setLoadingCountries] = useState(false);
+  const [loadingStates, setLoadingStates] = useState(false);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Sync activeTab if initialTab changes (e.g. from parent navigation)
   useEffect(() => {
@@ -66,6 +76,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       city: '',
       state: '',
       country: '',
+      postalCode: '',
       summary: ''
     };
   });
@@ -119,6 +130,88 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
   const activeTemplate = AVAILABLE_TEMPLATES.find(t => t.id === selectedTemplateId);
 
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        setLoadingCountries(true);
+        setLocationError(null);
+        const list = await locationService.getCountries();
+        if (alive) setCountries(list);
+      } catch {
+        if (alive) {
+          setCountries([]);
+          setLocationError('Location suggestions are unavailable. You can still enter them manually.');
+        }
+      } finally {
+        if (alive) setLoadingCountries(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const country = personalDetails.country.trim();
+    setStates([]);
+    setCities([]);
+
+    if (!country) {
+      return () => {
+        alive = false;
+      };
+    }
+
+    (async () => {
+      try {
+        setLoadingStates(true);
+        const list = await locationService.getStates(country);
+        if (alive) setStates(list);
+      } catch {
+        if (alive) setStates([]);
+      } finally {
+        if (alive) setLoadingStates(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [personalDetails.country]);
+
+  useEffect(() => {
+    let alive = true;
+    const country = personalDetails.country.trim();
+    const state = personalDetails.state.trim();
+    setCities([]);
+
+    if (!country || !state) {
+      return () => {
+        alive = false;
+      };
+    }
+
+    (async () => {
+      try {
+        setLoadingCities(true);
+        const list = await locationService.getCities(country, state);
+        if (alive) setCities(list);
+      } catch {
+        if (alive) setCities([]);
+      } finally {
+        if (alive) setLoadingCities(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [personalDetails.country, personalDetails.state]);
+
   // Handlers
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,7 +262,18 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const updateSkill = (id: string, field: keyof SkillItem, value: string) => setSkills(skills.map(i => i.id === id ? { ...i, [field]: value } : i));
 
   const updatePersonalDetails = (field: keyof PersonalDetails, value: string) => {
-    setPersonalDetails(prev => ({ ...prev, [field]: value }));
+    setPersonalDetails(prev => {
+      if (field === 'country') {
+        return { ...prev, country: value, state: '', city: '', postalCode: '' };
+      }
+
+      if (field === 'state') {
+        return { ...prev, state: value, city: '' };
+      }
+
+      return { ...prev, [field]: value };
+    });
+    setValidationMsg(null);
   };
 
   const handlePrint = () => {
@@ -205,6 +309,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       city: '',
       state: '',
       country: '',
+      postalCode: '',
       summary: '',
     });
 
@@ -229,8 +334,94 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     setSaveMsg(null);
   };
 
+  const hasText = (value?: string | null) => Boolean(value && value.trim().length > 0);
+
+  const getMissingRequiredFields = () => {
+    const missing: string[] = [];
+
+    if (!hasText(targetRole)) missing.push('Target role');
+
+    if (activeTab === 'upload') {
+      if (!fileData && !hasText(currentResumeText)) {
+        missing.push('Resume PDF or pasted resume text');
+      }
+      return missing;
+    }
+
+    if (activeTab === 'cover_letter') {
+      if (!hasText(jobDescription)) missing.push('Target job description');
+      return missing;
+    }
+
+    if (!selectedTemplateId) missing.push('Template');
+
+    const requiredDetails: Array<[keyof PersonalDetails, string]> = [
+      ['firstName', 'First name'],
+      ['lastName', 'Last name'],
+      ['email', 'Email'],
+      ['phone', 'Phone'],
+      ['address', 'Street address'],
+      ['country', 'Country'],
+      ['state', 'State / region'],
+      ['city', 'City'],
+      ['postalCode', 'Zip / postal code'],
+      ['summary', 'Professional summary'],
+    ];
+
+    requiredDetails.forEach(([field, label]) => {
+      if (!hasText(personalDetails[field])) missing.push(label);
+    });
+
+    if (preferences?.photo && !profileImageData) {
+      missing.push('Profile photo');
+    }
+
+    experiences.forEach((exp, index) => {
+      const prefix = `Employment ${index + 1}`;
+      if (!hasText(exp.role)) missing.push(`${prefix} job title`);
+      if (!hasText(exp.company)) missing.push(`${prefix} employer`);
+      if (!hasText(exp.dates)) missing.push(`${prefix} dates`);
+      if (!hasText(exp.description)) missing.push(`${prefix} description`);
+    });
+
+    educations.forEach((edu, index) => {
+      const prefix = `Education ${index + 1}`;
+      if (!hasText(edu.school)) missing.push(`${prefix} school`);
+      if (!hasText(edu.degree)) missing.push(`${prefix} degree`);
+      if (!hasText(edu.dates)) missing.push(`${prefix} dates`);
+    });
+
+    skills.forEach((skill, index) => {
+      const prefix = `Skill ${index + 1}`;
+      if (!hasText(skill.category)) missing.push(`${prefix} category`);
+      if (!hasText(skill.items)) missing.push(`${prefix} items`);
+    });
+
+    return missing;
+  };
+
+  const validateRequiredFields = () => {
+    setValidationMsg(null);
+
+    if (formRef.current && !formRef.current.reportValidity()) {
+      return false;
+    }
+
+    const missing = getMissingRequiredFields();
+    if (missing.length === 0) return true;
+
+    const visibleMissing = missing.slice(0, 6).join(', ');
+    const suffix = missing.length > 6 ? ` and ${missing.length - 6} more` : '';
+    setValidationMsg(`Please complete required fields: ${visibleMissing}${suffix}.`);
+    return false;
+  };
+
   const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateRequiredFields()) {
+      return;
+    }
 
     const payload: UserInputData = {
       role,
@@ -404,7 +595,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleAction} className="space-y-6 pt-2">
+        <form ref={formRef} onSubmit={handleAction} className="space-y-6 pt-2">
           
           {/* Target Role - Always visible */}
           <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
@@ -415,6 +606,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                 placeholder="e.g. Senior Product Designer"
                 value={targetRole}
                 onChange={e => setTargetRole(e.target.value)}
+                required
              />
           </div>
 
@@ -442,6 +634,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                     value={currentResumeText}
                     onChange={e => setCurrentResumeText(e.target.value)}
                     disabled={!!fileName}
+                    required={!fileName && !fileData}
                  />
                </div>
              </div>
@@ -484,44 +677,100 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                              <label className="text-[10px] font-bold text-slate-500 uppercase">First Name</label>
-                             <input value={personalDetails.firstName} onChange={e => updatePersonalDetails('firstName', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm font-medium" placeholder="First Name" />
+                             <input value={personalDetails.firstName} onChange={e => updatePersonalDetails('firstName', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm font-medium" placeholder="First Name" autoComplete="given-name" required />
                           </div>
                           <div>
                              <label className="text-[10px] font-bold text-slate-500 uppercase">Last Name</label>
-                             <input value={personalDetails.lastName} onChange={e => updatePersonalDetails('lastName', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm font-medium" placeholder="Last Name" />
+                             <input value={personalDetails.lastName} onChange={e => updatePersonalDetails('lastName', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm font-medium" placeholder="Last Name" autoComplete="family-name" required />
                           </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Email</label>
-                            <input value={personalDetails.email} onChange={e => updatePersonalDetails('email', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="email@example.com" />
+                            <input type="email" value={personalDetails.email} onChange={e => updatePersonalDetails('email', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="email@example.com" autoComplete="email" required />
                          </div>
                          <div>
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
-                            <input value={personalDetails.phone} onChange={e => updatePersonalDetails('phone', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="+1 (555) 000-0000" />
+                            <input value={personalDetails.phone} onChange={e => updatePersonalDetails('phone', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="+1 (555) 000-0000" autoComplete="tel" required />
                          </div>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                              <label className="text-[10px] font-bold text-slate-500 uppercase">Street Address</label>
-                             <input value={personalDetails.address} onChange={e => updatePersonalDetails('address', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. 123 Main St" />
+                             <input value={personalDetails.address} onChange={e => updatePersonalDetails('address', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. 123 Main St" autoComplete="street-address" required />
                           </div>
                           <div>
                              <label className="text-[10px] font-bold text-slate-500 uppercase">Country</label>
-                             <input value={personalDetails.country} onChange={e => updatePersonalDetails('country', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. United States" />
+                             <input
+                               list="country-options"
+                               value={personalDetails.country}
+                               onChange={e => updatePersonalDetails('country', e.target.value)}
+                               className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
+                               placeholder={loadingCountries ? 'Loading countries...' : 'e.g. United States'}
+                               autoComplete="country-name"
+                               required
+                             />
+                             <datalist id="country-options">
+                               {countries.map(country => (
+                                 <option key={country} value={country} />
+                               ))}
+                             </datalist>
                           </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {locationError && (
+                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded p-2">
+                          {locationError}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                          <div>
-                            <label className="text-[10px] font-bold text-slate-500 uppercase">City</label>
-                            <input value={personalDetails.city} onChange={e => updatePersonalDetails('city', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. San Francisco" />
+                             <label className="text-[10px] font-bold text-slate-500 uppercase">State / Region</label>
+                             <input
+                               list="state-options"
+                               value={personalDetails.state}
+                               onChange={e => updatePersonalDetails('state', e.target.value)}
+                               className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
+                               placeholder={loadingStates ? 'Loading states...' : 'e.g. CA'}
+                               autoComplete="address-level1"
+                               required
+                             />
+                             <datalist id="state-options">
+                               {states.map(state => (
+                                 <option key={state} value={state} />
+                               ))}
+                             </datalist>
                          </div>
                          <div>
-                             <label className="text-[10px] font-bold text-slate-500 uppercase">State / Zip</label>
-                             <input value={personalDetails.state} onChange={e => updatePersonalDetails('state', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. CA 94105" />
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">City</label>
+                            <input
+                              list="city-options"
+                              value={personalDetails.city}
+                              onChange={e => updatePersonalDetails('city', e.target.value)}
+                              className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
+                              placeholder={loadingCities ? 'Loading cities...' : 'e.g. San Francisco'}
+                              autoComplete="address-level2"
+                              required
+                            />
+                            <datalist id="city-options">
+                              {cities.map(city => (
+                                <option key={city} value={city} />
+                              ))}
+                            </datalist>
+                         </div>
+                         <div>
+                             <label className="text-[10px] font-bold text-slate-500 uppercase">Zip / Postal Code</label>
+                             <input
+                               value={personalDetails.postalCode}
+                               onChange={e => updatePersonalDetails('postalCode', e.target.value)}
+                               className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
+                               placeholder="e.g. 94105"
+                               autoComplete="postal-code"
+                               required
+                             />
                          </div>
                       </div>
                   </div>
@@ -535,6 +784,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                      onChange={e => updatePersonalDetails('summary', e.target.value)}
                      className="w-full h-32 bg-[#f7f9fa] p-3 border border-slate-300 rounded text-sm leading-relaxed" 
                      placeholder="A brief overview of your career history and key achievements..."
+                     required
                    />
                </div>
 
@@ -551,20 +801,20 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                               <div>
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">Job Title</label>
-                                  <input value={exp.role} onChange={e => updateExperience(exp.id, 'role', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm font-medium" />
+                                  <input value={exp.role} onChange={e => updateExperience(exp.id, 'role', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm font-medium" required />
                               </div>
                               <div>
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">Employer</label>
-                                  <input value={exp.company} onChange={e => updateExperience(exp.id, 'company', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" />
+                                  <input value={exp.company} onChange={e => updateExperience(exp.id, 'company', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" required />
                               </div>
                               <div className="md:col-span-2">
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">Dates</label>
-                                  <input value={exp.dates} onChange={e => updateExperience(exp.id, 'dates', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. Jan 2022 - Present" />
+                                  <input value={exp.dates} onChange={e => updateExperience(exp.id, 'dates', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. Jan 2022 - Present" required />
                               </div>
                            </div>
                            <div className="mb-2">
                                <label className="text-[10px] font-bold text-slate-500 uppercase">Description</label>
-                               <textarea value={exp.description} onChange={e => updateExperience(exp.id, 'description', e.target.value)} className="w-full h-20 bg-white p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="Achievements, responsibilities..." />
+                               <textarea value={exp.description} onChange={e => updateExperience(exp.id, 'description', e.target.value)} className="w-full h-20 bg-white p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="Achievements, responsibilities..." required />
                            </div>
                            {idx > 0 && <button type="button" onClick={() => removeExperience(exp.id)} className="text-red-400 text-xs hover:text-red-600">Remove</button>}
                         </div>
@@ -584,15 +834,15 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div>
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">School / University</label>
-                                  <input value={edu.school} onChange={e => updateEducation(edu.id, 'school', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" />
+                                  <input value={edu.school} onChange={e => updateEducation(edu.id, 'school', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" required />
                               </div>
                               <div>
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">Degree</label>
-                                  <input value={edu.degree} onChange={e => updateEducation(edu.id, 'degree', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" />
+                                  <input value={edu.degree} onChange={e => updateEducation(edu.id, 'degree', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" required />
                               </div>
                                <div className="md:col-span-2">
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">Dates</label>
-                                  <input value={edu.dates} onChange={e => updateEducation(edu.id, 'dates', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" />
+                                  <input value={edu.dates} onChange={e => updateEducation(edu.id, 'dates', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" required />
                               </div>
                            </div>
                            {idx > 0 && <button type="button" onClick={() => removeEducation(edu.id)} className="text-red-400 text-xs mt-2">Remove</button>}
@@ -610,8 +860,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                   <div className="space-y-4">
                      {skills.map((skill, idx) => (
                         <div key={skill.id} className="flex gap-4 items-start">
-                           <input value={skill.category} onChange={e => updateSkill(skill.id, 'category', e.target.value)} className="w-1/3 bg-slate-50 p-2 border border-slate-200 rounded text-sm font-medium" placeholder="Category" />
-                           <input value={skill.items} onChange={e => updateSkill(skill.id, 'items', e.target.value)} className="flex-1 bg-slate-50 p-2 border border-slate-200 rounded text-sm" placeholder="List skills..." />
+                           <input value={skill.category} onChange={e => updateSkill(skill.id, 'category', e.target.value)} className="w-1/3 bg-slate-50 p-2 border border-slate-200 rounded text-sm font-medium" placeholder="Category" required />
+                           <input value={skill.items} onChange={e => updateSkill(skill.id, 'items', e.target.value)} className="flex-1 bg-slate-50 p-2 border border-slate-200 rounded text-sm" placeholder="List skills..." required />
                            {idx > 0 && <button type="button" onClick={() => removeSkill(skill.id)} className="text-slate-400 hover:text-red-500 px-2">×</button>}
                         </div>
                      ))}
@@ -632,6 +882,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                       onChange={e => setJobDescription(e.target.value)}
                       className="w-full h-64 p-4 bg-slate-50 border border-slate-200 rounded focus:border-[#1a91f0] outline-none text-sm leading-relaxed"
                       placeholder="Paste job description here so AI can tailor your cover letter..."
+                      required
                   />
                   <div className="mt-4 bg-blue-50 text-blue-800 p-3 rounded text-sm border border-blue-100 flex items-start gap-2">
                      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -641,6 +892,12 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
           )}
 
           {/* Action Buttons */}
+          {validationMsg && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {validationMsg}
+            </div>
+          )}
+
           <div className="pt-4 pb-20 space-y-3">
              <button
                type="submit"
