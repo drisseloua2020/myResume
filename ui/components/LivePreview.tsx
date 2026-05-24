@@ -1,5 +1,6 @@
 import React from 'react';
 import { UserInputData, User } from '../types';
+import { apiAssetUrl } from '../services/apiClient';
 
 interface LivePreviewProps {
   data: UserInputData;
@@ -28,6 +29,11 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
 
   const phoneNumber = personalDetails?.phone || '';
   const summaryText = personalDetails?.summary || data.jobDescription || "Experienced professional with a proven track record of success in delivering high-quality results. Skilled in adapting to new challenges and utilizing industry best practices to drive efficiency and growth.";
+  const profileImageSrc = apiAssetUrl(data.profileImageUrl) || (
+    data.profileImageData
+      ? `data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`
+      : undefined
+  );
 
   // --- TEMPLATE: CREATIVE BOLD ---
   if (templateId === 'creative_bold') {
@@ -50,9 +56,9 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                 </div>
                 
                 {/* Photo (Circle Overlay) */}
-                {preferences?.photo && data.profileImageData && (
+                {preferences?.photo && profileImageSrc && (
                     <div className="w-32 h-32 rounded-full border-4 border-white shadow-xl overflow-hidden flex-shrink-0 mt-6 md:mt-0 bg-white">
-                        <img src={`data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`} className="w-full h-full object-cover" />
+                        <img src={profileImageSrc} className="w-full h-full object-cover" />
                     </div>
                 )}
                 
@@ -222,9 +228,9 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
         {/* Sidebar */}
         <div className="w-[32%] bg-slate-900 text-white p-6 pt-10 flex flex-col gap-6">
           {/* Photo */}
-          {preferences?.photo && data.profileImageData && (
+          {preferences?.photo && profileImageSrc && (
             <div className="w-32 h-32 mx-auto rounded-full overflow-hidden border-4 border-slate-700 mb-2">
-              <img src={`data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`} className="w-full h-full object-cover" />
+              <img src={profileImageSrc} className="w-full h-full object-cover" />
             </div>
           )}
 
@@ -438,9 +444,9 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
 
             {/* Sidebar (1 col) */}
             <div className="col-span-1 space-y-6 border-l border-slate-100 pl-4">
-               {preferences?.photo && data.profileImageData && (
+               {preferences?.photo && profileImageSrc && (
                    <div className="w-24 h-24 mb-4 border border-slate-200 p-1 bg-white">
-                       <img src={`data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`} className="w-full h-full object-cover" />
+                       <img src={profileImageSrc} className="w-full h-full object-cover" />
                    </div>
                )}
 
