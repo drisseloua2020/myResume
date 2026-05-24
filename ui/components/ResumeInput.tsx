@@ -684,7 +684,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       </div>
 
       {/* --- RIGHT COLUMN: LIVE PREVIEW --- */}
-      <div className="flex-1 print-container lg:sticky lg:top-24 self-start">
+      <div className="flex-1 print-container mt-[1in] lg:sticky lg:top-[calc(6rem+1in)] self-start">
          <div className="bg-slate-200/50 rounded-xl border-2 border-slate-200 p-4 lg:p-8 flex flex-col items-center min-h-[600px] no-print relative">
             <div className="w-full flex justify-between items-center mb-6 max-w-[210mm]">
                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
