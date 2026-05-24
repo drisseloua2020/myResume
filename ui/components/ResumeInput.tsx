@@ -335,9 +335,9 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     <div className="flex flex-col lg:flex-row gap-6 relative items-start">
       
       {/* --- LEFT COLUMN: EDITOR FORM --- */}
-      <div className="w-full lg:w-5/12 xl:w-[450px] 2xl:w-[500px] flex-shrink-0 no-print">
+      <div className="w-full lg:w-[52%] xl:w-[560px] 2xl:w-[640px] flex-shrink-0 no-print">
         <div className="w-full max-w-full min-w-0 flex flex-col sm:flex-row sm:flex-wrap xl:flex-nowrap sm:justify-between sm:items-stretch gap-3 mb-10 relative">
-          <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 flex overflow-x-auto w-full min-w-0 sm:flex-[1_1_28rem]">
+          <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 flex overflow-x-auto w-full min-w-0 sm:flex-[1_1_34rem] xl:min-w-[34rem]">
              <button
                type="button"
                onClick={() => setActiveTab('create')}
