@@ -97,6 +97,7 @@ export interface UserInputData {
     data: string;
   };
   jobDescription?: string;
+  jobUrl?: string;
   targetRole?: string;
   
   // New specific personal details

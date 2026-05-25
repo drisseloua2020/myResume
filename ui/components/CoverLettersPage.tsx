@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AVAILABLE_TEMPLATES } from '../constants';
-import { generateCoverLetter, listCoverLetters, getCoverLetter, deleteCoverLetter, CoverLetterListItem, CoverLetterRecord } from '../services/coverLetterService';
-//import { getSessionUser } from '../services/apiClient'; {user?.email}
+import {
+  CoverLetterListItem,
+  CoverLetterRecord,
+  deleteCoverLetter,
+  downloadCoverLetterPdf,
+  generateCoverLetter,
+  getCoverLetter,
+  listCoverLetters,
+} from '../services/coverLetterService';
 import { getLatestDraft, ResumeDraft } from '../services/resumeService';
 
 function templateName(id: string | null) {
@@ -9,9 +16,17 @@ function templateName(id: string | null) {
   return AVAILABLE_TEMPLATES.find(t => t.id === id)?.name || id;
 }
 
+function hasResumeData(draft: ResumeDraft | null): boolean {
+  if (!draft?.content) return false;
+  if (typeof draft.content !== 'object') return true;
+  return Object.keys(draft.content).length > 0;
+}
+
 type Props = {
   onOpenExamples?: () => void;
 };
+
+type JobSourceMode = 'url' | 'paste';
 
 export default function CoverLettersPage({ onOpenExamples }: Props) {
   const [loading, setLoading] = useState(true);
@@ -21,17 +36,19 @@ export default function CoverLettersPage({ onOpenExamples }: Props) {
   const [latestDraft, setLatestDraft] = useState<ResumeDraft | null>(null);
   const [draftLoading, setDraftLoading] = useState(true);
 
+  const [jobSourceMode, setJobSourceMode] = useState<JobSourceMode>('url');
+  const [jobUrl, setJobUrl] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [title, setTitle] = useState('');
   const [templateId, setTemplateId] = useState<string>(AVAILABLE_TEMPLATES[0]?.id || 'classic_pro');
   const [generating, setGenerating] = useState(false);
   const [selected, setSelected] = useState<CoverLetterRecord | null>(null);
-
   const [viewerTab, setViewerTab] = useState<'cover_letter' | 'resume'>('cover_letter');
 
-  //const user = getSessionUser();
-
   const sorted = useMemo(() => items, [items]);
+  const canGenerateFromUrl = jobUrl.trim().length >= 8 && /^https?:\/\//i.test(jobUrl.trim());
+  const canGenerateFromPaste = jobDescription.trim().length >= 20;
+  const canGenerate = hasResumeData(latestDraft) && (jobSourceMode === 'url' ? canGenerateFromUrl : canGenerateFromPaste);
 
   async function refresh() {
     setLoading(true);
@@ -51,7 +68,6 @@ export default function CoverLettersPage({ onOpenExamples }: Props) {
   }, []);
 
   useEffect(() => {
-    // Cover letters should be grounded on the user's latest resume draft.
     (async () => {
       setDraftLoading(true);
       try {
@@ -65,87 +81,85 @@ export default function CoverLettersPage({ onOpenExamples }: Props) {
     })();
   }, []);
 
-  function hasResumeData(draft: ResumeDraft | null): boolean {
-    if (!draft?.content) return false;
-    // Lightweight heuristic to avoid enabling generation on an empty object.
-    if (typeof draft.content !== 'object') return true;
-    return Object.keys(draft.content).length > 0;
-  }
-
-  const canGenerate = jobDescription.trim().length >= 20 && hasResumeData(latestDraft);
-
   async function handleGenerate() {
+    setError(null);
     if (!hasResumeData(latestDraft)) {
-      alert('Please create or import a resume in WorkSpace first. Then come back to generate a cover letter.');
+      setError('Please create or import a resume in WorkSpace first. Then come back to generate a cover letter.');
       return;
     }
-    if (jobDescription.trim().length < 20) {
-      alert('Please paste a job description (at least 20 characters).');
+    if (jobSourceMode === 'url' && !canGenerateFromUrl) {
+      setError('Enter a valid http or https job posting URL.');
+      return;
+    }
+    if (jobSourceMode === 'paste' && !canGenerateFromPaste) {
+      setError('Paste a job description with at least 20 characters.');
       return;
     }
 
     setGenerating(true);
     try {
       const record = await generateCoverLetter({
-        jobDescription,
-        title: title || undefined,
+        jobDescription: jobSourceMode === 'paste' ? jobDescription.trim() : undefined,
+        jobUrl: jobSourceMode === 'url' ? jobUrl.trim() : undefined,
+        title: title.trim() || undefined,
         templateId,
         resumeJson: latestDraft?.content ?? null,
       });
       setSelected(record);
       setViewerTab('cover_letter');
+      setTitle('');
+      if (jobSourceMode === 'url') {
+        setJobUrl('');
+      }
       await refresh();
     } catch (e: any) {
-      alert(e?.message || 'Generation failed');
+      setError(e?.message || 'Generation failed');
     } finally {
       setGenerating(false);
     }
   }
 
   async function openLetter(id: string) {
+    setError(null);
     try {
       const r = await getCoverLetter(id);
       setSelected(r);
+      setViewerTab('cover_letter');
     } catch (e: any) {
-      alert(e?.message || 'Failed to open');
+      setError(e?.message || 'Failed to open cover letter');
     }
   }
 
   async function removeLetter(id: string) {
     if (!confirm('Delete this cover letter?')) return;
+    setError(null);
     try {
       await deleteCoverLetter(id);
       if (selected?.id === id) setSelected(null);
       await refresh();
     } catch (e: any) {
-      alert(e?.message || 'Delete failed');
+      setError(e?.message || 'Delete failed');
     }
   }
 
-  function downloadSelected() {
-    if (!selected) return;
-    const text = selected.content.coverLetterFull || '';
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const safeTitle = (selected.title || 'cover_letter').replace(/[^a-z0-9_-]+/gi, '_');
-    a.download = `${safeTitle}_${selected.id}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+  async function downloadPdf(letter: CoverLetterListItem | CoverLetterRecord) {
+    setError(null);
+    try {
+      await downloadCoverLetterPdf(letter.id, letter.title);
+    } catch (e: any) {
+      setError(e?.message || 'PDF download failed');
+    }
   }
 
   return (
-    <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] gap-8">
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Cover Letters</h2>
-          <p className="text-slate-600">
-            Paste a job description, generate a tailored cover letter, and keep it saved in your account.
-          </p>
+            <p className="text-slate-600">
+              Use a job post URL or paste the job description, then save every tailored cover letter to your account.
+            </p>
           </div>
 
           {onOpenExamples && (
@@ -161,17 +175,19 @@ export default function CoverLettersPage({ onOpenExamples }: Props) {
         <div className="bg-white border border-slate-200 rounded p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-600">Title</label>
+              <label htmlFor="cover-letter-title" className="text-xs font-semibold text-slate-600">Job Title</label>
               <input
+                id="cover-letter-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Software Engineer - Acme"
+                placeholder="Optional, inferred when possible"
                 className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-600">Template (optional)</label>
+              <label htmlFor="cover-letter-template" className="text-xs font-semibold text-slate-600">Template</label>
               <select
+                id="cover-letter-template"
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
                 className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
@@ -185,37 +201,69 @@ export default function CoverLettersPage({ onOpenExamples }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-slate-600">Job Description</label>
-            <textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              rows={10}
-              className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
-              placeholder="Paste the job description here…"
-            />
+          <div className="inline-flex rounded border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setJobSourceMode('url')}
+              className={`px-4 py-2 rounded text-sm font-semibold ${jobSourceMode === 'url' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+            >
+              Job URL
+            </button>
+            <button
+              type="button"
+              onClick={() => setJobSourceMode('paste')}
+              className={`px-4 py-2 rounded text-sm font-semibold ${jobSourceMode === 'paste' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+            >
+              Paste Description
+            </button>
           </div>
+
+          {jobSourceMode === 'url' ? (
+            <div>
+              <label htmlFor="job-url" className="text-xs font-semibold text-slate-600">Job Posting URL</label>
+              <input
+                id="job-url"
+                value={jobUrl}
+                onChange={(e) => setJobUrl(e.target.value)}
+                placeholder="https://company.com/careers/software-engineer"
+                className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                If the page cannot be read, you will see an error and can paste the job description instead.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label htmlFor="job-description" className="text-xs font-semibold text-slate-600">Job Description</label>
+              <textarea
+                id="job-description"
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                rows={10}
+                className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                placeholder="Paste the job description here..."
+              />
+            </div>
+          )}
+
+          {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
 
           <button
             onClick={handleGenerate}
             disabled={generating || !canGenerate}
             className="w-full bg-slate-900 text-white rounded px-4 py-2 font-semibold hover:bg-slate-800 disabled:opacity-50"
           >
-            {generating ? 'Generating…' : 'Generate & Save'}
+            {generating ? 'Generating...' : 'Generate & Save'}
           </button>
 
           <div className="text-xs text-slate-500">
             {draftLoading ? (
-              'Checking your latest resume draft…'
+              'Checking your latest resume draft...'
             ) : hasResumeData(latestDraft) ? (
               <>Using your latest resume draft saved on <b>{new Date(latestDraft!.updatedAt).toLocaleString()}</b>.</>
             ) : (
               <>No resume draft found. Go to <b>WorkSpace</b> to create or import a resume to enable cover letter generation.</>
             )}
-          </div>
-
-          <div className="text-xs text-slate-500">
-            Signed in as <b>User</b>
           </div>
         </div>
 
@@ -225,22 +273,26 @@ export default function CoverLettersPage({ onOpenExamples }: Props) {
             <button onClick={refresh} className="text-sm text-slate-700 hover:text-slate-900">Refresh</button>
           </div>
 
-          {error && <div className="px-4 py-3 text-sm text-red-700 bg-red-50 border-b border-red-200">{error}</div>}
-
           {loading ? (
-            <div className="px-4 py-6 text-slate-500">Loading…</div>
+            <div className="px-4 py-6 text-slate-500">Loading...</div>
           ) : sorted.length === 0 ? (
             <div className="px-4 py-6 text-slate-600">No cover letters yet. Generate your first one above.</div>
           ) : (
             <div>
               {sorted.map((cl) => (
-                <div key={cl.id} className="px-4 py-3 border-b border-slate-100 flex items-start justify-between">
-                  <div>
-                    <div className="font-medium text-slate-900">{cl.title}</div>
-                    <div className="text-xs text-slate-500">{templateName(cl.templateId)} · {new Date(cl.createdAt).toLocaleString()}</div>
+                <div key={cl.id} className="px-4 py-3 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="font-medium text-slate-900 truncate">{cl.title}</div>
+                    <div className="text-xs text-slate-500">{templateName(cl.templateId)} | {new Date(cl.createdAt).toLocaleString()}</div>
+                    {cl.jobUrl && (
+                      <a href={cl.jobUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-semibold text-blue-700 hover:text-blue-900">
+                        Job link
+                      </a>
+                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => openLetter(cl.id)} className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 text-sm">Open</button>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => openLetter(cl.id)} className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 text-sm">View</button>
+                    <button onClick={() => downloadPdf(cl)} className="px-3 py-1.5 rounded bg-slate-900 text-white hover:bg-slate-800 text-sm">Download PDF</button>
                     <button onClick={() => removeLetter(cl.id)} className="px-3 py-1.5 rounded bg-slate-200 hover:bg-slate-300 text-sm">Delete</button>
                   </div>
                 </div>
@@ -270,18 +322,23 @@ export default function CoverLettersPage({ onOpenExamples }: Props) {
             </div>
           </div>
           <button
-            onClick={downloadSelected}
+            onClick={() => selected && downloadPdf(selected)}
             disabled={!selected}
             className="px-4 py-2 rounded bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
           >
-            Download
+            Download PDF
           </button>
         </div>
 
         {viewerTab === 'cover_letter' ? (
           selected ? (
             <div className="bg-white border border-slate-200 rounded p-6">
-              <div className="text-xs text-slate-500 mb-2">{selected.title} · {templateName(selected.templateId)}</div>
+              <div className="text-xs text-slate-500 mb-2">{selected.title} | {templateName(selected.templateId)}</div>
+              {selected.jobUrl && (
+                <a href={selected.jobUrl} target="_blank" rel="noreferrer" className="mb-4 inline-block text-xs font-semibold text-blue-700 hover:text-blue-900">
+                  Open job post
+                </a>
+              )}
               <div className="whitespace-pre-wrap text-slate-800 text-sm leading-relaxed">
                 {selected.content.coverLetterFull || ''}
               </div>

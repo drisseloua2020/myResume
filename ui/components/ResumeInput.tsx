@@ -7,6 +7,7 @@ import { saveResume, updateResume } from '../services/resumeService';
 import { locationService } from '../services/locationService';
 import { apiAssetUrl } from '../services/apiClient';
 import { uploadProfilePhoto } from '../services/uploadService';
+import { generateCoverLetter } from '../services/coverLetterService';
 
 interface ResumeInputProps {
   onGenerate: (data: UserInputData, mode: AppMode) => void;
@@ -24,6 +25,7 @@ interface ResumeInputProps {
 }
 
 type TabType = 'upload' | 'create' | 'cover_letter';
+type JobSourceMode = 'url' | 'paste';
 
 const IMPORT_DOCUMENT_TYPES: Record<string, string> = {
   'application/pdf': '.pdf',
@@ -71,6 +73,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const [isSavingResume, setIsSavingResume] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
+  const [coverLetterMsg, setCoverLetterMsg] = useState<string | null>(null);
   const [countries, setCountries] = useState<string[]>([]);
   const [states, setStates] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
@@ -118,6 +121,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       if (prefilledData.educationItems) setEducations(prefilledData.educationItems);
       if (prefilledData.skillItems) setSkills(prefilledData.skillItems);
       if (prefilledData.jobDescription) setJobDescription(prefilledData.jobDescription);
+      if (prefilledData.jobUrl) setJobUrl(prefilledData.jobUrl);
       if (prefilledData.preferences) {
         setPreferences(prev => ({
           ...prev!,
@@ -139,6 +143,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   // Common State
   const [targetRole, setTargetRole] = useState('');
   const [jobDescription, setJobDescription] = useState('');
+  const [jobUrl, setJobUrl] = useState('');
+  const [jobSourceMode, setJobSourceMode] = useState<JobSourceMode>('url');
   const [preferences, setPreferences] = useState<UserInputData['preferences']>({
     pages: '1-page',
     tone: 'modern',
@@ -402,7 +408,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     if (!hasText(targetRole)) missing.push('Target role');
 
     if (activeTab === 'cover_letter') {
-      if (!hasText(jobDescription)) missing.push('Target job description');
+      if (jobSourceMode === 'url') {
+        if (!/^https?:\/\//i.test(jobUrl.trim())) missing.push('Valid job posting URL');
+      } else if (jobDescription.trim().length < 20) {
+        missing.push('Target job description');
+      }
       return missing;
     }
 
@@ -481,6 +491,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       plan: userPlan,
       targetRole,
       jobDescription,
+      jobUrl: jobUrl.trim() || undefined,
       preferences,
       profileImageUrl,
       profileImageName: profilePhotoName || undefined,
@@ -503,8 +514,23 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     payload.skillItems = skills;
 
     if (activeTab === 'cover_letter') {
-      const mode = AppMode.CREATE_SCRATCH;
-      onGenerate(payload, mode);
+      setIsSavingResume(true);
+      setCoverLetterMsg(null);
+      setValidationMsg(null);
+      try {
+        const record = await generateCoverLetter({
+          jobDescription: jobSourceMode === 'paste' ? jobDescription.trim() : undefined,
+          jobUrl: jobSourceMode === 'url' ? jobUrl.trim() : undefined,
+          title: targetRole ? `${targetRole} Cover Letter` : undefined,
+          templateId: selectedTemplateId,
+          resumeJson: payload,
+        });
+        setCoverLetterMsg(`Created "${record.title}". Open the Cover Letters menu to view, download PDF, or delete it.`);
+      } catch (err: any) {
+        setValidationMsg(err?.message || 'Failed to generate cover letter.');
+      } finally {
+        setIsSavingResume(false);
+      }
       return;
     }
 
@@ -539,6 +565,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     plan: userPlan,
     targetRole,
     jobDescription,
+    jobUrl,
     preferences,
     profileImageUrl,
     profileImageName: profilePhotoName || undefined,
@@ -937,18 +964,51 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
           {activeTab === 'cover_letter' && (
               <div className="bg-white rounded border border-slate-200 p-8 shadow-sm">
-                  <h2 className="text-xl font-bold text-slate-800 mb-1">Target Job Description</h2>
-                  <p className="text-sm text-slate-500 mb-4">Paste the JD here. We will use your profile data (or uploaded resume) to write a tailored cover letter.</p>
-                  <textarea 
-                      value={jobDescription}
-                      onChange={e => setJobDescription(e.target.value)}
-                      className="w-full h-64 p-4 bg-slate-50 border border-slate-200 rounded focus:border-[#1a91f0] outline-none text-sm leading-relaxed"
-                      placeholder="Paste job description here so AI can tailor your cover letter..."
-                      required
-                  />
+                  <h2 className="text-xl font-bold text-slate-800 mb-1">Target Job</h2>
+                  <p className="text-sm text-slate-500 mb-4">Share a job URL or paste the description. We will use your live editor data to create and save a tailored cover letter.</p>
+                  <div className="inline-flex rounded border border-slate-200 bg-slate-50 p-1 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setJobSourceMode('url')}
+                      className={`px-4 py-2 rounded text-sm font-semibold ${jobSourceMode === 'url' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                    >
+                      Job URL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJobSourceMode('paste')}
+                      className={`px-4 py-2 rounded text-sm font-semibold ${jobSourceMode === 'paste' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+                    >
+                      Paste Description
+                    </button>
+                  </div>
+                  {jobSourceMode === 'url' ? (
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Job Posting URL</label>
+                      <input
+                        value={jobUrl}
+                        onChange={e => setJobUrl(e.target.value)}
+                        className="mt-1 w-full p-4 bg-slate-50 border border-slate-200 rounded focus:border-[#1a91f0] outline-none text-sm"
+                        placeholder="https://company.com/careers/software-engineer"
+                        required={activeTab === 'cover_letter' && jobSourceMode === 'url'}
+                      />
+                      <p className="text-xs text-slate-500 mt-2">If the URL cannot be processed, you will see an error and can paste the job description instead.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Job Description</label>
+                      <textarea
+                          value={jobDescription}
+                          onChange={e => setJobDescription(e.target.value)}
+                          className="mt-1 w-full h-64 p-4 bg-slate-50 border border-slate-200 rounded focus:border-[#1a91f0] outline-none text-sm leading-relaxed"
+                          placeholder="Paste job description here so AI can tailor your cover letter..."
+                          required={activeTab === 'cover_letter' && jobSourceMode === 'paste'}
+                      />
+                    </div>
+                  )}
                   <div className="mt-4 bg-blue-50 text-blue-800 p-3 rounded text-sm border border-blue-100 flex items-start gap-2">
                      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                     <p>We'll use your employment history from the "Live Editor" tab to write this letter. Make sure your details are up to date there.</p>
+                     <p>Created letters are saved under the Cover Letters menu with PDF download and delete actions.</p>
                   </div>
               </div>
           )}
@@ -959,6 +1019,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
               {validationMsg}
             </div>
           )}
+          {activeTab === 'cover_letter' && coverLetterMsg && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {coverLetterMsg}
+            </div>
+          )}
 
           <div className="pt-4 pb-20 space-y-3">
              <button
@@ -967,13 +1032,13 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                className={`w-full bg-slate-800 text-white text-lg font-bold px-12 py-4 rounded-lg shadow-lg transform transition hover:-translate-y-1 hover:shadow-xl flex items-center justify-center gap-2 ${(isLoading || isSavingResume) ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-700'}`}
              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-               {activeTab === 'create' ? (isSavingResume ? 'Saving...' : 'Save Resume') : (
-                 isLoading ? 'Processing...' : (
-                    activeTab === 'upload' ? 'Import to Live Editor' :
-                    activeTab === 'cover_letter' ? 'Generate Cover Letter' :
-                    'Save Resume'
-                 )
-               )}
+                {activeTab === 'create' ? (isSavingResume ? 'Saving...' : 'Save Resume') : (
+                  isLoading ? 'Processing...' : (
+                     activeTab === 'upload' ? 'Import to Live Editor' :
+                     activeTab === 'cover_letter' ? (isSavingResume ? 'Generating...' : 'Generate & Save Cover Letter') :
+                     'Save Resume'
+                  )
+                )}
              </button>
 
              {activeTab === 'create' && (

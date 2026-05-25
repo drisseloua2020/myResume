@@ -77,7 +77,7 @@ const ContactPage: React.FC<ContactPageProps> = ({ user }) => {
     const result = contactSchema.safeParse(formData);
     if (!result.success) {
       const fieldErrors: Partial<Record<keyof ContactFormData, string>> = {};
-      result.error.errors.forEach(err => {
+      result.error.issues.forEach(err => {
         const key = err.path?.[0] as keyof ContactFormData | undefined;
         if (key) fieldErrors[key] = err.message;
       });
