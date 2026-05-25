@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResumeInput from './ResumeInput';
@@ -24,6 +24,7 @@ vi.mock('../services/uploadService', () => ({
 
 describe('ResumeInput', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(saveResume).mockResolvedValue({ id: 'res_saved' });
   });
 
@@ -97,6 +98,106 @@ describe('ResumeInput', () => {
           preferences: expect.objectContaining({
             photo: true,
           }),
+        }),
+      }));
+    });
+  });
+
+  it('rejects unsupported import files before they reach the live editor parser', async () => {
+    const user = userEvent.setup();
+    const onImport = vi.fn();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+    const { container } = render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={onImport}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    expect(fileInput.accept).toContain('.pdf');
+    expect(fileInput.accept).toContain('.doc');
+    expect(fileInput.accept).toContain('.docx');
+    expect(fileInput.accept).not.toContain('image/');
+
+    const rejectedImage = new File(['not a resume'], 'resume.png', { type: 'image/png' });
+    fireEvent.change(fileInput, { target: { files: [rejectedImage] } });
+
+    expect(alertSpy).toHaveBeenCalledWith('Supported formats: PDF, DOC, DOCX.');
+    expect(screen.queryByText('resume.png')).not.toBeInTheDocument();
+    expect(onImport).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
+  it('sends Word import files to the live editor parser', async () => {
+    const user = userEvent.setup();
+    const onImport = vi.fn();
+
+    const { container } = render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={onImport}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    expect(fileInput.accept).toContain('.pdf');
+    expect(fileInput.accept).toContain('.doc');
+    expect(fileInput.accept).toContain('.docx');
+    expect(fileInput.accept).not.toContain('image/');
+
+    const docx = new File(['resume content'], 'resume.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    await user.upload(fileInput, docx);
+
+    expect(await screen.findByText('resume.docx')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /import to live editor/i }));
+
+    await waitFor(() => {
+      expect(onImport).toHaveBeenCalledWith(expect.objectContaining({
+        currentResumeText: '',
+        fileData: expect.objectContaining({
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          name: 'resume.docx',
+          data: expect.any(String),
         }),
       }));
     });

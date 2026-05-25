@@ -318,8 +318,8 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-        authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', 'Importing PDF to Editor');
-        // We use FORMAT_EXISTING mode to parse the PDF/Text
+        authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', 'Importing document to Editor');
+        // We use FORMAT_EXISTING mode to parse the uploaded document.
         const parsedResults = await generateResumeContent(data, AppMode.FORMAT_EXISTING);
         
         if (parsedResults.json) {

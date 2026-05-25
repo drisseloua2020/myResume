@@ -25,6 +25,26 @@ interface ResumeInputProps {
 
 type TabType = 'upload' | 'create' | 'cover_letter';
 
+const IMPORT_DOCUMENT_TYPES: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+};
+
+const IMPORT_DOCUMENT_ACCEPT = [
+  ...Object.keys(IMPORT_DOCUMENT_TYPES),
+  ...Object.values(IMPORT_DOCUMENT_TYPES),
+].join(',');
+
+function getImportDocumentMimeType(file: File): string | null {
+  if (file.type && IMPORT_DOCUMENT_TYPES[file.type]) return file.type;
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith('.pdf')) return 'application/pdf';
+  if (lowerName.endsWith('.doc')) return 'application/msword';
+  if (lowerName.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  return null;
+}
+
 const ResumeInput: React.FC<ResumeInputProps> = ({ 
   onGenerate, 
   onImport,
@@ -128,7 +148,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
   // Mode A State (Upload)
   const [currentResumeText, setCurrentResumeText] = useState('');
-  const [fileData, setFileData] = useState<{ mimeType: string, data: string } | undefined>(undefined);
+  const [fileData, setFileData] = useState<UserInputData['fileData'] | undefined>(undefined);
   const [fileName, setFileName] = useState<string | null>(null);
 
   // Profile Photo State
@@ -237,15 +257,16 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic'];
-      if (!validTypes.includes(file.type)) {
-        alert("Supported formats: PDF, PNG, JPEG, WEBP.");
+      const mimeType = getImportDocumentMimeType(file);
+      if (!mimeType) {
+        alert("Supported formats: PDF, DOC, DOCX.");
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
       setFileName(file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFileData({ mimeType: file.type, data: (reader.result as string).split(',')[1] });
+        setFileData({ mimeType, data: (reader.result as string).split(',')[1], name: file.name });
         setCurrentResumeText('');
       };
       reader.readAsDataURL(file);
@@ -371,14 +392,14 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const getMissingRequiredFields = () => {
     const missing: string[] = [];
 
-    if (!hasText(targetRole)) missing.push('Target role');
-
     if (activeTab === 'upload') {
-      if (!fileData && !hasText(currentResumeText)) {
-        missing.push('Resume PDF or pasted resume text');
+      if (!fileData) {
+        missing.push('Resume PDF or Word document');
       }
       return missing;
     }
+
+    if (!hasText(targetRole)) missing.push('Target role');
 
     if (activeTab === 'cover_letter') {
       if (!hasText(jobDescription)) missing.push('Target job description');
@@ -584,7 +605,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                onClick={() => setActiveTab('upload')}
                className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-center ${activeTab === 'upload' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
              >
-               Import PDF
+              Import File
              </button>
              <button
                type="button"
@@ -646,17 +667,17 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              <input
                 type="text"
                 className="w-full bg-[#f7f9fa] p-3 border-b-2 border-slate-200 focus:border-[#1a91f0] outline-none font-medium transition-colors"
-                placeholder="e.g. Senior Product Designer"
-                value={targetRole}
-                onChange={e => setTargetRole(e.target.value)}
-                required
+               placeholder="e.g. Senior Product Designer"
+               value={targetRole}
+               onChange={e => setTargetRole(e.target.value)}
+                required={activeTab !== 'upload'}
              />
           </div>
 
           {activeTab === 'upload' && (
              <div className="bg-white rounded border border-slate-200 p-8 shadow-sm text-center">
                <div className="border-2 border-dashed border-slate-300 rounded-lg p-10 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                  <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept="application/pdf,image/*" />
+                  <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept={IMPORT_DOCUMENT_ACCEPT} />
                   <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                   </div>
@@ -664,21 +685,13 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                     <p className="font-semibold text-slate-800">{fileName}</p>
                   ) : (
                     <>
-                      <p className="font-semibold text-slate-700">Upload Resume (PDF)</p>
-                      <p className="text-sm text-slate-400 mt-1">or drag and drop here</p>
+                      <p className="font-semibold text-slate-700">Upload Resume (PDF, DOC, DOCX)</p>
+                      <p className="text-sm text-slate-400 mt-1">Only PDF and Word documents are accepted</p>
                     </>
                   )}
                </div>
-               <div className="mt-6">
-                 <p className="text-xs font-bold text-slate-400 uppercase mb-2">OR PASTE TEXT</p>
-                 <textarea
-                    className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded focus:ring-1 focus:ring-blue-500 outline-none text-sm"
-                    placeholder="Paste your resume content here..."
-                    value={currentResumeText}
-                    onChange={e => setCurrentResumeText(e.target.value)}
-                    disabled={!!fileName}
-                    required={!fileName && !fileData}
-                 />
+               <div className="mt-6 text-left rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                 The uploaded document is parsed securely, then mapped into the live editor fields for review and editing.
                </div>
              </div>
           )}
@@ -980,7 +993,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              )}
 
              <p className="text-xs text-center text-slate-400 mt-2">
-                {activeTab === 'upload' ? 'Extracts text and fills the editor so you can verify and customize.' :
+               {activeTab === 'upload' ? 'Parses a PDF or Word resume and fills the editor so you can verify and customize.' :
                  activeTab === 'cover_letter' ? 'Create a tailored cover letter and cold email based on your resume.' :
                  'Saves your resume JSON to your library. Click Save again to update the same record.'}
              </p>
