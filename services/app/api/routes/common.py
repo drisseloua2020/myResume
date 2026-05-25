@@ -35,11 +35,12 @@ def to_resume_draft_out(draft) -> ResumeDraftOut:
 
 def to_cover_letter_out(cover_letter) -> CoverLetterOut:
     content = cover_letter.content
+    job_url = content.get("jobUrl") if isinstance(content, dict) else None
     if isinstance(content, dict) and {"coverLetterFull", "coverLetterShort", "coldEmail"}.issubset(content.keys()):
         typed = GeneratedCoverLetterContent(coverLetterFull=str(content.get("coverLetterFull", "")), coverLetterShort=str(content.get("coverLetterShort", "")), coldEmail=str(content.get("coldEmail", "")))
     else:
         typed = content
-    return CoverLetterOut(id=cover_letter.id, templateId=cover_letter.template_id, title=cover_letter.title, jobDescription=cover_letter.job_description, content=typed, createdAt=cover_letter.created_at)
+    return CoverLetterOut(id=cover_letter.id, templateId=cover_letter.template_id, title=cover_letter.title, jobDescription=cover_letter.job_description, jobUrl=job_url, content=typed, createdAt=cover_letter.created_at)
 
 def to_profile_sync_update_out(update) -> ProfileSyncUpdateOut:
     return ProfileSyncUpdateOut(id=update.id, source=update.source, category=update.category, title=update.title, details=update.details, payload=update.payload, createdAt=update.created_at)

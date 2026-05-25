@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResumeInput from './ResumeInput';
 import { saveResume } from '../services/resumeService';
+import { generateCoverLetter } from '../services/coverLetterService';
 import { SubscriptionPlan, UserRole } from '../types';
 
 vi.mock('../services/locationService', () => ({
@@ -22,10 +23,27 @@ vi.mock('../services/uploadService', () => ({
   uploadProfilePhoto: vi.fn(),
 }));
 
+vi.mock('../services/coverLetterService', () => ({
+  generateCoverLetter: vi.fn(),
+}));
+
 describe('ResumeInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(saveResume).mockResolvedValue({ id: 'res_saved' });
+    vi.mocked(generateCoverLetter).mockResolvedValue({
+      id: 'cl_1',
+      templateId: 'classic_pro',
+      title: 'Senior Developer Cover Letter',
+      jobDescription: 'Senior Developer role building reliable products for customers.',
+      jobUrl: 'https://jobs.example.com/senior-developer',
+      createdAt: '2026-05-25T00:00:00Z',
+      content: {
+        coverLetterFull: 'Dear team...',
+        coverLetterShort: 'Short letter',
+        coldEmail: 'Hello',
+      },
+    });
   });
 
   it('restores and persists the include-photo status from a loaded resume record', async () => {
@@ -201,5 +219,50 @@ describe('ResumeInput', () => {
         }),
       }));
     });
+  });
+
+  it('creates and saves a cover letter from a job URL', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        initialTab="cover_letter"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    await user.type(screen.getByPlaceholderText(/senior product designer/i), 'Senior Developer');
+    await user.type(screen.getByPlaceholderText(/company.com\/careers/i), 'https://jobs.example.com/senior-developer');
+    await user.click(screen.getByRole('button', { name: /generate & save cover letter/i }));
+
+    await waitFor(() => {
+      expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({
+        jobUrl: 'https://jobs.example.com/senior-developer',
+        jobDescription: undefined,
+        title: 'Senior Developer Cover Letter',
+        templateId: 'classic_pro',
+        resumeJson: expect.objectContaining({
+          targetRole: 'Senior Developer',
+          jobUrl: 'https://jobs.example.com/senior-developer',
+        }),
+      }));
+    });
+    expect(await screen.findByText(/open the cover letters menu/i)).toBeInTheDocument();
   });
 });

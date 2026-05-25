@@ -71,7 +71,12 @@ async function request<T>(
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const message = res.status === 401 ? "Session expired. Please log in again." : (data?.error || `Request failed (${res.status})`);
+    const detail = typeof data?.detail === "string"
+      ? data.detail
+      : Array.isArray(data?.detail)
+        ? data.detail.map((item: any) => item?.msg || item?.message || String(item)).join(", ")
+        : undefined;
+    const message = res.status === 401 ? "Session expired. Please log in again." : (data?.error || detail || `Request failed (${res.status})`);
     throw new Error(message);
   }
 
