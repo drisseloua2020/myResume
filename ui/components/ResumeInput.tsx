@@ -20,6 +20,7 @@ interface ResumeInputProps {
   user: User; // Need user info for the preview
   initialTab?: 'upload' | 'create' | 'cover_letter';
   prefilledData?: Partial<UserInputData> | null;
+  loadedResumeId?: string | null;
 }
 
 type TabType = 'upload' | 'create' | 'cover_letter';
@@ -35,7 +36,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   selectedTemplateId, 
   user, 
   initialTab = 'create',
-  prefilledData 
+  prefilledData,
+  loadedResumeId = null,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
@@ -61,6 +63,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    setSavedResumeId(loadedResumeId);
+    setSaveMsg(null);
+  }, [loadedResumeId]);
 
   // Personal Details State - Initialize with user data if available
   const [personalDetails, setPersonalDetails] = useState<PersonalDetails>(() => {

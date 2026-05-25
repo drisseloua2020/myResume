@@ -1,16 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import { deleteResume, getResume, listResumes, ResumeListItem } from '../services/resumeService';
+import type { ResumeRecord } from '../services/resumeService';
 import ConfirmDeleteResumeModal from './ConfirmDeleteResumeModal';
 
 function templateName(id: string) {
   return AVAILABLE_TEMPLATES.find((t) => t.id === id)?.name || id;
 }
 
-export default function ResumeLibraryPage() {
+type ResumeLibraryPageProps = {
+  onLoadResume?: (resume: ResumeRecord) => void | Promise<void>;
+};
+
+export default function ResumeLibraryPage({ onLoadResume }: ResumeLibraryPageProps) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ResumeListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadingResumeId, setLoadingResumeId] = useState<string | null>(null);
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -54,6 +60,19 @@ export default function ResumeLibraryPage() {
     }
   }
 
+  async function handleLoad(id: string) {
+    if (!onLoadResume) return;
+    setLoadingResumeId(id);
+    try {
+      const resume = await getResume(id);
+      await onLoadResume(resume);
+    } catch (e: any) {
+      alert(e?.message || 'Load failed');
+    } finally {
+      setLoadingResumeId(null);
+    }
+  }
+
   async function handleDelete(id: string) {
     setDeleteConfirmId(id);
   }
@@ -92,7 +111,7 @@ export default function ResumeLibraryPage() {
       )}
 
       {loading ? (
-        <div className="text-slate-500">Loading…</div>
+        <div className="text-slate-500">Loading...</div>
       ) : itemsWithTemplate.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded p-6 text-slate-600">
           You haven't saved any resumes yet. Generate a resume, then click <b>Save to Library</b>.
@@ -100,20 +119,27 @@ export default function ResumeLibraryPage() {
       ) : (
         <div className="bg-white border border-slate-200 rounded overflow-hidden">
           <div className="grid grid-cols-12 bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wide px-4 py-3 border-b border-slate-200">
-            <div className="col-span-5">Title</div>
+            <div className="col-span-4">Title</div>
             <div className="col-span-3">Template</div>
             <div className="col-span-2">Saved</div>
-            <div className="col-span-2 text-right">Actions</div>
+            <div className="col-span-3 text-right">Actions</div>
           </div>
           {itemsWithTemplate.map((r) => (
             <div key={r.id} className="grid grid-cols-12 px-4 py-3 border-b border-slate-100 items-center">
-              <div className="col-span-5">
+              <div className="col-span-4">
                 <div className="font-medium text-slate-900">{r.title}</div>
                 <div className="text-xs text-slate-500">{r.id}</div>
               </div>
               <div className="col-span-3 text-slate-700">{r.templateName}</div>
-              <div className="col-span-2 text-slate-700 text-sm">{new Date(r.createdAt).toLocaleDateString()}</div>
-              <div className="col-span-2 flex justify-end gap-2">
+              <div className="col-span-2 text-slate-700 text-sm">{new Date(r.updatedAt || r.createdAt).toLocaleDateString()}</div>
+              <div className="col-span-3 flex justify-end gap-2">
+                <button
+                  onClick={() => handleLoad(r.id)}
+                  disabled={loadingResumeId === r.id}
+                  className="px-3 py-1.5 rounded bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                >
+                  {loadingResumeId === r.id ? 'Loading...' : 'Load'}
+                </button>
                 <button
                   onClick={() => handleDownload(r.id)}
                   className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 text-sm"
