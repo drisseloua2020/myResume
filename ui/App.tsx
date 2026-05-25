@@ -41,6 +41,7 @@ const App: React.FC = () => {
   // State to hold imported data for the editor
   const [editorData, setEditorData] = useState<Partial<UserInputData> | null>(null);
   const [loadedResumeId, setLoadedResumeId] = useState<string | null>(null);
+  const [loadedResumeTitle, setLoadedResumeTitle] = useState<string | null>(null);
   const initialResumeLoadUserRef = useRef<string | null>(null);
 
 
@@ -57,6 +58,7 @@ const App: React.FC = () => {
       setResults(null);
       setEditorData(null);
       setLoadedResumeId(null);
+      setLoadedResumeTitle(null);
       initialResumeLoadUserRef.current = null;
       setSelectedTemplateId(undefined);
       setAgentUpdates([]);
@@ -91,6 +93,7 @@ const App: React.FC = () => {
     setSelectedTemplateId(resume.templateId);
     setEditorData({ ...resumeContent, templateId: resume.templateId });
     setLoadedResumeId(resume.id);
+    setLoadedResumeTitle(resume.title);
     setGeneratorTab('create');
     setActiveTab('workspace');
     setWorkspaceResetKey((k) => k + 1);
@@ -128,6 +131,7 @@ const App: React.FC = () => {
           setSelectedTemplateId(templateId);
           setEditorData({ ...draftContent, templateId });
           setLoadedResumeId(null);
+          setLoadedResumeTitle(null);
           setWorkspaceResetKey((k) => k + 1);
         }
       } catch {
@@ -188,6 +192,7 @@ const App: React.FC = () => {
     setResults(null);
     setEditorData(null);
     setLoadedResumeId(null);
+    setLoadedResumeTitle(null);
     initialResumeLoadUserRef.current = null;
     if (user.role === 'admin') {
       setActiveTab('admin_logs');
@@ -214,6 +219,7 @@ const App: React.FC = () => {
     setResults(null);
     setEditorData(null);
     setLoadedResumeId(null);
+    setLoadedResumeTitle(null);
     initialResumeLoadUserRef.current = null;
     setAgentUpdates([]);
     setWorkspaceResetKey((k) => k + 1);
@@ -320,6 +326,7 @@ const App: React.FC = () => {
             const mappedData = mapJsonToState(parsedResults.json);
             setEditorData(mappedData);
             setLoadedResumeId(null);
+            setLoadedResumeTitle(null);
             // Persist imported result as the latest draft (workspace state)
             await saveDraft({
               templateId: selectedTemplateId,
@@ -487,6 +494,12 @@ const App: React.FC = () => {
           <div>
             <div className="text-sm font-semibold text-slate-900">Sources</div>
             <div className="text-xs text-slate-600">Connect & sync LinkedIn, GitHub, and Universal sources.</div>
+            {loadedResumeId && loadedResumeTitle && (
+              <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Loaded resume: {loadedResumeTitle}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -555,6 +568,7 @@ const App: React.FC = () => {
             setResults(null);
             setEditorData(null);
             setLoadedResumeId(null);
+            setLoadedResumeTitle(null);
             setGeneratorTab('create');
             setWorkspaceResetKey((k) => k + 1);
           }}
