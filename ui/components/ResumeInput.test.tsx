@@ -1,0 +1,104 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import ResumeInput from './ResumeInput';
+import { saveResume } from '../services/resumeService';
+import { SubscriptionPlan, UserRole } from '../types';
+
+vi.mock('../services/locationService', () => ({
+  locationService: {
+    getCountries: vi.fn().mockResolvedValue(['United States']),
+    getStates: vi.fn().mockResolvedValue(['California']),
+    getCities: vi.fn().mockResolvedValue(['San Francisco']),
+  },
+}));
+
+vi.mock('../services/resumeService', () => ({
+  saveResume: vi.fn(),
+  updateResume: vi.fn(),
+}));
+
+vi.mock('../services/uploadService', () => ({
+  uploadProfilePhoto: vi.fn(),
+}));
+
+describe('ResumeInput', () => {
+  beforeEach(() => {
+    vi.mocked(saveResume).mockResolvedValue({ id: 'res_saved' });
+  });
+
+  it('restores and persists the include-photo status from a loaded resume record', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+        prefilledData={{
+          targetRole: 'Senior Developer',
+          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
+          profileImageName: 'profile.png',
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: true,
+          },
+          personalDetails: {
+            firstName: 'Resume',
+            lastName: 'User',
+            email: 'resume@example.com',
+            phone: '555-0100',
+            address: '100 Main St',
+            city: 'San Francisco',
+            state: 'California',
+            country: 'United States',
+            postalCode: '94105',
+            summary: 'Experienced developer.',
+          },
+          experienceItems: [
+            { id: 'exp_1', role: 'Senior Developer', company: 'Acme', dates: '2020 - Present', description: 'Built products.' },
+          ],
+          educationItems: [
+            { id: 'edu_1', degree: 'BS Computer Science', school: 'State University', dates: '2016 - 2020' },
+          ],
+          skillItems: [
+            { id: 'skill_1', category: 'Technical', items: 'React, Python' },
+          ],
+        }}
+      />
+    );
+
+    const includePhoto = await screen.findByLabelText(/include photo/i);
+    await waitFor(() => expect(includePhoto).toBeChecked());
+
+    await user.click(screen.getByRole('button', { name: /^save resume$/i }));
+
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledWith(expect.objectContaining({
+        content: expect.objectContaining({
+          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
+          profileImageName: 'profile.png',
+          preferences: expect.objectContaining({
+            photo: true,
+          }),
+        }),
+      }));
+    });
+  });
+});
