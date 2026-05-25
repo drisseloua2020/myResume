@@ -98,6 +98,12 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       if (prefilledData.educationItems) setEducations(prefilledData.educationItems);
       if (prefilledData.skillItems) setSkills(prefilledData.skillItems);
       if (prefilledData.jobDescription) setJobDescription(prefilledData.jobDescription);
+      if (prefilledData.preferences) {
+        setPreferences(prev => ({
+          ...prev!,
+          ...prefilledData.preferences,
+        }));
+      }
       if (prefilledData.personalDetails) {
          setPersonalDetails(prev => ({
              ...prev,
