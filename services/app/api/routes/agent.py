@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
+import re
+import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
+from xml.etree import ElementTree
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from google.genai import types
@@ -31,6 +34,55 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 def _extract_pdf_text(pdf_bytes: bytes) -> str:
     reader = PdfReader(BytesIO(pdf_bytes))
     return "\n".join((page.extract_text() or "") for page in reader.pages).replace("\r", "").strip()[:60000]
+
+
+def _limit_resume_text(text: str) -> str:
+    return re.sub(r"\n{3,}", "\n\n", text.replace("\r", "")).strip()[:60000]
+
+
+def _extract_docx_text(docx_bytes: bytes) -> str:
+    with zipfile.ZipFile(BytesIO(docx_bytes)) as docx:
+        names = [
+            "word/document.xml",
+            *sorted(name for name in docx.namelist() if name.startswith("word/header") and name.endswith(".xml")),
+            *sorted(name for name in docx.namelist() if name.startswith("word/footer") and name.endswith(".xml")),
+        ]
+
+        chunks: list[str] = []
+        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        for name in names:
+            try:
+                root = ElementTree.fromstring(docx.read(name))
+            except Exception:
+                continue
+
+            paragraphs: list[str] = []
+            for paragraph in root.findall(".//w:p", namespace):
+                texts = [node.text or "" for node in paragraph.findall(".//w:t", namespace)]
+                value = "".join(texts).strip()
+                if value:
+                    paragraphs.append(value)
+            chunks.extend(paragraphs)
+
+    return _limit_resume_text("\n".join(chunks))
+
+
+def _extract_legacy_doc_text(doc_bytes: bytes) -> str:
+    decoded = doc_bytes.decode("utf-8", errors="ignore") or doc_bytes.decode("latin-1", errors="ignore")
+    printable_runs = re.findall(r"[A-Za-z0-9@#%&.,;:!?/()'\"+\-\s]{8,}", decoded.replace("\x00", " "))
+    return _limit_resume_text("\n".join(run.strip() for run in printable_runs if run.strip()))
+
+
+def _document_kind(mime: str, name: str = "") -> str | None:
+    clean_mime = mime.lower().strip()
+    lower_name = name.lower()
+    if clean_mime == "application/pdf" or lower_name.endswith(".pdf"):
+        return "pdf"
+    if clean_mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or lower_name.endswith(".docx"):
+        return "docx"
+    if clean_mime == "application/msword" or lower_name.endswith(".doc"):
+        return "doc"
+    return None
 
 
 @router.get("/sources", response_model=DataSourcesEnvelope)
@@ -104,24 +156,44 @@ def generate_resume(
 ) -> GenerateResumeOut:
     _ = current_user
     input_data = dict(payload.input or {})
-    client = get_gemini_client()
-    model = get_model_name()
 
     parts: list[types.Part | str] = []
     file_data = input_data.get("fileData") or {}
     if file_data.get("data") and file_data.get("mimeType"):
         mime = str(file_data["mimeType"])
+        name = str(file_data.get("name") or "")
+        kind = _document_kind(mime, name)
+        if not kind:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Supported import formats: PDF, DOC, DOCX.",
+            )
+
         raw_value = file_data["data"]
         decoded = base64.b64decode(raw_value) if isinstance(raw_value, str) else raw_value
-        if "pdf" in mime:
+        if kind == "pdf":
             try:
                 extracted = _extract_pdf_text(decoded)
                 input_data["currentResumeText"] = extracted
                 parts.append(f"EXTRACTED_RESUME_TEXT_FROM_PDF:\n{extracted}")
             except Exception:
                 parts.append(types.Part.from_bytes(data=decoded, mime_type=mime))
+        elif kind == "docx":
+            try:
+                extracted = _extract_docx_text(decoded)
+                if not extracted:
+                    raise ValueError("No text found in DOCX")
+                input_data["currentResumeText"] = extracted
+                parts.append(f"EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT:\n{extracted}")
+            except Exception:
+                parts.append(types.Part.from_bytes(data=decoded, mime_type=mime))
         else:
-            parts.append(types.Part.from_bytes(data=decoded, mime_type=mime))
+            extracted = _extract_legacy_doc_text(decoded)
+            if extracted:
+                input_data["currentResumeText"] = extracted
+                parts.append(f"EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT:\n{extracted}")
+            else:
+                parts.append(types.Part.from_bytes(data=decoded, mime_type=mime))
 
     profile_image_data = input_data.get("profileImageData") or {}
     if profile_image_data.get("data") and profile_image_data.get("mimeType"):
@@ -131,6 +203,8 @@ def generate_resume(
     parts.append(f"MODE: {payload.mode}\n\nUSER_INPUT_JSON:\n{json.dumps(input_data, indent=2)}")
 
     try:
+        client = get_gemini_client()
+        model = get_model_name()
         response = client.models.generate_content(
             model=model,
             contents=parts,

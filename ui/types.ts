@@ -87,6 +87,7 @@ export interface UserInputData {
   fileData?: {
     mimeType: string;
     data: string; // Base64 encoded string
+    name?: string;
   };
   // Profile Photo
   profileImageUrl?: string;
