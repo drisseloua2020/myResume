@@ -32,6 +32,8 @@ class ResumeOut(StrictModel):
     updatedAt: datetime
 class ResumeEnvelope(StrictModel):
     resume: ResumeOut
+class LatestResumeEnvelope(StrictModel):
+    resume: ResumeOut | None
 class ResumesEnvelope(StrictModel):
     resumes: list[ResumeSummaryOut]
 class ResumeDraftOut(StrictModel):

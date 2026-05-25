@@ -6,7 +6,7 @@ from app.api.deps import get_current_user, get_db
 from app.api.routes.common import to_resume_draft_out, to_resume_out, to_resume_summary_out
 from app.models.entities import Resume, ResumeDraft, User
 from app.schemas.common import IdResponse, OkResponse
-from app.schemas.resumes import CreateResumeIn, DraftIn, ResumeDraftEnvelope, ResumeEnvelope, ResumesEnvelope, UpdateResumeIn
+from app.schemas.resumes import CreateResumeIn, DraftIn, LatestResumeEnvelope, ResumeDraftEnvelope, ResumeEnvelope, ResumesEnvelope, UpdateResumeIn
 from app.services.activity import log_activity, new_prefixed_id
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 @router.post("/", response_model=IdResponse, status_code=status.HTTP_201_CREATED)
@@ -15,7 +15,10 @@ def create_resume(payload: CreateResumeIn, current_user: User = Depends(get_curr
     db.add(resume); db.flush(); log_activity(db, current_user.id, "RESUME_SAVE", details=f"Template: {payload.templateId}", user_name=current_user.name); db.commit(); return IdResponse(id=resume.id)
 @router.get("/", response_model=ResumesEnvelope)
 def list_resumes(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ResumesEnvelope:
-    rows = db.scalars(select(Resume).where(Resume.user_id == current_user.id).order_by(desc(Resume.updated_at))).all(); return ResumesEnvelope(resumes=[to_resume_summary_out(item) for item in rows])
+    rows = db.scalars(select(Resume).where(Resume.user_id == current_user.id).order_by(desc(Resume.updated_at), desc(Resume.created_at))).all(); return ResumesEnvelope(resumes=[to_resume_summary_out(item) for item in rows])
+@router.get("/latest", response_model=LatestResumeEnvelope)
+def latest_resume(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> LatestResumeEnvelope:
+    resume = db.scalar(select(Resume).where(Resume.user_id == current_user.id).order_by(desc(Resume.updated_at), desc(Resume.created_at)).limit(1)); return LatestResumeEnvelope(resume=to_resume_out(resume) if resume else None)
 @router.post("/draft", response_model=OkResponse)
 def save_draft(payload: DraftIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> OkResponse:
     template_id = payload.templateId or ""

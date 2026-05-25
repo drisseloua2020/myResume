@@ -39,9 +39,8 @@ export async function getResume(id: string): Promise<ResumeRecord> {
 }
 
 export async function getLatestResume(): Promise<ResumeRecord | null> {
-  const resumes = await listResumes();
-  if (resumes.length === 0) return null;
-  return getResume(resumes[0].id);
+  const res = await api.get<{ resume: ResumeRecord | null }>('/resumes/latest');
+  return res.resume;
 }
 
 export async function deleteResume(id: string): Promise<void> {
