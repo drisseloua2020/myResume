@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import ResumeInput from './components/ResumeInput';
@@ -25,7 +25,8 @@ import { generateResumeContent } from './services/geminiService';
 import { authService } from './services/authService';
 import { setSession, clearSession, SESSION_EXPIRED_EVENT } from './services/apiClient';
 import { agentService } from './services/agentService';
-import { saveDraft, getLatestDraft } from './services/resumeService';
+import { saveDraft, getLatestDraft, getLatestResume } from './services/resumeService';
+import type { ResumeRecord } from './services/resumeService';
 import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, PersonalDetails } from './types';
 
 const App: React.FC = () => {
@@ -39,6 +40,8 @@ const App: React.FC = () => {
 
   // State to hold imported data for the editor
   const [editorData, setEditorData] = useState<Partial<UserInputData> | null>(null);
+  const [loadedResumeId, setLoadedResumeId] = useState<string | null>(null);
+  const initialResumeLoadUserRef = useRef<string | null>(null);
 
 
   // Global handler: if API returns 401, disconnect user and return to home page.
@@ -53,6 +56,8 @@ const App: React.FC = () => {
       setError(null);
       setResults(null);
       setEditorData(null);
+      setLoadedResumeId(null);
+      initialResumeLoadUserRef.current = null;
       setSelectedTemplateId(undefined);
       setAgentUpdates([]);
       setShowAgentModal(false);
@@ -70,31 +75,72 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Load latest draft when opening the WorkSpace
-  useEffect(() => {
-    if (!currentUser) return;
-    if (activeTab !== 'workspace') return;
-    // If we already have editorData from an import in this session, don't overwrite it
-    if (editorData) return;
-
-    (async () => {
-      try {
-        const draft = await getLatestDraft(selectedTemplateId);
-        if (draft?.content) {
-          setEditorData(draft.content as any);
-        }
-      } catch {
-        // ignore load errors (workspace can start empty)
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, activeTab, selectedTemplateId]);
-
   // Agent State
   const [agentUpdates, setAgentUpdates] = useState<AgentUpdate[]>([]);
   const [showAgentModal, setShowAgentModal] = useState<boolean>(false);
   const [showNewResumeConfirm, setShowNewResumeConfirm] = useState(false);
   const [workspaceResetKey, setWorkspaceResetKey] = useState(0);
+
+  const openResumeInWorkspace = (resume: ResumeRecord) => {
+    const resumeContent = resume.content && typeof resume.content === 'object' && !Array.isArray(resume.content)
+      ? resume.content as Partial<UserInputData>
+      : {};
+
+    setResults(null);
+    setError(null);
+    setSelectedTemplateId(resume.templateId);
+    setEditorData({ ...resumeContent, templateId: resume.templateId });
+    setLoadedResumeId(resume.id);
+    setGeneratorTab('create');
+    setActiveTab('workspace');
+    setWorkspaceResetKey((k) => k + 1);
+  };
+
+  // Load the newest saved resume when a user lands in the WorkSpace.
+  // If the user has no saved resume yet, fall back to the last autosaved draft.
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'admin') return;
+    if (activeTab !== 'workspace') return;
+    if (editorData) return;
+    if (initialResumeLoadUserRef.current === currentUser.id) return;
+
+    let cancelled = false;
+    initialResumeLoadUserRef.current = currentUser.id;
+
+    (async () => {
+      try {
+        const latestResume = await getLatestResume();
+        if (cancelled) return;
+
+        if (latestResume) {
+          openResumeInWorkspace(latestResume);
+          return;
+        }
+
+        const draft = await getLatestDraft(selectedTemplateId);
+        if (cancelled) return;
+
+        if (draft?.content) {
+          const draftContent = draft.content && typeof draft.content === 'object' && !Array.isArray(draft.content)
+            ? draft.content as Partial<UserInputData>
+            : {};
+          const templateId = draft.templateId || selectedTemplateId;
+          setSelectedTemplateId(templateId);
+          setEditorData({ ...draftContent, templateId });
+          setLoadedResumeId(null);
+          setWorkspaceResetKey((k) => k + 1);
+        }
+      } catch {
+        // Workspace can still start empty if the saved-resume lookup fails.
+        initialResumeLoadUserRef.current = null;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, activeTab, editorData, selectedTemplateId]);
 
   // Check for existing session on load
   useEffect(() => {
@@ -140,6 +186,9 @@ const App: React.FC = () => {
   const handleLogin = (user: User, initialTemplateId?: string) => {
     setCurrentUser(user);
     setResults(null);
+    setEditorData(null);
+    setLoadedResumeId(null);
+    initialResumeLoadUserRef.current = null;
     if (user.role === 'admin') {
       setActiveTab('admin_logs');
       return;
@@ -162,7 +211,12 @@ const App: React.FC = () => {
     void authService.logout();
     setCurrentUser(null);
     setSelectedTemplateId(undefined);
+    setResults(null);
+    setEditorData(null);
+    setLoadedResumeId(null);
+    initialResumeLoadUserRef.current = null;
     setAgentUpdates([]);
+    setWorkspaceResetKey((k) => k + 1);
   };
 
   const handlePlanUpdate = (newPlan: SubscriptionPlan) => {
@@ -265,6 +319,7 @@ const App: React.FC = () => {
         if (parsedResults.json) {
             const mappedData = mapJsonToState(parsedResults.json);
             setEditorData(mappedData);
+            setLoadedResumeId(null);
             // Persist imported result as the latest draft (workspace state)
             await saveDraft({
               templateId: selectedTemplateId,
@@ -369,7 +424,7 @@ const App: React.FC = () => {
     if (activeTab === 'resumes') {
       return (
         <div className="max-w-6xl mx-auto py-8 px-6">
-          <ResumeLibraryPage />
+          <ResumeLibraryPage onLoadResume={openResumeInWorkspace} />
         </div>
       );
     }
@@ -465,6 +520,7 @@ const App: React.FC = () => {
           selectedTemplateId={selectedTemplateId}
           user={currentUser}
           initialTab={generatorTab}
+          loadedResumeId={loadedResumeId}
         />
       </div>
     );
@@ -498,6 +554,7 @@ const App: React.FC = () => {
             // Clear current editor data and start fresh
             setResults(null);
             setEditorData(null);
+            setLoadedResumeId(null);
             setGeneratorTab('create');
             setWorkspaceResetKey((k) => k + 1);
           }}
