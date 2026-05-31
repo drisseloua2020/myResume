@@ -303,6 +303,109 @@ def _build_cover_letter_pdf(title: str, body: str) -> bytes:
     return bytes(pdf)
 
 
+def _resume_highlights(resume_context) -> list[str]:
+    if not isinstance(resume_context, dict):
+        return []
+
+    highlights: list[str] = []
+    personal = resume_context.get("personalDetails")
+    if isinstance(personal, dict) and personal.get("summary"):
+        highlights.append(str(personal["summary"]))
+
+    for item in resume_context.get("experienceItems") or []:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip()
+        company = str(item.get("company") or "").strip()
+        description = str(item.get("description") or "").strip()
+        parts = [part for part in (role, company) if part]
+        if description:
+            parts.append(description)
+        if parts:
+            highlights.append(" - ".join(parts))
+
+    skill_values: list[str] = []
+    for item in resume_context.get("skillItems") or []:
+        if isinstance(item, dict) and item.get("items"):
+            skill_values.append(str(item["items"]))
+    if skill_values:
+        highlights.append("Skills: " + ", ".join(skill_values[:4]))
+
+    return [_clean_text(value)[:500] for value in highlights if _clean_text(value)][:6]
+
+
+def _job_priorities(job_description: str) -> list[str]:
+    priorities: list[str] = []
+    keywords = (
+        "experience",
+        "architecture",
+        "engineer",
+        "platform",
+        "cloud",
+        "devops",
+        "lead",
+        "mentor",
+        "responsible",
+        "build",
+        "design",
+        "ai",
+    )
+    for raw_line in job_description.splitlines():
+        line = re.sub(r"^\s*[-*]\s*", "", raw_line).strip()
+        if not 30 <= len(line) <= 260:
+            continue
+        lower = line.lower()
+        if any(keyword in lower for keyword in keywords):
+            priorities.append(line)
+        if len(priorities) >= 5:
+            break
+    return priorities
+
+
+def _build_local_cover_letter(title: str, job_description: str, resume_context, current_user: User) -> tuple[str, str, str, str]:
+    role = title or _infer_job_title(job_description)
+    name = current_user.name or "[YOUR NAME]"
+    highlights = _resume_highlights(resume_context)
+    priorities = _job_priorities(job_description)
+    primary_highlight = highlights[0] if highlights else "[NEEDS USER INPUT: add the most relevant resume achievement]"
+    secondary_highlight = highlights[1] if len(highlights) > 1 else primary_highlight
+    priority_text = "; ".join(priorities[:3]) if priorities else "the responsibilities and qualifications described in the job posting"
+
+    full = f"""Dear Hiring Team,
+
+I am excited to apply for the {role} role. The opportunity stood out because it emphasizes {priority_text}, which aligns with the background and strengths reflected in my resume.
+
+A relevant example from my experience is: {primary_highlight}. I would bring that same practical, outcome-focused approach to this role, especially where the team needs someone who can understand the business context, work across technical details, and help turn priorities into dependable delivery.
+
+I also bring experience that connects to this posting through: {secondary_highlight}. I would welcome the chance to discuss how my background can support your team and contribute to the work ahead.
+
+Thank you for your time and consideration.
+
+Sincerely,
+{name}"""
+
+    short = f"""Dear Hiring Team,
+
+I am excited to apply for the {role} role. My background includes {primary_highlight}, and I see a strong connection to your need for {priority_text}. I would welcome the opportunity to discuss how I can contribute to your team.
+
+Sincerely,
+{name}"""
+
+    cold_email = f"""Hello,
+
+I am interested in the {role} role and wanted to share my resume for consideration.
+
+My background includes {primary_highlight}.
+
+I would be glad to discuss how that experience maps to your team's needs.
+
+Best,
+{name}"""
+
+    raw = "LOCAL_FALLBACK_COVER_LETTER: Gemini generation failed, so ResumeForge created a conservative saved draft from the parsed job description and resume context."
+    return full, short, cold_email, raw
+
+
 @router.post("/generate", response_model=CoverLetterEnvelope, status_code=status.HTTP_201_CREATED)
 def generate(payload: GenerateCoverLetterIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CoverLetterEnvelope:
     job_description, job_url, inferred_title = _resolve_job_source(payload)
@@ -330,28 +433,44 @@ USER_CONTEXT_JSON:
         cover_letter_full = extract(raw, "COVER_LETTER_FULL:", "COVER_LETTER_SHORT:") or raw.strip()
         cover_letter_short = extract(raw, "COVER_LETTER_SHORT:", "COLD_EMAIL:") or ""
         cold_email = extract(raw, "COLD_EMAIL:", None) or ""
-        entity = CoverLetter(
-            id=new_prefixed_id("cl"),
-            user_id=current_user.id,
-            template_id=payload.templateId,
-            title=title,
-            job_description=job_description,
-            content={
-                "coverLetterFull": cover_letter_full,
-                "coverLetterShort": cover_letter_short,
-                "coldEmail": cold_email,
-                "raw": raw,
-                "jobUrl": job_url,
-            },
+        if not cover_letter_full.strip():
+            raise RuntimeError("AI response did not include cover letter content")
+        generation_source = "ai"
+    except Exception:
+        cover_letter_full, cover_letter_short, cold_email, raw = _build_local_cover_letter(
+            title,
+            job_description,
+            resume_context,
+            current_user,
         )
+        generation_source = "local_fallback"
+
+    entity = CoverLetter(
+        id=new_prefixed_id("cl"),
+        user_id=current_user.id,
+        template_id=payload.templateId,
+        title=title,
+        job_description=job_description,
+        content={
+            "coverLetterFull": cover_letter_full,
+            "coverLetterShort": cover_letter_short,
+            "coldEmail": cold_email,
+            "raw": raw,
+            "jobUrl": job_url,
+            "generationSource": generation_source,
+        },
+    )
+    try:
         db.add(entity)
         db.flush()
-        log_activity(db, current_user.id, "COVERLETTER_GENERATE", details=f"Template: {payload.templateId or 'n/a'}", user_name=current_user.name)
+        details = f"Template: {payload.templateId or 'n/a'}, Source: {generation_source}"
+        log_activity(db, current_user.id, "COVERLETTER_GENERATE", details=details, user_name=current_user.name)
         db.commit()
         db.refresh(entity)
         return CoverLetterEnvelope(coverLetter=to_cover_letter_out(entity))
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI generation failed") from exc
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not save cover letter.") from exc
 
 
 @router.get("/", response_model=CoverLettersEnvelope)
