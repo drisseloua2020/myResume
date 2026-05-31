@@ -85,6 +85,50 @@ def test_generate_cover_letter_returns_error_when_job_url_cannot_be_processed(cl
     assert response.json()["detail"] == "Could not process the job URL. Paste the job description instead."
 
 
+def test_generate_cover_letter_strips_uploaded_binary_resume_context(client, monkeypatch):
+    token = _signup(client, "cover-sanitize@example.com")
+    fake_client = _FakeGeminiClient()
+    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
+    monkeypatch.setattr(
+        "app.api.routes.cover_letters._fetch_job_description_from_url",
+        lambda url: (
+            "Software Architect\nBuild AI-accelerated engineering platforms and mentor teams.",
+            "Software Architect",
+        ),
+    )
+    binary_blob = "a" * 50000
+
+    response = client.post(
+        "/cover-letters/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "jobUrl": "https://jobs.example.com/software-architect",
+            "resumeJson": {
+                "targetRole": "Software Architect",
+                "currentResumeText": "Experienced architect with AI delivery background.",
+                "fileData": {"mimeType": "application/pdf", "data": binary_blob},
+                "profileImageData": {"mimeType": "image/png", "data": binary_blob},
+                "experienceItems": [
+                    {
+                        "role": "Architect",
+                        "company": "Example Co",
+                        "description": "Led AI platform work.",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    contents = fake_client.models.calls[0]["contents"][0]
+    assert "Software Architect" in contents
+    assert "Experienced architect with AI delivery background." in contents
+    assert "Led AI platform work." in contents
+    assert "fileData" not in contents
+    assert "profileImageData" not in contents
+    assert binary_blob not in contents
+
+
 def test_download_cover_letter_pdf(client, monkeypatch):
     token = _signup(client, "cover-pdf@example.com")
     fake_client = _FakeGeminiClient()

@@ -26,6 +26,8 @@ router = APIRouter(prefix="/cover-letters", tags=["cover-letters"])
 MAX_JOB_DESCRIPTION_CHARS = 20000
 MAX_JOB_SOURCE_CHARS = 500000
 JOB_URL_ERROR = "Could not process the job URL. Paste the job description instead."
+MAX_RESUME_PROMPT_STRING_CHARS = 12000
+MAX_RESUME_PROMPT_COLLECTION_ITEMS = 80
 
 
 class _VisibleTextParser(HTMLParser):
@@ -89,6 +91,44 @@ def _html_to_text(html: str) -> str:
     parser.feed(html)
     parser.close()
     return _clean_text(parser.text())
+
+
+def _sanitize_resume_context(value, *, depth: int = 0):
+    """Remove uploaded binary blobs before sending resume context to the AI model."""
+    if depth > 8:
+        return "[TRUNCATED]"
+
+    binary_keys = {
+        "data",
+        "fileData",
+        "profileImageData",
+        "legacyProfileImageData",
+        "profileImageUrl",
+        "profileImageName",
+    }
+
+    if isinstance(value, dict):
+        clean: dict[str, object] = {}
+        for key, item in value.items():
+            clean_key = str(key)
+            if clean_key in binary_keys:
+                continue
+            clean[clean_key] = _sanitize_resume_context(item, depth=depth + 1)
+        return clean
+
+    if isinstance(value, list):
+        return [
+            _sanitize_resume_context(item, depth=depth + 1)
+            for item in value[:MAX_RESUME_PROMPT_COLLECTION_ITEMS]
+        ]
+
+    if isinstance(value, str):
+        cleaned = _clean_text(value)
+        if len(cleaned) > MAX_RESUME_PROMPT_STRING_CHARS:
+            return f"{cleaned[:MAX_RESUME_PROMPT_STRING_CHARS]}...[TRUNCATED]"
+        return cleaned
+
+    return value
 
 
 def _validate_job_url(job_url: str) -> str:
@@ -267,6 +307,7 @@ def _build_cover_letter_pdf(title: str, body: str) -> bytes:
 def generate(payload: GenerateCoverLetterIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CoverLetterEnvelope:
     job_description, job_url, inferred_title = _resolve_job_source(payload)
     title = (payload.title or inferred_title or "Cover Letter")[:200]
+    resume_context = _sanitize_resume_context(payload.resumeJson)
     user_prompt = f"""You are generating ONLY cover letter outputs.
 
 Return EXACTLY these sections (no resume sections):
@@ -280,10 +321,10 @@ COLD_EMAIL:
 <text>
 
 USER_CONTEXT_JSON:
-{json.dumps({'name': current_user.name, 'email': current_user.email, 'templateId': payload.templateId, 'jobUrl': job_url, 'jobDescription': job_description, 'resumeJson': payload.resumeJson}, indent=2)}"""
-    client = get_gemini_client()
-    model = get_model_name()
+{json.dumps({'name': current_user.name, 'email': current_user.email, 'templateId': payload.templateId, 'jobUrl': job_url, 'jobDescription': job_description, 'resumeJson': resume_context}, indent=2)}"""
     try:
+        client = get_gemini_client()
+        model = get_model_name()
         response = client.models.generate_content(model=model, contents=[user_prompt], config=make_config(RESUME_FORGE_SYSTEM_PROMPT))
         raw = response.text or ""
         cover_letter_full = extract(raw, "COVER_LETTER_FULL:", "COVER_LETTER_SHORT:") or raw.strip()
