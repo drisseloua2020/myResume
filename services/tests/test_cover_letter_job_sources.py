@@ -129,6 +129,48 @@ def test_generate_cover_letter_strips_uploaded_binary_resume_context(client, mon
     assert binary_blob not in contents
 
 
+def test_generate_cover_letter_uses_local_fallback_when_ai_fails(client, monkeypatch):
+    token = _signup(client, "cover-fallback@example.com")
+    monkeypatch.setattr(
+        "app.api.routes.cover_letters._fetch_job_description_from_url",
+        lambda url: (
+            "Software Architect\nDesign AI-enabled platforms, mentor engineering teams, and build reliable delivery practices.",
+            "Software Architect",
+        ),
+    )
+    monkeypatch.setattr(
+        "app.api.routes.cover_letters.get_gemini_client",
+        lambda: (_ for _ in ()).throw(RuntimeError("Missing GEMINI_API_KEY")),
+    )
+
+    response = client.post(
+        "/cover-letters/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "jobUrl": "https://jobs.example.com/software-architect",
+            "resumeJson": {
+                "targetRole": "Software Architect",
+                "personalDetails": {
+                    "summary": "Architect with platform engineering and AI delivery experience.",
+                },
+                "experienceItems": [
+                    {
+                        "role": "Lead Architect",
+                        "company": "Example Co",
+                        "description": "Built developer platforms and mentored engineering teams.",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    payload = response.json()["coverLetter"]
+    assert payload["title"] == "Software Architect"
+    assert "Dear Hiring Team" in payload["content"]["coverLetterFull"]
+    assert "platform engineering and AI delivery experience" in payload["content"]["coverLetterFull"]
+
+
 def test_download_cover_letter_pdf(client, monkeypatch):
     token = _signup(client, "cover-pdf@example.com")
     fake_client = _FakeGeminiClient()
