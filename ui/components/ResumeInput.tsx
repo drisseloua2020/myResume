@@ -521,7 +521,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
         const record = await generateCoverLetter({
           jobDescription: jobSourceMode === 'paste' ? jobDescription.trim() : undefined,
           jobUrl: jobSourceMode === 'url' ? jobUrl.trim() : undefined,
-          title: targetRole ? `${targetRole} Cover Letter` : undefined,
           templateId: selectedTemplateId,
           resumeJson: payload,
         });
