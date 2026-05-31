@@ -102,6 +102,37 @@ def test_generate_cover_letter_prefers_job_title_over_resume_title(client, monke
     assert "Senior Developer Cover Letter" not in contents
 
 
+def test_generate_cover_letter_normalizes_noisy_job_board_title(client, monkeypatch):
+    token = _signup(client, "cover-noisy-title@example.com")
+    fake_client = _FakeGeminiClient()
+    noisy_title = "Software Architect - AI Accelerated Engineering Lead (Central) - 617 - Slalom"
+    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
+    monkeypatch.setattr(
+        "app.api.routes.cover_letters._fetch_job_description_from_url",
+        lambda url: (
+            f"{noisy_title}\nMission\nDesign AI-enabled platforms and lead architecture practices.",
+            noisy_title,
+        ),
+    )
+
+    response = client.post(
+        "/cover-letters/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "jobUrl": "https://jobs.slalom.com/en_US/careersmarketplace/JobDetail?jobId=617",
+            "resumeJson": {"targetRole": "Senior Developer"},
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    payload = response.json()["coverLetter"]
+    assert payload["title"] == "Software Architect"
+
+    contents = fake_client.models.calls[0]["contents"][0]
+    assert '"jobTitleFromDescription": "Software Architect"' in contents
+    assert noisy_title in contents
+
+
 def test_generate_cover_letter_returns_error_when_job_url_cannot_be_processed(client, monkeypatch):
     token = _signup(client, "cover-url-error@example.com")
 

@@ -28,6 +28,21 @@ MAX_JOB_SOURCE_CHARS = 500000
 JOB_URL_ERROR = "Could not process the job URL. Paste the job description instead."
 MAX_RESUME_PROMPT_STRING_CHARS = 12000
 MAX_RESUME_PROMPT_COLLECTION_ITEMS = 80
+JOB_TITLE_KEYWORDS = (
+    "administrator",
+    "analyst",
+    "architect",
+    "consultant",
+    "designer",
+    "developer",
+    "director",
+    "engineer",
+    "lead",
+    "manager",
+    "principal",
+    "scientist",
+    "specialist",
+)
 
 
 class _VisibleTextParser(HTMLParser):
@@ -152,6 +167,66 @@ def _validate_job_url(job_url: str) -> str:
     return clean_url
 
 
+def _looks_like_job_title(value: str) -> bool:
+    lower = value.lower()
+    return any(keyword in lower for keyword in JOB_TITLE_KEYWORDS)
+
+
+def _strip_parenthetical_location(value: str) -> str:
+    location_words = {
+        "central",
+        "east",
+        "eastern",
+        "global",
+        "hybrid",
+        "north",
+        "northeast",
+        "remote",
+        "south",
+        "southeast",
+        "southwest",
+        "us",
+        "usa",
+        "west",
+        "western",
+    }
+
+    def replace(match: re.Match[str]) -> str:
+        inner = match.group(1).strip().lower()
+        if inner in location_words or re.fullmatch(r"[a-z]{2}", inner):
+            return ""
+        return match.group(0)
+
+    return re.sub(r"\s*\(([^()]*)\)\s*$", replace, value).strip()
+
+
+def _normalize_job_title_candidate(value: str) -> str:
+    candidate = re.sub(r"\s+", " ", value).strip(" -:|.")
+    if not candidate:
+        return ""
+
+    parts = [
+        part.strip(" -:|.")
+        for part in re.split(r"\s+(?:[-–—|•·])\s+", candidate)
+        if part.strip(" -:|.")
+    ]
+    if not parts:
+        parts = [candidate]
+
+    for part in parts:
+        clean = _strip_parenthetical_location(part)
+        clean = re.sub(r"\s+#?\d{2,}\s*$", "", clean).strip(" -:|.")
+        clean = re.sub(r"\s+role$", "", clean, flags=re.IGNORECASE).strip()
+        if not clean or clean.isdigit():
+            continue
+        if len(clean.split()) > 8:
+            continue
+        if _looks_like_job_title(clean):
+            return clean[:200]
+
+    return ""
+
+
 def _infer_job_title(job_description: str, fallback_url: str | None = None) -> str:
     ignored_prefixes = (
         "about ",
@@ -180,20 +255,23 @@ def _infer_job_title(job_description: str, fallback_url: str | None = None) -> s
         line = re.sub(r"\s+", " ", raw_line).strip(" -:|")
         if not 4 <= len(line) <= 120:
             continue
-        if line.endswith(".") or len(line.split()) > 12:
+        if line.endswith(".") and not re.search(r"\s+(?:[-–—|•·])\s+", line):
             continue
         lower = line.lower()
         if lower.startswith(ignored_prefixes) or lower.startswith(prose_prefixes):
             continue
-        if any(keyword in lower for keyword in ("engineer", "developer", "manager", "analyst", "designer", "architect", "specialist", "director", "lead", "consultant")):
-            return line[:200]
+        normalized_title = _normalize_job_title_candidate(line)
+        if normalized_title:
+            return normalized_title
 
     if fallback_url:
         parsed = urlparse(fallback_url)
         slug = parsed.path.rstrip("/").split("/")[-1]
         slug = re.sub(r"[-_]+", " ", slug).strip()
         if 4 <= len(slug) <= 120:
-            return slug.title()[:200]
+            normalized_title = _normalize_job_title_candidate(slug.title())
+            if normalized_title:
+                return normalized_title
 
     return "Cover Letter"
 
@@ -420,7 +498,7 @@ Best,
 
 
 def _resolve_cover_letter_title(inferred_title: str, payload_title: str | None) -> str:
-    clean_inferred = (inferred_title or "").strip()
+    clean_inferred = _normalize_job_title_candidate(inferred_title or "") or (inferred_title or "").strip()
     if clean_inferred and clean_inferred != "Cover Letter":
         return clean_inferred[:200]
     clean_payload = (payload_title or "").strip()
