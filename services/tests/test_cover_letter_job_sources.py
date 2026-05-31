@@ -67,6 +67,41 @@ def test_generate_cover_letter_from_job_url_fetches_description(client, monkeypa
     assert "Build internal developer platforms" in contents
 
 
+def test_generate_cover_letter_prefers_job_title_over_resume_title(client, monkeypatch):
+    token = _signup(client, "cover-title@example.com")
+    fake_client = _FakeGeminiClient()
+    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
+    monkeypatch.setattr(
+        "app.api.routes.cover_letters._fetch_job_description_from_url",
+        lambda url: (
+            "Software Architect\nDesign AI-enabled platforms and lead architecture practices.",
+            "Software Architect",
+        ),
+    )
+
+    response = client.post(
+        "/cover-letters/generate",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "jobUrl": "https://jobs.example.com/software-architect",
+            "title": "Senior Developer Cover Letter",
+            "resumeJson": {
+                "targetRole": "Senior Developer",
+                "personalDetails": {"summary": "Senior developer with platform experience."},
+            },
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    payload = response.json()["coverLetter"]
+    assert payload["title"] == "Software Architect"
+
+    contents = fake_client.models.calls[0]["contents"][0]
+    assert "jobTitleFromDescription" in contents
+    assert "Software Architect" in contents
+    assert "Senior Developer Cover Letter" not in contents
+
+
 def test_generate_cover_letter_returns_error_when_job_url_cannot_be_processed(client, monkeypatch):
     token = _signup(client, "cover-url-error@example.com")
 

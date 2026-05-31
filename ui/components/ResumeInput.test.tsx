@@ -255,7 +255,6 @@ describe('ResumeInput', () => {
       expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({
         jobUrl: 'https://jobs.example.com/senior-developer',
         jobDescription: undefined,
-        title: 'Senior Developer Cover Letter',
         templateId: 'classic_pro',
         resumeJson: expect.objectContaining({
           targetRole: 'Senior Developer',

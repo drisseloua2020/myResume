@@ -165,12 +165,25 @@ def _infer_job_title(job_description: str, fallback_url: str | None = None) -> s
         "salary",
         "who we are",
     )
+    prose_prefixes = (
+        "we need ",
+        "we are ",
+        "we're ",
+        "you will ",
+        "you'll ",
+        "this role ",
+        "this position ",
+        "looking for ",
+        "seeking ",
+    )
     for raw_line in job_description.splitlines():
         line = re.sub(r"\s+", " ", raw_line).strip(" -:|")
         if not 4 <= len(line) <= 120:
             continue
+        if line.endswith(".") or len(line.split()) > 12:
+            continue
         lower = line.lower()
-        if lower.startswith(ignored_prefixes):
+        if lower.startswith(ignored_prefixes) or lower.startswith(prose_prefixes):
             continue
         if any(keyword in lower for keyword in ("engineer", "developer", "manager", "analyst", "designer", "architect", "specialist", "director", "lead", "consultant")):
             return line[:200]
@@ -406,12 +419,22 @@ Best,
     return full, short, cold_email, raw
 
 
+def _resolve_cover_letter_title(inferred_title: str, payload_title: str | None) -> str:
+    clean_inferred = (inferred_title or "").strip()
+    if clean_inferred and clean_inferred != "Cover Letter":
+        return clean_inferred[:200]
+    clean_payload = (payload_title or "").strip()
+    return (clean_payload or "Cover Letter")[:200]
+
+
 @router.post("/generate", response_model=CoverLetterEnvelope, status_code=status.HTTP_201_CREATED)
 def generate(payload: GenerateCoverLetterIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CoverLetterEnvelope:
     job_description, job_url, inferred_title = _resolve_job_source(payload)
-    title = (payload.title or inferred_title or "Cover Letter")[:200]
+    title = _resolve_cover_letter_title(inferred_title, payload.title)
     resume_context = _sanitize_resume_context(payload.resumeJson)
     user_prompt = f"""You are generating ONLY cover letter outputs.
+Use JOB_TITLE_FROM_DESCRIPTION as the position the candidate is applying to.
+Do not use the resume target role, resume title, or current role as the applied-for position unless it matches JOB_TITLE_FROM_DESCRIPTION.
 
 Return EXACTLY these sections (no resume sections):
 COVER_LETTER_FULL:
@@ -424,7 +447,7 @@ COLD_EMAIL:
 <text>
 
 USER_CONTEXT_JSON:
-{json.dumps({'name': current_user.name, 'email': current_user.email, 'templateId': payload.templateId, 'jobUrl': job_url, 'jobDescription': job_description, 'resumeJson': resume_context}, indent=2)}"""
+{json.dumps({'name': current_user.name, 'email': current_user.email, 'templateId': payload.templateId, 'jobTitleFromDescription': title, 'jobUrl': job_url, 'jobDescription': job_description, 'resumeJson': resume_context}, indent=2)}"""
     try:
         client = get_gemini_client()
         model = get_model_name()
