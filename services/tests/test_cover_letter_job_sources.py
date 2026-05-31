@@ -104,8 +104,31 @@ def test_generate_cover_letter_prefers_job_title_over_resume_title(client, monke
 
 def test_generate_cover_letter_normalizes_noisy_job_board_title(client, monkeypatch):
     token = _signup(client, "cover-noisy-title@example.com")
-    fake_client = _FakeGeminiClient()
     noisy_title = "Software Architect - AI Accelerated Engineering Lead (Central) - 617 - Slalom"
+
+    class _NoisyTitleGeminiResponse:
+        text = f"""COVER_LETTER_FULL:
+I am excited to apply for the {noisy_title} role.
+
+COVER_LETTER_SHORT:
+Applying for {noisy_title}.
+
+COLD_EMAIL:
+I am interested in {noisy_title}."""
+
+    class _NoisyTitleGeminiModels:
+        def __init__(self):
+            self.calls = []
+
+        def generate_content(self, **kwargs):
+            self.calls.append(kwargs)
+            return _NoisyTitleGeminiResponse()
+
+    class _NoisyTitleGeminiClient:
+        def __init__(self):
+            self.models = _NoisyTitleGeminiModels()
+
+    fake_client = _NoisyTitleGeminiClient()
     monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
     monkeypatch.setattr(
         "app.api.routes.cover_letters._fetch_job_description_from_url",
@@ -127,10 +150,14 @@ def test_generate_cover_letter_normalizes_noisy_job_board_title(client, monkeypa
     assert response.status_code == 201, response.text
     payload = response.json()["coverLetter"]
     assert payload["title"] == "Software Architect"
+    assert noisy_title not in payload["content"]["coverLetterFull"]
+    assert noisy_title not in payload["content"]["coverLetterShort"]
+    assert noisy_title not in payload["content"]["coldEmail"]
+    assert "Software Architect role" in payload["content"]["coverLetterFull"]
 
     contents = fake_client.models.calls[0]["contents"][0]
     assert '"jobTitleFromDescription": "Software Architect"' in contents
-    assert noisy_title in contents
+    assert noisy_title not in contents
 
 
 def test_generate_cover_letter_returns_error_when_job_url_cannot_be_processed(client, monkeypatch):

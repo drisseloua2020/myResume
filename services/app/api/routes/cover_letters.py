@@ -227,6 +227,34 @@ def _normalize_job_title_candidate(value: str) -> str:
     return ""
 
 
+def _job_title_variants(job_description: str, normalized_title: str) -> list[str]:
+    title = (normalized_title or "").strip()
+    if not title or title == "Cover Letter":
+        return []
+
+    variants: list[str] = []
+    for raw_line in job_description.splitlines():
+        line = re.sub(r"\s+", " ", raw_line).strip(" -:|.")
+        if not line or line == title:
+            continue
+        if _normalize_job_title_candidate(line) == title and line not in variants:
+            variants.append(line)
+
+    return sorted(variants, key=len, reverse=True)
+
+
+def _replace_noisy_job_title_variants(text: str, normalized_title: str, variants: list[str]) -> str:
+    clean_text = text
+    for variant in variants:
+        clean_text = clean_text.replace(variant, normalized_title)
+    return clean_text
+
+
+def _normalize_job_description_for_generation(job_description: str, normalized_title: str, variants: list[str]) -> str:
+    clean_description = _replace_noisy_job_title_variants(job_description, normalized_title, variants)
+    return clean_description[:MAX_JOB_DESCRIPTION_CHARS]
+
+
 def _infer_job_title(job_description: str, fallback_url: str | None = None) -> str:
     ignored_prefixes = (
         "about ",
@@ -509,9 +537,17 @@ def _resolve_cover_letter_title(inferred_title: str, payload_title: str | None) 
 def generate(payload: GenerateCoverLetterIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CoverLetterEnvelope:
     job_description, job_url, inferred_title = _resolve_job_source(payload)
     title = _resolve_cover_letter_title(inferred_title, payload.title)
+    noisy_title_variants = _job_title_variants(job_description, title)
+    job_description_for_generation = _normalize_job_description_for_generation(
+        job_description,
+        title,
+        noisy_title_variants,
+    )
     resume_context = _sanitize_resume_context(payload.resumeJson)
     user_prompt = f"""You are generating ONLY cover letter outputs.
 Use JOB_TITLE_FROM_DESCRIPTION as the position the candidate is applying to.
+Use only JOB_TITLE_FROM_DESCRIPTION in the cover letter body.
+Never spell out a longer job-board title, requisition title, tracking number, company suffix, or location suffix.
 Do not use the resume target role, resume title, or current role as the applied-for position unless it matches JOB_TITLE_FROM_DESCRIPTION.
 
 Return EXACTLY these sections (no resume sections):
@@ -525,7 +561,7 @@ COLD_EMAIL:
 <text>
 
 USER_CONTEXT_JSON:
-{json.dumps({'name': current_user.name, 'email': current_user.email, 'templateId': payload.templateId, 'jobTitleFromDescription': title, 'jobUrl': job_url, 'jobDescription': job_description, 'resumeJson': resume_context}, indent=2)}"""
+{json.dumps({'name': current_user.name, 'email': current_user.email, 'templateId': payload.templateId, 'jobTitleFromDescription': title, 'jobUrl': job_url, 'jobDescription': job_description_for_generation, 'resumeJson': resume_context}, indent=2)}"""
     try:
         client = get_gemini_client()
         model = get_model_name()
@@ -534,13 +570,16 @@ USER_CONTEXT_JSON:
         cover_letter_full = extract(raw, "COVER_LETTER_FULL:", "COVER_LETTER_SHORT:") or raw.strip()
         cover_letter_short = extract(raw, "COVER_LETTER_SHORT:", "COLD_EMAIL:") or ""
         cold_email = extract(raw, "COLD_EMAIL:", None) or ""
+        cover_letter_full = _replace_noisy_job_title_variants(cover_letter_full, title, noisy_title_variants)
+        cover_letter_short = _replace_noisy_job_title_variants(cover_letter_short, title, noisy_title_variants)
+        cold_email = _replace_noisy_job_title_variants(cold_email, title, noisy_title_variants)
         if not cover_letter_full.strip():
             raise RuntimeError("AI response did not include cover letter content")
         generation_source = "ai"
     except Exception:
         cover_letter_full, cover_letter_short, cold_email, raw = _build_local_cover_letter(
             title,
-            job_description,
+            job_description_for_generation,
             resume_context,
             current_user,
         )
