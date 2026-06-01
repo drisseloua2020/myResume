@@ -166,6 +166,38 @@ describe('ResumeInput', () => {
     alertSpy.mockRestore();
   });
 
+  it('hides target role while importing an existing resume file', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    expect(screen.getByText(/^Target Role$/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /import file/i }));
+
+    expect(screen.queryByText(/^Target Role$/i)).not.toBeInTheDocument();
+  });
+
   it('sends Word import files to the live editor parser', async () => {
     const user = userEvent.setup();
     const onImport = vi.fn();
@@ -211,6 +243,7 @@ describe('ResumeInput', () => {
 
     await waitFor(() => {
       expect(onImport).toHaveBeenCalledWith(expect.objectContaining({
+        targetRole: '',
         currentResumeText: '',
         fileData: expect.objectContaining({
           mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
