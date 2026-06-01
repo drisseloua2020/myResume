@@ -7,6 +7,7 @@ from zipfile import ZipFile
 
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+PDF_MIME = "application/pdf"
 
 
 class _FakeGeminiResponse:
@@ -87,6 +88,45 @@ def _docx_bytes(text: str) -> bytes:
         docx.writestr("[Content_Types].xml", "")
         docx.writestr("word/document.xml", document_xml)
     return buffer.getvalue()
+
+
+def _pdf_bytes(lines: list[str]) -> bytes:
+    def escape_pdf_text(value: str) -> str:
+        return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    content = "BT\n/F1 12 Tf\n72 760 Td\n"
+    for index, line in enumerate(lines):
+        prefix = "" if index == 0 else "0 -18 Td "
+        content += f"{prefix}({escape_pdf_text(line)}) Tj\n"
+    content += "ET\n"
+    stream = content.encode("latin-1")
+
+    objects: list[bytes] = []
+
+    def add_object(value: str | bytes) -> None:
+        objects.append(value if isinstance(value, bytes) else value.encode("latin-1"))
+
+    add_object("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
+    add_object("2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n")
+    add_object(
+        "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n"
+    )
+    add_object("4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n")
+    add_object(b"5 0 obj << /Length " + str(len(stream)).encode("ascii") + b" >> stream\n" + stream + b"endstream endobj\n")
+
+    output = BytesIO()
+    output.write(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for obj in objects:
+        offsets.append(output.tell())
+        output.write(obj)
+    xref = output.tell()
+    output.write(f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("latin-1"))
+    for offset in offsets:
+        output.write(f"{offset:010d} 00000 n \n".encode("latin-1"))
+    output.write(f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode("latin-1"))
+    return output.getvalue()
 
 
 def test_generate_resume_extracts_docx_text_before_ai_parse(client, monkeypatch):
@@ -215,3 +255,65 @@ def test_generate_resume_falls_back_to_local_import_parser_when_ai_fails(client,
     assert resume_json["header"]["email"] == "alex@example.com"
     assert "Python" in resume_json["skills"]["core"]
     assert resume_json["experience"][0]["highlights"][0]["bullet"] == "Built APIs for internal users"
+
+
+def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _pdf_bytes([
+        "Alex Resume",
+        "Senior Python Engineer",
+        "alex@example.com | (555) 010-0200 | Austin, TX",
+        "SUMMARY",
+        "Backend engineer building reliable APIs.",
+        "SKILLS",
+        "Python, FastAPI, SQL",
+        "EXPERIENCE",
+        "Senior Python Engineer - Acme Corp",
+        "Jan 2020 - Present",
+        "Built APIs for internal users",
+        "Reduced latency by 35%",
+        "EDUCATION",
+        "State University",
+        "BS Computer Science",
+    ])
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": PDF_MIME,
+                    "name": "alex-resume.pdf",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["header"]["name"] == "Alex Resume"
+    assert resume_json["header"]["title"] == "Senior Python Engineer"
+    assert resume_json["header"]["email"] == "alex@example.com"
+    assert resume_json["header"]["phone"] == "(555) 010-0200"
+    assert resume_json["header"]["location"] == "Austin, TX"
+    assert resume_json["summary"] == "Backend engineer building reliable APIs."
+    assert resume_json["skills"]["core"] == ["Python", "FastAPI", "SQL"]
+    assert resume_json["experience"][0]["role"] == "Senior Python Engineer"
+    assert resume_json["experience"][0]["company"] == "Acme Corp"
+    assert resume_json["experience"][0]["start"] == "Jan 2020"
+    assert resume_json["experience"][0]["end"] == "Present"
+    assert [item["bullet"] for item in resume_json["experience"][0]["highlights"]] == [
+        "Built APIs for internal users",
+        "Reduced latency by 35%",
+    ]
+    assert resume_json["education"][0]["school"] == "State University"
+    assert resume_json["education"][0]["degree"] == "BS Computer Science"
