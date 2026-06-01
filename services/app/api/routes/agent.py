@@ -31,9 +31,56 @@ from app.services.profile_sync import create_mock_agent_updates, ensure_default_
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
+PDF_SECTION_HEADINGS = (
+    "summary",
+    "profile",
+    "skills",
+    "experience",
+    "education",
+    "certifications",
+    "projects",
+)
+
+
+def _normalize_extracted_text(text: str) -> str:
+    lines: list[str] = []
+    for raw_line in text.replace("\r", "\n").replace("\u00a0", " ").splitlines():
+        line = re.sub(r"[ \t]+", " ", raw_line).strip()
+        if not line:
+            if lines and lines[-1] != "":
+                lines.append("")
+            continue
+        lines.append(line)
+    return _limit_resume_text("\n".join(lines).strip())
+
+
+def _pdf_text_score(text: str) -> int:
+    lines = [line for line in text.splitlines() if line.strip()]
+    headings = sum(1 for line in lines if line.strip().lower().rstrip(":") in PDF_SECTION_HEADINGS)
+    contacts = 1 if re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", text) else 0
+    return len(lines) + headings * 12 + contacts * 8
+
+
 def _extract_pdf_text(pdf_bytes: bytes) -> str:
     reader = PdfReader(BytesIO(pdf_bytes))
-    return "\n".join((page.extract_text() or "") for page in reader.pages).replace("\r", "").strip()[:60000]
+    chunks: list[str] = []
+    for page in reader.pages:
+        candidates: list[str] = []
+        for mode in ("layout", "plain"):
+            try:
+                extracted = page.extract_text(extraction_mode=mode) or ""
+            except TypeError:
+                extracted = page.extract_text() or ""
+            except Exception:
+                extracted = ""
+            normalized = _normalize_extracted_text(extracted)
+            if normalized:
+                candidates.append(normalized)
+
+        if candidates:
+            chunks.append(max(candidates, key=_pdf_text_score))
+
+    return _limit_resume_text("\n\n".join(chunks))
 
 
 def _limit_resume_text(text: str) -> str:
@@ -120,19 +167,104 @@ def _document_kind(mime: str, name: str = "") -> str | None:
 
 
 SECTION_ALIASES: dict[str, set[str]] = {
-    "summary": {"summary", "profile", "professional summary", "career summary", "objective"},
-    "skills": {"skills", "technical skills", "core skills", "technologies", "tools"},
-    "experience": {"experience", "work experience", "professional experience", "employment history", "work history"},
+    "summary": {"summary", "profile", "professional summary", "career summary", "objective", "about", "about me"},
+    "skills": {
+        "skills",
+        "technical skills",
+        "core skills",
+        "technologies",
+        "tools",
+        "areas of expertise",
+        "key skills",
+        "technical competencies",
+        "competencies",
+    },
+    "experience": {
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment history",
+        "work history",
+        "career history",
+        "professional background",
+    },
     "projects": {"projects", "selected projects", "project experience"},
-    "education": {"education", "academic background"},
-    "certifications": {"certifications", "certification", "licenses", "licenses and certifications"},
-    "awards": {"awards", "honors", "achievements"},
+    "education": {"education", "academic background", "education and training"},
+    "certifications": {"certifications", "certification", "licenses", "licenses and certifications", "certificates"},
+    "awards": {"awards", "honors", "achievements", "recognition"},
     "publications": {"publications"},
 }
 
+ROLE_KEYWORDS = {
+    "accountant",
+    "administrator",
+    "analyst",
+    "architect",
+    "associate",
+    "consultant",
+    "coordinator",
+    "developer",
+    "designer",
+    "director",
+    "engineer",
+    "lead",
+    "manager",
+    "officer",
+    "owner",
+    "principal",
+    "product",
+    "program",
+    "project",
+    "recruiter",
+    "scientist",
+    "security",
+    "software",
+    "specialist",
+    "supervisor",
+    "technician",
+}
+
+DEGREE_KEYWORDS = {
+    "bachelor",
+    "master",
+    "mba",
+    "phd",
+    "degree",
+    "diploma",
+    "certificate",
+    "university",
+    "college",
+    "school",
+}
+
+DEGREE_ONLY_KEYWORDS = {
+    "ba",
+    "bachelor",
+    "bs",
+    "certificate",
+    "degree",
+    "diploma",
+    "ma",
+    "master",
+    "mba",
+    "ms",
+    "phd",
+}
+
+DATE_RANGE_RE = re.compile(
+    r"(?P<start>(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|"
+    r"Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}/)?\s*\d{4})\s*"
+    r"(?:-|\u2013|\u2014|to)\s*"
+    r"(?P<end>(?:Present|Current|Now|Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}/)?\s*\d{4}|Present|Current|Now)",
+    flags=re.I,
+)
+
 
 def _clean_resume_line(line: str) -> str:
-    return re.sub(r"^[\s\-\*\u2022\u00b7]+", "", line).strip()
+    cleaned = line.replace("\u00a0", " ")
+    cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
+    return re.sub(r"^[\s\-\*\u2022\u00b7]+", "", cleaned).strip(" \t;")
 
 
 def _resume_lines(text: str) -> list[str]:
@@ -154,8 +286,13 @@ def _looks_like_email(line: str) -> bool:
 
 
 def _looks_like_phone(line: str) -> bool:
-    digits = re.sub(r"\D", "", line)
+    digits = re.sub(r"\D", "", _extract_phone(line))
     return 7 <= len(digits) <= 15 and bool(re.search(r"[()\-+.\s]", line))
+
+
+def _extract_phone(line: str) -> str:
+    match = re.search(r"(?:\+?\(?\d[\d().\-\s]{6,}\d)", line)
+    return match.group(0).strip() if match else ""
 
 
 def _looks_like_url(line: str) -> bool:
@@ -164,6 +301,16 @@ def _looks_like_url(line: str) -> bool:
 
 def _is_contact_line(line: str) -> bool:
     return _looks_like_email(line) or _looks_like_phone(line) or _looks_like_url(line)
+
+
+def _header_segments(lines: list[str]) -> list[str]:
+    segments: list[str] = []
+    for line in lines:
+        for segment in re.split(r"\s+(?:\||\u2022|\u00b7)\s+", line):
+            value = segment.strip(" ,;")
+            if value:
+                segments.append(value)
+    return segments
 
 
 def _extract_header(lines: list[str]) -> dict[str, object]:
@@ -180,19 +327,21 @@ def _extract_header(lines: list[str]) -> dict[str, object]:
     name = ""
     title = ""
 
-    for line in header_window:
+    segments = _header_segments(header_window)
+
+    for line in segments:
         if not email:
             match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", line)
             if match:
                 email = match.group(0)
-        if not phone and _looks_like_phone(line):
-            phone = line
+        if not phone:
+            phone = _extract_phone(line)
         if _looks_like_url(line):
             links.append({"label": "Link", "url": line})
         if not location and "," in line and not _is_contact_line(line) and len(line) <= 90:
             location = line
 
-    for line in header_window:
+    for line in segments:
         if _is_contact_line(line) or line == location:
             continue
         if not name:
@@ -243,6 +392,227 @@ def _highlight_items(lines: list[str]) -> list[dict[str, object]]:
     return highlights
 
 
+def _looks_like_date_range(line: str) -> bool:
+    if DATE_RANGE_RE.search(line):
+        return True
+    return bool(re.search(r"\b(?:19|20)\d{2}\b", line) and re.search(r"(?:-|to|present|current|now)", line, flags=re.I))
+
+
+def _split_date_range(line: str) -> tuple[str, str]:
+    match = DATE_RANGE_RE.search(line)
+    if not match:
+        return "", ""
+    return match.group("start").strip(), match.group("end").strip()
+
+
+def _strip_date_range(line: str) -> str:
+    return DATE_RANGE_RE.sub("", line).strip(" -|,;")
+
+
+def _looks_like_role_title(line: str) -> bool:
+    if len(line) > 110 or _is_contact_line(line) or _section_for_heading(line) or _looks_like_date_range(line):
+        return False
+    words = set(re.findall(r"[A-Za-z]+", line.lower()))
+    return bool(words & ROLE_KEYWORDS)
+
+
+def _looks_like_degree_or_school(line: str) -> bool:
+    words = set(re.findall(r"[A-Za-z]+", line.lower()))
+    return bool(words & DEGREE_KEYWORDS)
+
+
+def _looks_like_degree(line: str) -> bool:
+    words = set(re.findall(r"[A-Za-z]+", line.lower()))
+    return bool(words & DEGREE_ONLY_KEYWORDS)
+
+
+def _detail_segments(line: str) -> list[str]:
+    return [
+        segment.strip(" ,;")
+        for segment in re.split(r"\s+(?:\||\u2022|\u00b7)\s+", line)
+        if segment.strip(" ,;")
+    ]
+
+
+def _parse_role_company(line: str) -> dict[str, str] | None:
+    start, end = _split_date_range(line)
+    clean = _strip_date_range(line)
+    if not clean:
+        return None
+
+    role = ""
+    company = ""
+    location = ""
+
+    segments = [segment for segment in _detail_segments(clean) if not _looks_like_date_range(segment)]
+    if len(segments) >= 2:
+        role_index = next((index for index, segment in enumerate(segments) if _looks_like_role_title(segment)), -1)
+        if role_index >= 0:
+            role = segments[role_index]
+            company = next((segment for index, segment in enumerate(segments) if index != role_index and "," not in segment), "")
+            location = next((segment for index, segment in enumerate(segments) if index != role_index and "," in segment), "")
+        else:
+            company, role = segments[0], segments[1]
+
+    if not role and not company:
+        pieces = [piece.strip(" ,;") for piece in re.split(r"\s+(?:-|\u2013|\u2014)\s+", clean, maxsplit=1)]
+        if len(pieces) == 2:
+            first, second = pieces
+            if _looks_like_role_title(first):
+                role, company = first, second
+            elif _looks_like_role_title(second):
+                company, role = first, second
+            else:
+                role, company = first, second
+
+    if not role and _looks_like_role_title(clean):
+        role = clean
+
+    if not role and not company:
+        return None
+
+    return {
+        "company": company,
+        "role": role,
+        "location": location,
+        "start": start,
+        "end": end,
+    }
+
+
+def _experience_start_at(lines: list[str], index: int) -> tuple[dict[str, str], int] | None:
+    line = lines[index]
+    next_line = lines[index + 1] if index + 1 < len(lines) else ""
+    third_line = lines[index + 2] if index + 2 < len(lines) else ""
+
+    parsed = _parse_role_company(line)
+    if parsed and (parsed["company"] or _looks_like_date_range(next_line) or len(_detail_segments(line)) >= 2):
+        consumed = 1
+        if not parsed["start"] and _looks_like_date_range(next_line):
+            parsed["start"], parsed["end"] = _split_date_range(next_line)
+            consumed = 2
+        return parsed, consumed
+
+    if next_line and _looks_like_role_title(next_line) and not _is_contact_line(line):
+        parsed = {"company": line, "role": next_line, "location": "", "start": "", "end": ""}
+        consumed = 2
+        if _looks_like_date_range(third_line):
+            parsed["start"], parsed["end"] = _split_date_range(third_line)
+            consumed = 3
+        return parsed, consumed
+
+    if _looks_like_role_title(line) and next_line and not _is_contact_line(next_line) and not _section_for_heading(next_line):
+        parsed = {"company": next_line, "role": line, "location": "", "start": "", "end": ""}
+        consumed = 2
+        if _looks_like_date_range(third_line):
+            parsed["start"], parsed["end"] = _split_date_range(third_line)
+            consumed = 3
+        elif _looks_like_date_range(next_line):
+            parsed["company"] = ""
+            parsed["start"], parsed["end"] = _split_date_range(next_line)
+        return parsed, consumed
+
+    return None
+
+
+def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    current: dict[str, object] | None = None
+    current_highlights: list[str] = []
+    index = 0
+
+    def flush_current() -> None:
+        nonlocal current, current_highlights
+        if not current:
+            return
+        current["highlights"] = _highlight_items(current_highlights)
+        if current["role"] or current["company"] or current["highlights"]:
+            entries.append(current)
+        current = None
+        current_highlights = []
+
+    while index < len(lines):
+        line = lines[index]
+        start = _experience_start_at(lines, index)
+        if start:
+            flush_current()
+            parsed, consumed = start
+            current = {
+                "company": parsed.get("company", ""),
+                "role": parsed.get("role", ""),
+                "location": parsed.get("location", ""),
+                "start": parsed.get("start", ""),
+                "end": parsed.get("end", ""),
+                "highlights": [],
+            }
+            index += consumed
+            continue
+
+        if _looks_like_date_range(line) and current:
+            current["start"], current["end"] = _split_date_range(line)
+        elif line and not _is_contact_line(line):
+            if current is None:
+                current = {"company": "", "role": "", "location": "", "start": "", "end": "", "highlights": []}
+            current_highlights.append(line)
+        index += 1
+
+    flush_current()
+    return entries
+
+
+def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
+    clean_lines = [line for line in lines if not _is_contact_line(line)]
+    if not clean_lines:
+        return []
+
+    degree_index = next(
+        (index for index, line in enumerate(clean_lines) if _looks_like_degree(line)),
+        next((index for index, line in enumerate(clean_lines) if _looks_like_degree_or_school(line)), 0),
+    )
+    degree = clean_lines[degree_index]
+    school = ""
+    if degree_index > 0:
+        school = clean_lines[degree_index - 1]
+    elif len(clean_lines) > 1:
+        school = clean_lines[1]
+
+    start, end = "", ""
+    date_line = next((line for line in clean_lines if _looks_like_date_range(line)), "")
+    if date_line:
+        start, end = _split_date_range(date_line)
+
+    notes = [
+        line for index, line in enumerate(clean_lines)
+        if index not in {degree_index, max(0, degree_index - 1)} and line != date_line
+    ]
+    return [{
+        "school": school,
+        "degree": degree,
+        "location": "",
+        "start": start,
+        "end": end,
+        "notes": notes[:8],
+    }]
+
+
+def _parse_project_entries(lines: list[str]) -> list[dict[str, object]]:
+    clean_lines = [line for line in lines if not _is_contact_line(line)]
+    if not clean_lines:
+        return []
+    projects: list[dict[str, object]] = []
+    current_name = clean_lines[0]
+    bullets: list[str] = []
+    for line in clean_lines[1:]:
+        if len(line) <= 80 and not _looks_like_date_range(line) and not _looks_like_role_title(line) and bullets:
+            projects.append({"name": current_name, "link": "", "description": "", "bullets": bullets[:8]})
+            current_name = line
+            bullets = []
+        else:
+            bullets.append(line)
+    projects.append({"name": current_name, "link": "", "description": "", "bullets": bullets[:8]})
+    return projects[:5]
+
+
 def _local_resume_json_from_text(text: str) -> dict[str, object]:
     lines = _resume_lines(text)
     header = _extract_header(lines)
@@ -252,35 +622,9 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
     summary_lines = [line for line in sections.get("summary", []) if line not in header_values and not _is_contact_line(line)]
     summary = " ".join(summary_lines[:3]).strip()
 
-    experience_lines = [line for line in sections.get("experience", []) if not _is_contact_line(line)]
-    education_lines = [line for line in sections.get("education", []) if not _is_contact_line(line)]
-    project_lines = [line for line in sections.get("projects", []) if not _is_contact_line(line)]
-
-    experience = []
-    if experience_lines:
-        experience.append({
-            "company": "",
-            "role": "",
-            "location": "",
-            "start": "",
-            "end": "",
-            "highlights": _highlight_items(experience_lines),
-        })
-
-    education = []
-    if education_lines:
-        education.append({
-            "school": education_lines[0],
-            "degree": education_lines[1] if len(education_lines) > 1 else "",
-            "location": "",
-            "start": "",
-            "end": "",
-            "notes": education_lines[2:8],
-        })
-
-    projects = []
-    if project_lines:
-        projects.append({"name": project_lines[0], "link": "", "description": "", "bullets": project_lines[1:8]})
+    experience = _parse_experience_entries([line for line in sections.get("experience", []) if not _is_contact_line(line)])
+    education = _parse_education_entries([line for line in sections.get("education", []) if not _is_contact_line(line)])
+    projects = _parse_project_entries([line for line in sections.get("projects", []) if not _is_contact_line(line)])
 
     return {
         "header": header,
