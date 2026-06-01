@@ -119,6 +119,223 @@ def _document_kind(mime: str, name: str = "") -> str | None:
     return None
 
 
+SECTION_ALIASES: dict[str, set[str]] = {
+    "summary": {"summary", "profile", "professional summary", "career summary", "objective"},
+    "skills": {"skills", "technical skills", "core skills", "technologies", "tools"},
+    "experience": {"experience", "work experience", "professional experience", "employment history", "work history"},
+    "projects": {"projects", "selected projects", "project experience"},
+    "education": {"education", "academic background"},
+    "certifications": {"certifications", "certification", "licenses", "licenses and certifications"},
+    "awards": {"awards", "honors", "achievements"},
+    "publications": {"publications"},
+}
+
+
+def _clean_resume_line(line: str) -> str:
+    return re.sub(r"^[\s\-\*\u2022\u00b7]+", "", line).strip()
+
+
+def _resume_lines(text: str) -> list[str]:
+    return [_clean_resume_line(line) for line in _limit_resume_text(text).splitlines() if _clean_resume_line(line)]
+
+
+def _section_for_heading(line: str) -> str | None:
+    if len(line) > 60:
+        return None
+    normalized = re.sub(r"[^A-Za-z& ]+", "", line).replace("&", "and").strip().lower()
+    for section, aliases in SECTION_ALIASES.items():
+        if normalized in aliases:
+            return section
+    return None
+
+
+def _looks_like_email(line: str) -> bool:
+    return bool(re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", line))
+
+
+def _looks_like_phone(line: str) -> bool:
+    digits = re.sub(r"\D", "", line)
+    return 7 <= len(digits) <= 15 and bool(re.search(r"[()\-+.\s]", line))
+
+
+def _looks_like_url(line: str) -> bool:
+    return bool(re.search(r"https?://|linkedin\.com|github\.com", line, flags=re.I))
+
+
+def _is_contact_line(line: str) -> bool:
+    return _looks_like_email(line) or _looks_like_phone(line) or _looks_like_url(line)
+
+
+def _extract_header(lines: list[str]) -> dict[str, object]:
+    header_window: list[str] = []
+    for line in lines[:12]:
+        if _section_for_heading(line):
+            break
+        header_window.append(line)
+
+    email = ""
+    phone = ""
+    links: list[dict[str, str]] = []
+    location = ""
+    name = ""
+    title = ""
+
+    for line in header_window:
+        if not email:
+            match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", line)
+            if match:
+                email = match.group(0)
+        if not phone and _looks_like_phone(line):
+            phone = line
+        if _looks_like_url(line):
+            links.append({"label": "Link", "url": line})
+        if not location and "," in line and not _is_contact_line(line) and len(line) <= 90:
+            location = line
+
+    for line in header_window:
+        if _is_contact_line(line) or line == location:
+            continue
+        if not name:
+            name = line
+            continue
+        if not title and len(line) <= 100:
+            title = line
+            break
+
+    return {
+        "name": name,
+        "title": title,
+        "location": location,
+        "phone": phone,
+        "email": email,
+        "links": links or [{"label": "LinkedIn", "url": ""}],
+    }
+
+
+def _sectionize_resume(lines: list[str]) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {key: [] for key in SECTION_ALIASES}
+    current = "summary"
+    for line in lines:
+        section = _section_for_heading(line)
+        if section:
+            current = section
+            continue
+        sections.setdefault(current, []).append(line)
+    return sections
+
+
+def _skill_values(lines: list[str]) -> list[str]:
+    values: list[str] = []
+    for line in lines:
+        source = line.split(":", 1)[1] if ":" in line else line
+        for item in re.split(r"[,;|/]", source):
+            value = item.strip(" .")
+            if value and len(value) <= 60 and value not in values:
+                values.append(value)
+    return values[:30]
+
+
+def _highlight_items(lines: list[str]) -> list[dict[str, object]]:
+    highlights: list[dict[str, object]] = []
+    for line in lines[:14]:
+        metrics = re.findall(r"\b\d+(?:[.,]\d+)?%?\b", line)[:4]
+        highlights.append({"bullet": line, "tags": [], "metrics": metrics})
+    return highlights
+
+
+def _local_resume_json_from_text(text: str) -> dict[str, object]:
+    lines = _resume_lines(text)
+    header = _extract_header(lines)
+    sections = _sectionize_resume(lines)
+    header_values = {str(value) for value in header.values() if isinstance(value, str) and value}
+
+    summary_lines = [line for line in sections.get("summary", []) if line not in header_values and not _is_contact_line(line)]
+    summary = " ".join(summary_lines[:3]).strip()
+
+    experience_lines = [line for line in sections.get("experience", []) if not _is_contact_line(line)]
+    education_lines = [line for line in sections.get("education", []) if not _is_contact_line(line)]
+    project_lines = [line for line in sections.get("projects", []) if not _is_contact_line(line)]
+
+    experience = []
+    if experience_lines:
+        experience.append({
+            "company": "",
+            "role": "",
+            "location": "",
+            "start": "",
+            "end": "",
+            "highlights": _highlight_items(experience_lines),
+        })
+
+    education = []
+    if education_lines:
+        education.append({
+            "school": education_lines[0],
+            "degree": education_lines[1] if len(education_lines) > 1 else "",
+            "location": "",
+            "start": "",
+            "end": "",
+            "notes": education_lines[2:8],
+        })
+
+    projects = []
+    if project_lines:
+        projects.append({"name": project_lines[0], "link": "", "description": "", "bullets": project_lines[1:8]})
+
+    return {
+        "header": header,
+        "summary": summary,
+        "skills": {
+            "core": _skill_values(sections.get("skills", [])),
+            "tools": [],
+            "cloud": [],
+            "data": [],
+            "other": [],
+        },
+        "experience": experience,
+        "projects": projects,
+        "education": education,
+        "certifications": sections.get("certifications", [])[:12],
+        "awards": sections.get("awards", [])[:12],
+        "publications": sections.get("publications", [])[:12],
+    }
+
+
+def _build_local_import_resume_response(input_data: dict) -> str | None:
+    resume_text = _limit_resume_text(str(input_data.get("currentResumeText") or ""))
+    if not resume_text:
+        return None
+
+    resume_json = _local_resume_json_from_text(resume_text)
+    return f"""RESUME_JSON:
+{json.dumps(resume_json, indent=2)}
+
+GAP_AND_FIX_LIST:
+- Imported with local parser because AI generation was unavailable.
+- Review parsed fields, then add any missing employers, dates, metrics, and contact details.
+
+RESUME_ATS:
+{resume_text}
+
+RESUME_HUMAN:
+{resume_text}
+
+RESUME_TARGETED:
+{resume_text}
+
+RESUME_WITH_PHOTO:
+Use the live editor to add a profile photo if needed.
+
+COVER_LETTER_FULL:
+N/A - no job description provided
+
+COVER_LETTER_SHORT:
+N/A - no job description provided
+
+COLD_EMAIL:
+N/A - no job description provided"""
+
+
 @router.get("/sources", response_model=DataSourcesEnvelope)
 def list_sources(
     current_user: User = Depends(get_current_user),
@@ -255,6 +472,15 @@ def generate_resume(
             contents=parts,
             config=make_config(RESUME_FORGE_SYSTEM_PROMPT),
         )
-        return GenerateResumeOut(text=response.text or "")
+        text = response.text or ""
+        if not text.strip() and payload.mode == "MODE_A":
+            fallback = _build_local_import_resume_response(input_data)
+            if fallback:
+                return GenerateResumeOut(text=fallback)
+        return GenerateResumeOut(text=text)
     except Exception as exc:
+        if payload.mode == "MODE_A":
+            fallback = _build_local_import_resume_response(input_data)
+            if fallback:
+                return GenerateResumeOut(text=fallback)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI generation failed") from exc

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -49,6 +50,20 @@ class _FakeGeminiModels:
 class _FakeGeminiClient:
     def __init__(self):
         self.models = _FakeGeminiModels()
+
+
+class _FailingGeminiModels:
+    def __init__(self):
+        self.calls = []
+
+    def generate_content(self, **kwargs):
+        self.calls.append(kwargs)
+        raise RuntimeError("Gemini unavailable")
+
+
+class _FailingGeminiClient:
+    def __init__(self):
+        self.models = _FailingGeminiModels()
 
 
 def _signup(client) -> str:
@@ -152,3 +167,51 @@ def test_generate_resume_rejects_unreadable_docx_before_ai_parse(client, monkeyp
     assert response.status_code == 422, response.text
     assert "Could not extract readable text" in response.json()["detail"]
     assert fake_client.models.calls == []
+
+
+def test_generate_resume_falls_back_to_local_import_parser_when_ai_fails(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Alex Resume",
+            "Senior Python Engineer",
+            "alex@example.com",
+            "SUMMARY",
+            "Backend engineer building APIs.",
+            "SKILLS",
+            "Python, FastAPI, SQL",
+            "EXPERIENCE",
+            "Built APIs for internal users",
+        ])
+    )
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "alex-resume.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert len(fake_client.models.calls) == 1
+
+    text = response.json()["text"]
+    assert "Imported with local parser because AI generation was unavailable" in text
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["header"]["name"] == "Alex Resume"
+    assert resume_json["header"]["title"] == "Senior Python Engineer"
+    assert resume_json["header"]["email"] == "alex@example.com"
+    assert "Python" in resume_json["skills"]["core"]
+    assert resume_json["experience"][0]["highlights"][0]["bullet"] == "Built APIs for internal users"
