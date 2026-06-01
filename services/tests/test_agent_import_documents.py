@@ -80,6 +80,7 @@ def test_generate_resume_extracts_docx_text_before_ai_parse(client, monkeypatch)
     monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes("Alex Resume\nSenior Python Engineer\nBuilt APIs")
+    encoded_resume = base64.b64encode(resume_bytes).decode("ascii")
     response = client.post(
         "/agent/generate-resume",
         headers={"Authorization": f"Bearer {token}"},
@@ -89,7 +90,7 @@ def test_generate_resume_extracts_docx_text_before_ai_parse(client, monkeypatch)
                 "fileData": {
                     "mimeType": DOCX_MIME,
                     "name": "alex-resume.docx",
-                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                    "data": encoded_resume,
                 }
             },
         },
@@ -101,6 +102,9 @@ def test_generate_resume_extracts_docx_text_before_ai_parse(client, monkeypatch)
     assert "EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT" in joined
     assert "Alex Resume" in joined
     assert "Senior Python Engineer" in joined
+    assert encoded_resume not in joined
+    assert '"textExtracted": true' in joined
+    assert '"name": "alex-resume.docx"' in joined
 
 
 def test_generate_resume_rejects_unsupported_import_file_type(client):
@@ -122,3 +126,29 @@ def test_generate_resume_rejects_unsupported_import_file_type(client):
 
     assert response.status_code == 400, response.text
     assert response.json()["detail"] == "Supported import formats: PDF, DOC, DOCX."
+
+
+def test_generate_resume_rejects_unreadable_docx_before_ai_parse(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FakeGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    empty_docx = _docx_bytes("")
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "empty.docx",
+                    "data": base64.b64encode(empty_docx).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert "Could not extract readable text" in response.json()["detail"]
+    assert fake_client.models.calls == []

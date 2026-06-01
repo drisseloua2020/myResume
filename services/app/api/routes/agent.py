@@ -40,6 +40,40 @@ def _limit_resume_text(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text.replace("\r", "")).strip()[:60000]
 
 
+def _decode_upload_data(raw_value: object) -> bytes:
+    if isinstance(raw_value, bytes):
+        return raw_value
+    if not isinstance(raw_value, str):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded resume file data is invalid.")
+    try:
+        return base64.b64decode(raw_value, validate=True)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded resume file data is invalid.") from exc
+
+
+def _file_metadata_for_prompt(file_data: dict) -> dict[str, str | bool]:
+    safe: dict[str, str | bool] = {"textExtracted": True}
+    if file_data.get("mimeType"):
+        safe["mimeType"] = str(file_data["mimeType"])
+    if file_data.get("name"):
+        safe["name"] = str(file_data["name"])
+    return safe
+
+
+def _profile_image_metadata_for_prompt(profile_image_data: dict) -> dict[str, str | bool]:
+    safe: dict[str, str | bool] = {"binaryOmitted": True}
+    if profile_image_data.get("mimeType"):
+        safe["mimeType"] = str(profile_image_data["mimeType"])
+    return safe
+
+
+def _raise_unreadable_import(kind: str) -> None:
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"Could not extract readable text from this {kind}. Please upload a text-based PDF or a DOCX file.",
+    )
+
+
 def _extract_docx_text(docx_bytes: bytes) -> str:
     with zipfile.ZipFile(BytesIO(docx_bytes)) as docx:
         names = [
@@ -169,36 +203,47 @@ def generate_resume(
                 detail="Supported import formats: PDF, DOC, DOCX.",
             )
 
-        raw_value = file_data["data"]
-        decoded = base64.b64decode(raw_value) if isinstance(raw_value, str) else raw_value
+        decoded = _decode_upload_data(file_data["data"])
         if kind == "pdf":
             try:
                 extracted = _extract_pdf_text(decoded)
-                input_data["currentResumeText"] = extracted
-                parts.append(f"EXTRACTED_RESUME_TEXT_FROM_PDF:\n{extracted}")
-            except Exception:
-                parts.append(types.Part.from_bytes(data=decoded, mime_type=mime))
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Could not extract readable text from this PDF. Please upload a text-based PDF or DOCX file.",
+                ) from exc
+            if not extracted:
+                _raise_unreadable_import("PDF")
+            input_data["currentResumeText"] = extracted
+            input_data["fileData"] = _file_metadata_for_prompt(file_data)
+            parts.append(f"EXTRACTED_RESUME_TEXT_FROM_PDF:\n{extracted}")
         elif kind == "docx":
             try:
                 extracted = _extract_docx_text(decoded)
-                if not extracted:
-                    raise ValueError("No text found in DOCX")
-                input_data["currentResumeText"] = extracted
-                parts.append(f"EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT:\n{extracted}")
-            except Exception:
-                parts.append(types.Part.from_bytes(data=decoded, mime_type=mime))
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Could not extract readable text from this DOCX file. Please upload a text-based PDF or DOCX file.",
+                ) from exc
+            if not extracted:
+                _raise_unreadable_import("DOCX file")
+            input_data["currentResumeText"] = extracted
+            input_data["fileData"] = _file_metadata_for_prompt(file_data)
+            parts.append(f"EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT:\n{extracted}")
         else:
             extracted = _extract_legacy_doc_text(decoded)
             if extracted:
                 input_data["currentResumeText"] = extracted
+                input_data["fileData"] = _file_metadata_for_prompt(file_data)
                 parts.append(f"EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT:\n{extracted}")
             else:
-                parts.append(types.Part.from_bytes(data=decoded, mime_type=mime))
+                _raise_unreadable_import("Word document")
 
     profile_image_data = input_data.get("profileImageData") or {}
     if profile_image_data.get("data") and profile_image_data.get("mimeType"):
-        decoded = base64.b64decode(str(profile_image_data["data"]))
+        decoded = _decode_upload_data(profile_image_data["data"])
         parts.append(types.Part.from_bytes(data=decoded, mime_type=str(profile_image_data["mimeType"])))
+        input_data["profileImageData"] = _profile_image_metadata_for_prompt(profile_image_data)
 
     parts.append(f"MODE: {payload.mode}\n\nUSER_INPUT_JSON:\n{json.dumps(input_data, indent=2)}")
 

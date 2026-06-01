@@ -116,7 +116,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   // Handle Prefilled Data (e.g. from Import)
   useEffect(() => {
     if (prefilledData) {
-      if (prefilledData.targetRole) setTargetRole(prefilledData.targetRole);
+      if ('targetRole' in prefilledData) setTargetRole(prefilledData.targetRole || '');
       if (prefilledData.experienceItems) setExperiences(prefilledData.experienceItems);
       if (prefilledData.educationItems) setEducations(prefilledData.educationItems);
       if (prefilledData.skillItems) setSkills(prefilledData.skillItems);
@@ -489,7 +489,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     const payload: UserInputData = {
       role,
       plan: userPlan,
-      targetRole,
+      targetRole: activeTab === 'upload' ? '' : targetRole,
       jobDescription,
       jobUrl: jobUrl.trim() || undefined,
       preferences,
@@ -687,18 +687,19 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
         <form ref={formRef} onSubmit={handleAction} className="space-y-6 pt-2">
           
-          {/* Target Role - Always visible */}
-          <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
-             <h2 className="text-sm font-bold text-slate-800 mb-1 uppercase tracking-wide">Target Role</h2>
-             <input
-                type="text"
-                className="w-full bg-[#f7f9fa] p-3 border-b-2 border-slate-200 focus:border-[#1a91f0] outline-none font-medium transition-colors"
-               placeholder="e.g. Senior Product Designer"
-               value={targetRole}
-               onChange={e => setTargetRole(e.target.value)}
-                required={activeTab !== 'upload'}
-             />
-          </div>
+          {activeTab !== 'upload' && (
+            <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
+               <h2 className="text-sm font-bold text-slate-800 mb-1 uppercase tracking-wide">Target Role</h2>
+               <input
+                  type="text"
+                  className="w-full bg-[#f7f9fa] p-3 border-b-2 border-slate-200 focus:border-[#1a91f0] outline-none font-medium transition-colors"
+                 placeholder="e.g. Senior Product Designer"
+                 value={targetRole}
+                 onChange={e => setTargetRole(e.target.value)}
+                  required
+               />
+            </div>
+          )}
 
           {activeTab === 'upload' && (
              <div className="bg-white rounded border border-slate-200 p-8 shadow-sm text-center">

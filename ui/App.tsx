@@ -305,7 +305,7 @@ const App: React.FC = () => {
       };
 
       return {
-          targetRole: json.header?.title || '',
+          targetRole: '',
           personalDetails: personalDetails,
           experienceItems: experiences,
           educationItems: educations,
