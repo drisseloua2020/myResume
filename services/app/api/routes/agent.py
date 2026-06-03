@@ -31,6 +31,8 @@ from app.services.profile_sync import create_mock_agent_updates, ensure_default_
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
+CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
 PDF_SECTION_HEADINGS = (
     "summary",
     "profile",
@@ -44,7 +46,7 @@ PDF_SECTION_HEADINGS = (
 
 def _normalize_extracted_text(text: str) -> str:
     lines: list[str] = []
-    for raw_line in text.replace("\r", "\n").replace("\u00a0", " ").splitlines():
+    for raw_line in CONTROL_CHAR_RE.sub("", text).replace("\r", "\n").replace("\u00a0", " ").splitlines():
         line = re.sub(r"[ \t]+", " ", raw_line).strip()
         if not line:
             if lines and lines[-1] != "":
@@ -84,7 +86,8 @@ def _extract_pdf_text(pdf_bytes: bytes) -> str:
 
 
 def _limit_resume_text(text: str) -> str:
-    return re.sub(r"\n{3,}", "\n\n", text.replace("\r", "")).strip()[:60000]
+    clean_text = CONTROL_CHAR_RE.sub("", text)
+    return re.sub(r"\n{3,}", "\n\n", clean_text.replace("\r", "")).strip()[:60000]
 
 
 def _decode_upload_data(raw_value: object) -> bytes:
@@ -253,18 +256,26 @@ DEGREE_ONLY_KEYWORDS = {
 
 DATE_RANGE_RE = re.compile(
     r"(?P<start>(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|"
-    r"Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}/)?\s*\d{4})\s*"
-    r"(?:-|\u2013|\u2014|to)\s*"
+    r"Sep(?:tember)?|Sept(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}[/.])?\s*(?:19|20)\d{2})\s*"
+    r"(?:-|\u2013|\u2014|to|through|until)\s*"
     r"(?P<end>(?:Present|Current|Now|Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
-    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}/)?\s*\d{4}|Present|Current|Now)",
+    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Sept(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}[/.])?\s*(?:19|20)\d{2}|Present|Current|Now)",
+    flags=re.I,
+)
+
+DATE_VALUE_RE = re.compile(
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|"
+    r"Sep(?:tember)?|Sept(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(?:19|20)\d{2}"
+    r"|\d{1,2}[/.](?:19|20)?\d{2}"
+    r"|(?:19|20)\d{2}",
     flags=re.I,
 )
 
 
 def _clean_resume_line(line: str) -> str:
-    cleaned = line.replace("\u00a0", " ")
+    cleaned = CONTROL_CHAR_RE.sub("", line).replace("\u00a0", " ")
     cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
-    return re.sub(r"^[\s\-\*\u2022\u00b7]+", "", cleaned).strip(" \t;")
+    return re.sub(r"^[\s\-\*\u2022\u00b7,]+", "", cleaned).strip(" \t;,")
 
 
 def _resume_lines(text: str) -> list[str]:
@@ -286,6 +297,8 @@ def _looks_like_email(line: str) -> bool:
 
 
 def _looks_like_phone(line: str) -> bool:
+    if DATE_RANGE_RE.search(line) and not re.search(r"\+|\(|\)|\b\d{3}[\s.-]\d{3}[\s.-]\d{4}\b", line):
+        return False
     digits = re.sub(r"\D", "", _extract_phone(line))
     return 7 <= len(digits) <= 15 and bool(re.search(r"[()\-+.\s]", line))
 
@@ -378,7 +391,7 @@ def _skill_values(lines: list[str]) -> list[str]:
     for line in lines:
         source = line.split(":", 1)[1] if ":" in line else line
         for item in re.split(r"[,;|/]", source):
-            value = item.strip(" .")
+            value = _clean_resume_line(item).strip(" .")
             if value and len(value) <= 60 and value not in values:
                 values.append(value)
     return values[:30]
@@ -393,20 +406,43 @@ def _highlight_items(lines: list[str]) -> list[dict[str, object]]:
 
 
 def _looks_like_date_range(line: str) -> bool:
-    if DATE_RANGE_RE.search(line):
-        return True
-    return bool(re.search(r"\b(?:19|20)\d{2}\b", line) and re.search(r"(?:-|to|present|current|now)", line, flags=re.I))
+    start, _ = _split_date_range(line)
+    return bool(start)
 
 
 def _split_date_range(line: str) -> tuple[str, str]:
     match = DATE_RANGE_RE.search(line)
-    if not match:
-        return "", ""
-    return match.group("start").strip(), match.group("end").strip()
+    if match:
+        return _normalize_date_value(match.group("start")), _normalize_date_value(match.group("end"))
+
+    match = DATE_VALUE_RE.search(line)
+    if match and _is_date_only_line(line):
+        return _normalize_date_value(match.group(0)), ""
+
+    return "", ""
 
 
 def _strip_date_range(line: str) -> str:
-    return DATE_RANGE_RE.sub("", line).strip(" -|,;")
+    clean = DATE_RANGE_RE.sub("", line)
+    clean = DATE_VALUE_RE.sub("", clean)
+    return clean.strip(" -|,;()")
+
+
+def _normalize_date_value(value: str) -> str:
+    clean = re.sub(r"\s+", " ", value.strip(" -|,;()"))
+    if clean.lower() in {"present", "current", "now"}:
+        return "Present"
+    return clean
+
+
+def _is_date_only_line(line: str) -> bool:
+    clean = line.strip(" -|,;()")
+    if not clean:
+        return False
+    without_range = DATE_RANGE_RE.sub("", clean)
+    if without_range != clean:
+        return not without_range.strip(" -|,;()")
+    return not DATE_VALUE_RE.sub("", clean).strip(" -|,;()")
 
 
 def _looks_like_role_title(line: str) -> bool:
@@ -485,6 +521,9 @@ def _experience_start_at(lines: list[str], index: int) -> tuple[dict[str, str], 
     next_line = lines[index + 1] if index + 1 < len(lines) else ""
     third_line = lines[index + 2] if index + 2 < len(lines) else ""
 
+    if _is_date_only_line(line):
+        return None
+
     parsed = _parse_role_company(line)
     if parsed and (parsed["company"] or _looks_like_date_range(next_line) or len(_detail_segments(line)) >= 2):
         consumed = 1
@@ -519,6 +558,8 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
     current: dict[str, object] | None = None
     current_highlights: list[str] = []
+    pending_start = ""
+    pending_end = ""
     index = 0
 
     def flush_current() -> None:
@@ -533,6 +574,17 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
 
     while index < len(lines):
         line = lines[index]
+        if _is_date_only_line(line):
+            start, end = _split_date_range(line)
+            if current:
+                current["start"] = start
+                current["end"] = end
+            else:
+                pending_start = start
+                pending_end = end
+            index += 1
+            continue
+
         start = _experience_start_at(lines, index)
         if start:
             flush_current()
@@ -541,10 +593,12 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
                 "company": parsed.get("company", ""),
                 "role": parsed.get("role", ""),
                 "location": parsed.get("location", ""),
-                "start": parsed.get("start", ""),
-                "end": parsed.get("end", ""),
+                "start": parsed.get("start", "") or pending_start,
+                "end": parsed.get("end", "") or pending_end,
                 "highlights": [],
             }
+            pending_start = ""
+            pending_end = ""
             index += consumed
             continue
 
@@ -565,25 +619,33 @@ def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
     if not clean_lines:
         return []
 
-    degree_index = next(
-        (index for index, line in enumerate(clean_lines) if _looks_like_degree(line)),
-        next((index for index, line in enumerate(clean_lines) if _looks_like_degree_or_school(line)), 0),
-    )
-    degree = clean_lines[degree_index]
-    school = ""
-    if degree_index > 0:
-        school = clean_lines[degree_index - 1]
-    elif len(clean_lines) > 1:
-        school = clean_lines[1]
-
-    start, end = "", ""
     date_line = next((line for line in clean_lines if _looks_like_date_range(line)), "")
+    start, end = ("", "")
     if date_line:
         start, end = _split_date_range(date_line)
 
+    content_lines = [
+        _strip_date_range(line) if _looks_like_date_range(line) else line
+        for line in clean_lines
+    ]
+    content_lines = [line for line in content_lines if line]
+    if not content_lines:
+        return [{"school": "", "degree": "", "location": "", "start": start, "end": end, "notes": []}]
+
+    degree_index = next(
+        (index for index, line in enumerate(content_lines) if _looks_like_degree(line)),
+        next((index for index, line in enumerate(content_lines) if _looks_like_degree_or_school(line)), 0),
+    )
+    degree = content_lines[degree_index]
+    school = ""
+    if degree_index > 0:
+        school = content_lines[degree_index - 1]
+    elif len(content_lines) > 1:
+        school = content_lines[1]
+
     notes = [
-        line for index, line in enumerate(clean_lines)
-        if index not in {degree_index, max(0, degree_index - 1)} and line != date_line
+        line for index, line in enumerate(content_lines)
+        if index not in {degree_index, max(0, degree_index - 1)}
     ]
     return [{
         "school": school,

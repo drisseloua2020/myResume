@@ -121,6 +121,70 @@ describe('ResumeInput', () => {
     });
   });
 
+  it('clears an existing profile photo when imported resume data starts a new resume', async () => {
+    const baseProps = {
+      onGenerate: vi.fn(),
+      onImport: vi.fn(),
+      onTemplateChange: vi.fn(),
+      isLoading: false,
+      role: UserRole.USER,
+      userPlan: SubscriptionPlan.FREE,
+      selectedTemplateId: 'classic_pro',
+      user: {
+        id: 'usr_1',
+        name: 'Resume User',
+        email: 'resume@example.com',
+        role: UserRole.USER,
+        plan: SubscriptionPlan.FREE,
+        status: 'Active',
+        createdAt: '2026-05-25T00:00:00Z',
+        paidAmount: '$0.00',
+      },
+    };
+
+    const { rerender } = render(
+      <ResumeInput
+        {...baseProps}
+        prefilledData={{
+          targetRole: 'Senior Developer',
+          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
+          profileImageName: 'profile.png',
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: true,
+          },
+        }}
+      />
+    );
+
+    const includePhoto = await screen.findByLabelText(/include photo/i);
+    await waitFor(() => expect(includePhoto).toBeChecked());
+    expect(screen.getByText('profile.png')).toBeInTheDocument();
+
+    rerender(
+      <ResumeInput
+        {...baseProps}
+        prefilledData={{
+          targetRole: '',
+          profileImageUrl: undefined,
+          profileImageName: undefined,
+          profileImageData: undefined,
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: false,
+          },
+        }}
+      />
+    );
+
+    await waitFor(() => expect(includePhoto).not.toBeChecked());
+    expect(screen.queryByText('profile.png')).not.toBeInTheDocument();
+  });
+
   it('rejects unsupported import files before they reach the live editor parser', async () => {
     const user = userEvent.setup();
     const onImport = vi.fn();
@@ -244,6 +308,12 @@ describe('ResumeInput', () => {
     await waitFor(() => {
       expect(onImport).toHaveBeenCalledWith(expect.objectContaining({
         targetRole: '',
+        profileImageUrl: undefined,
+        profileImageName: undefined,
+        profileImageData: undefined,
+        preferences: expect.objectContaining({
+          photo: false,
+        }),
         currentResumeText: '',
         fileData: expect.objectContaining({
           mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
