@@ -269,7 +269,7 @@ def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(clie
         "SUMMARY",
         "Backend engineer building reliable APIs.",
         "SKILLS",
-        "Python, FastAPI, SQL",
+        "\x7f, Python, FastAPI, SQL",
         "EXPERIENCE",
         "Senior Python Engineer - Acme Corp",
         "Jan 2020 - Present",
@@ -317,3 +317,62 @@ def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(clie
     ]
     assert resume_json["education"][0]["school"] == "State University"
     assert resume_json["education"][0]["degree"] == "BS Computer Science"
+
+
+def test_generate_resume_collects_common_resume_date_formats_when_ai_fails(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Alex Resume",
+            "Data Analyst",
+            "alex@example.com",
+            "EXPERIENCE",
+            "05/2021 - 08/2023",
+            "Data Analyst",
+            "Insight LLC",
+            "Built dashboards",
+            "Project Manager | BuildCo | 2018 - 2020",
+            "Delivered migration",
+            "EDUCATION",
+            "State University",
+            "BS Computer Science",
+            "May 2021",
+        ])
+    )
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "alex-resume.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["experience"][0]["role"] == "Data Analyst"
+    assert resume_json["experience"][0]["company"] == "Insight LLC"
+    assert resume_json["experience"][0]["start"] == "05/2021"
+    assert resume_json["experience"][0]["end"] == "08/2023"
+
+    assert resume_json["experience"][1]["role"] == "Project Manager"
+    assert resume_json["experience"][1]["company"] == "BuildCo"
+    assert resume_json["experience"][1]["start"] == "2018"
+    assert resume_json["experience"][1]["end"] == "2020"
+
+    assert resume_json["education"][0]["school"] == "State University"
+    assert resume_json["education"][0]["degree"] == "BS Computer Science"
+    assert resume_json["education"][0]["start"] == "May 2021"
+    assert resume_json["education"][0]["end"] == ""

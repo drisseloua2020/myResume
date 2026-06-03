@@ -134,9 +134,9 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              ...prefilledData.personalDetails
          }));
       }
-      if (prefilledData.profileImageUrl) setProfileImageUrl(prefilledData.profileImageUrl);
-      if (prefilledData.profileImageName) setProfilePhotoName(prefilledData.profileImageName);
-      if (prefilledData.profileImageData) setLegacyProfileImageData(prefilledData.profileImageData);
+      if ('profileImageUrl' in prefilledData) setProfileImageUrl(prefilledData.profileImageUrl || undefined);
+      if ('profileImageName' in prefilledData) setProfilePhotoName(prefilledData.profileImageName || null);
+      if ('profileImageData' in prefilledData) setLegacyProfileImageData(prefilledData.profileImageData || undefined);
     }
   }, [prefilledData]);
   
@@ -492,10 +492,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       targetRole: activeTab === 'upload' ? '' : targetRole,
       jobDescription,
       jobUrl: jobUrl.trim() || undefined,
-      preferences,
-      profileImageUrl,
-      profileImageName: profilePhotoName || undefined,
-      profileImageData: legacyProfileImageData,
+      preferences: activeTab === 'upload' ? { ...preferences!, photo: false } : preferences,
+      profileImageUrl: activeTab === 'upload' ? undefined : profileImageUrl,
+      profileImageName: activeTab === 'upload' ? undefined : profilePhotoName || undefined,
+      profileImageData: activeTab === 'upload' ? undefined : legacyProfileImageData,
       templateId: selectedTemplateId,
       personalDetails
     };

@@ -25,9 +25,48 @@ import { generateResumeContent } from './services/geminiService';
 import { authService } from './services/authService';
 import { setSession, clearSession, SESSION_EXPIRED_EVENT } from './services/apiClient';
 import { agentService } from './services/agentService';
-import { saveDraft, getLatestDraft, getLatestResume } from './services/resumeService';
+import { saveDraft, getLatestDraft, getLatestResume, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
 import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, PersonalDetails } from './types';
+
+const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
+
+const cleanImportedText = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  return value.replace(IMPORT_TEXT_CONTROL_CHARS, '').replace(/\u00a0/g, ' ').trim();
+};
+
+const importedDateRange = (value: any): string => {
+  const explicit = cleanImportedText(value?.dates)
+    || cleanImportedText(value?.dateRange)
+    || cleanImportedText(value?.period)
+    || cleanImportedText(value?.date)
+    || cleanImportedText(value?.years);
+  if (explicit) return explicit;
+
+  const start = cleanImportedText(value?.start);
+  const end = cleanImportedText(value?.end);
+  return start && end ? `${start} - ${end}` : start || end;
+};
+
+const DEFAULT_IMPORTED_TEMPLATE_ID = 'classic_pro';
+
+const computeImportedResumeTitle = (content: Partial<UserInputData>): string => {
+  const firstName = cleanImportedText(content.personalDetails?.firstName);
+  const lastName = cleanImportedText(content.personalDetails?.lastName);
+  const name = [firstName, lastName].filter(Boolean).join(' ').trim();
+  const role = cleanImportedText(content.targetRole) || cleanImportedText(content.experienceItems?.[0]?.role);
+
+  const title = name && role
+    ? `${name} - ${role}`
+    : name
+      ? `${name} Resume`
+      : role
+        ? `Resume - ${role}`
+        : 'Imported Resume';
+
+  return title.slice(0, 200);
+};
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -255,57 +294,70 @@ const App: React.FC = () => {
       
       const experiences: ExperienceItem[] = json.experience?.map((exp: any) => ({
           id: Math.random().toString(),
-          role: exp.role || '',
-          company: exp.company || '',
-          dates: exp.start && exp.end ? `${exp.start} - ${exp.end}` : (exp.start || ''),
-          description: exp.highlights?.map((h: any) => typeof h === 'string' ? h : h.bullet).join('\n') || ''
+          role: cleanImportedText(exp.role),
+          company: cleanImportedText(exp.company),
+          dates: importedDateRange(exp),
+          description: exp.highlights?.map((h: any) => cleanImportedText(typeof h === 'string' ? h : h.bullet)).filter(Boolean).join('\n') || ''
       })) || [];
 
       const educations: EducationItem[] = json.education?.map((edu: any) => ({
           id: Math.random().toString(),
-          degree: edu.degree || '',
-          school: edu.school || '',
-          dates: edu.start && edu.end ? `${edu.start} - ${edu.end}` : (edu.start || '')
+          degree: cleanImportedText(edu.degree),
+          school: cleanImportedText(edu.school),
+          dates: importedDateRange(edu)
       })) || [];
 
       const skills: SkillItem[] = [];
       if (json.skills) {
           Object.entries(json.skills).forEach(([category, items]) => {
               if (Array.isArray(items) && items.length > 0) {
+                  const cleanItems = items
+                    .map((item) => cleanImportedText(item).replace(/^[\s,;]+/, '').replace(/[\s,;]+$/, ''))
+                    .filter(Boolean);
+                  if (cleanItems.length === 0) return;
                   skills.push({
                       id: Math.random().toString(),
                       category: category.charAt(0).toUpperCase() + category.slice(1),
-                      items: items.join(', ')
+                      items: cleanItems.join(', ')
                   });
               }
           });
       }
 
       // Extract location data if possible (simple split)
-      const locationParts = json.header?.location ? json.header.location.split(',') : [];
+      const locationParts = cleanImportedText(json.header?.location).split(',');
       const city = locationParts[0]?.trim() || '';
       const state = locationParts[1]?.trim() || '';
 
       // Extract Name
-      const nameParts = json.header?.name ? json.header.name.split(' ') : [];
+      const nameParts = cleanImportedText(json.header?.name).split(' ').filter(Boolean);
       const firstName = nameParts[0] || '';
       const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
       const personalDetails: PersonalDetails = {
           firstName: firstName,
           lastName: lastName,
-          email: json.header?.email || '',
-          phone: json.header?.phone || '',
+          email: cleanImportedText(json.header?.email),
+          phone: cleanImportedText(json.header?.phone),
           address: '', // Resume parsers often miss street address, default empty
           city: city,
           state: state,
           country: '',
           postalCode: '',
-          summary: json.summary || ''
+          summary: cleanImportedText(json.summary)
       };
 
       return {
           targetRole: '',
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: false,
+          },
+          profileImageUrl: undefined,
+          profileImageName: undefined,
+          profileImageData: undefined,
           personalDetails: personalDetails,
           experienceItems: experiences,
           educationItems: educations,
@@ -324,17 +376,30 @@ const App: React.FC = () => {
         
         if (parsedResults.json) {
             const mappedData = mapJsonToState(parsedResults.json);
+            const templateId = selectedTemplateId || data.templateId || DEFAULT_IMPORTED_TEMPLATE_ID;
+            const importedContent: UserInputData = {
+              role: data.role,
+              plan: data.plan,
+              jobDescription: data.jobDescription,
+              jobUrl: data.jobUrl,
+              ...mappedData,
+              templateId,
+            };
+            const importedTitle = computeImportedResumeTitle(importedContent);
+            const saved = await saveResume({
+              templateId,
+              title: importedTitle,
+              content: importedContent,
+            });
+            setSelectedTemplateId(templateId);
             setEditorData(mappedData);
-            setLoadedResumeId(null);
-            setLoadedResumeTitle(null);
+            setLoadedResumeId(saved.id);
+            setLoadedResumeTitle(importedTitle);
+            setWorkspaceResetKey((k) => k + 1);
             // Persist imported result as the latest draft (workspace state)
             await saveDraft({
-              templateId: selectedTemplateId,
-              content: {
-                ...data,
-                ...mappedData,
-                templateId: selectedTemplateId,
-              },
+              templateId,
+              content: importedContent,
             });
             // Switch to Create tab to show the editor
             setGeneratorTab('create');
