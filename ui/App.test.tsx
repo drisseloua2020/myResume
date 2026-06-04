@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { generateResumeContent } from './services/geminiService';
-import { saveResume, saveDraft, getLatestDraft, getLatestResume } from './services/resumeService';
+import { saveResume, updateResume, saveDraft, getLatestDraft, getLatestResume } from './services/resumeService';
 import { SubscriptionPlan, UserRole } from './types';
 
 const testUser = {
@@ -41,6 +41,7 @@ vi.mock('./services/resumeService', () => ({
   getLatestDraft: vi.fn(),
   saveDraft: vi.fn(),
   saveResume: vi.fn(),
+  updateResume: vi.fn(),
 }));
 
 vi.mock('./services/locationService', () => ({
@@ -132,5 +133,76 @@ describe('App import flow', () => {
         }),
       }));
     });
+  });
+
+  it('starts a fresh template flow without overwriting the loaded resume', async () => {
+    const user = userEvent.setup();
+    vi.mocked(getLatestResume).mockResolvedValue({
+      id: 'res_existing',
+      templateId: 'modern_tech',
+      title: 'Existing Resume',
+      content: {
+        role: UserRole.USER,
+        plan: SubscriptionPlan.FREE,
+        templateId: 'modern_tech',
+        targetRole: 'Software Architect',
+        preferences: {
+          pages: '1-page',
+          tone: 'modern',
+          region: 'US',
+          photo: false,
+        },
+        personalDetails: {
+          firstName: 'Alex',
+          lastName: 'Resume',
+          email: 'alex@example.com',
+          phone: '555-0100',
+          address: '1 Main St',
+          city: 'Austin',
+          state: 'TX',
+          country: 'United States',
+          postalCode: '78701',
+          summary: 'Software architect.',
+        },
+        experienceItems: [
+          {
+            id: 'exp_1',
+            role: 'Software Architect',
+            company: 'Tech Co',
+            dates: '2021 - Present',
+            description: 'Led platform architecture.',
+          },
+        ],
+        educationItems: [
+          {
+            id: 'edu_1',
+            school: 'State University',
+            degree: 'BS Computer Science',
+            dates: '2012 - 2016',
+          },
+        ],
+        skillItems: [
+          {
+            id: 'skill_1',
+            category: 'Core',
+            items: 'Architecture, AI',
+          },
+        ],
+      },
+      createdAt: '2026-05-01T00:00:00Z',
+      updatedAt: '2026-05-02T00:00:00Z',
+    });
+
+    render(<App />);
+
+    await screen.findByText(/Loaded resume: Existing Resume/i);
+
+    await user.click(screen.getAllByRole('button', { name: /new resume/i })[0]);
+    await user.click(screen.getByRole('button', { name: /choose template/i }));
+
+    expect(await screen.findByRole('heading', { name: /choose a template/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Loaded resume: Existing Resume/i)).not.toBeInTheDocument();
+    expect(saveResume).not.toHaveBeenCalled();
+    expect(updateResume).not.toHaveBeenCalled();
   });
 });

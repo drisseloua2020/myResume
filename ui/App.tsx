@@ -138,6 +138,19 @@ const App: React.FC = () => {
     setWorkspaceResetKey((k) => k + 1);
   };
 
+  const startNewResume = () => {
+    setShowNewResumeConfirm(false);
+    setResults(null);
+    setError(null);
+    setEditorData(null);
+    setLoadedResumeId(null);
+    setLoadedResumeTitle(null);
+    setSelectedTemplateId(undefined);
+    setGeneratorTab('create');
+    setActiveTab('templates');
+    setWorkspaceResetKey((k) => k + 1);
+  };
+
   // Load the newest saved resume when a user lands in the WorkSpace.
   // If the user has no saved resume yet, fall back to the last autosaved draft.
   useEffect(() => {
@@ -587,6 +600,7 @@ const App: React.FC = () => {
           onGenerate={handleGenerate} 
           onImport={handleImport}
           onTemplateChange={setSelectedTemplateId}
+          onNewResume={() => setShowNewResumeConfirm(true)}
           onDraftChange={async (draft) => {
             // Persist workspace edits as the user types
             await saveDraft({ templateId: draft.templateId ?? selectedTemplateId, content: draft });
@@ -627,16 +641,7 @@ const App: React.FC = () => {
       {showNewResumeConfirm && (
         <ConfirmNewResumeModal
           onCancel={() => setShowNewResumeConfirm(false)}
-          onConfirm={() => {
-            setShowNewResumeConfirm(false);
-            // Clear current editor data and start fresh
-            setResults(null);
-            setEditorData(null);
-            setLoadedResumeId(null);
-            setLoadedResumeTitle(null);
-            setGeneratorTab('create');
-            setWorkspaceResetKey((k) => k + 1);
-          }}
+          onConfirm={startNewResume}
         />
       )}
 
