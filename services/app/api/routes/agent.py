@@ -170,7 +170,18 @@ def _document_kind(mime: str, name: str = "") -> str | None:
 
 
 SECTION_ALIASES: dict[str, set[str]] = {
-    "summary": {"summary", "profile", "professional summary", "career summary", "objective", "about", "about me"},
+    "summary": {
+        "summary",
+        "profile",
+        "professional summary",
+        "professional profile",
+        "career summary",
+        "career profile",
+        "executive summary",
+        "objective",
+        "about",
+        "about me",
+    },
     "skills": {
         "skills",
         "technical skills",
@@ -180,20 +191,34 @@ SECTION_ALIASES: dict[str, set[str]] = {
         "areas of expertise",
         "key skills",
         "technical competencies",
+        "technical expertise",
+        "technology",
+        "technologies and tools",
         "competencies",
+        "core competencies",
     },
     "experience": {
         "experience",
         "work experience",
+        "work experience continued",
         "professional experience",
         "employment history",
+        "employment experience",
         "work history",
         "career history",
+        "career experience",
         "professional background",
     },
     "projects": {"projects", "selected projects", "project experience"},
-    "education": {"education", "academic background", "education and training"},
-    "certifications": {"certifications", "certification", "licenses", "licenses and certifications", "certificates"},
+    "education": {"education", "academic background", "academic history", "education and training"},
+    "certifications": {
+        "certifications",
+        "certification",
+        "licenses",
+        "licenses and certifications",
+        "certifications and licenses",
+        "certificates",
+    },
     "awards": {"awards", "honors", "achievements", "recognition"},
     "publications": {"publications"},
 }
@@ -285,7 +310,8 @@ def _resume_lines(text: str) -> list[str]:
 def _section_for_heading(line: str) -> str | None:
     if len(line) > 60:
         return None
-    normalized = re.sub(r"[^A-Za-z& ]+", "", line).replace("&", "and").strip().lower()
+    normalized = re.sub(r"[^A-Za-z& ]+", "", line).replace("&", "and")
+    normalized = re.sub(r"\s+", " ", normalized).strip().lower()
     for section, aliases in SECTION_ALIASES.items():
         if normalized in aliases:
             return section
@@ -470,6 +496,39 @@ def _detail_segments(line: str) -> list[str]:
     ]
 
 
+def _role_company_segments(line: str) -> list[str]:
+    segments = _detail_segments(line)
+    if len(segments) == 1 and "," in line:
+        segments = [segment.strip(" ,;") for segment in re.split(r"\s*,\s*", line) if segment.strip(" ,;")]
+    return [segment for segment in segments if segment and not _looks_like_date_range(segment)]
+
+
+def _assign_role_company_from_segments(segments: list[str]) -> tuple[str, str, str]:
+    if not segments:
+        return "", "", ""
+
+    role = ""
+    company = ""
+    location = ""
+    role_index = next((index for index, segment in enumerate(segments) if _looks_like_role_title(segment)), -1)
+
+    if role_index >= 0:
+        role = segments[role_index]
+        remaining = [segment for index, segment in enumerate(segments) if index != role_index]
+        if remaining:
+            company = remaining[0]
+        if len(remaining) > 1:
+            location = ", ".join(remaining[1:])
+    elif len(segments) >= 2:
+        company, role = segments[0], segments[1]
+        if len(segments) > 2:
+            location = ", ".join(segments[2:])
+    elif _looks_like_role_title(segments[0]):
+        role = segments[0]
+
+    return role, company, location
+
+
 def _parse_role_company(line: str) -> dict[str, str] | None:
     start, end = _split_date_range(line)
     clean = _strip_date_range(line)
@@ -480,15 +539,28 @@ def _parse_role_company(line: str) -> dict[str, str] | None:
     company = ""
     location = ""
 
-    segments = [segment for segment in _detail_segments(clean) if not _looks_like_date_range(segment)]
+    segments = _role_company_segments(clean)
     if len(segments) >= 2:
-        role_index = next((index for index, segment in enumerate(segments) if _looks_like_role_title(segment)), -1)
-        if role_index >= 0:
-            role = segments[role_index]
-            company = next((segment for index, segment in enumerate(segments) if index != role_index and "," not in segment), "")
-            location = next((segment for index, segment in enumerate(segments) if index != role_index and "," in segment), "")
-        else:
-            company, role = segments[0], segments[1]
+        role, company, location = _assign_role_company_from_segments(segments)
+
+    if not role and not company:
+        pieces = [piece.strip(" ,;") for piece in re.split(r"\s+(?:-|\u2013|\u2014)\s+", clean) if piece.strip(" ,;")]
+        if len(pieces) >= 2:
+            role, company, location = _assign_role_company_from_segments(pieces)
+            if not role and not company:
+                first, second = pieces[0], pieces[1]
+                if _looks_like_role_title(first):
+                    role, company = first, second
+                elif _looks_like_role_title(second):
+                    company, role = first, second
+                else:
+                    role, company = first, second
+
+    if not role and not company:
+        match = re.match(r"(?P<role>.+?)\s+(?:at|with)\s+(?P<company>.+)$", clean, flags=re.I)
+        if match and _looks_like_role_title(match.group("role")):
+            role = match.group("role").strip(" ,;")
+            company = match.group("company").strip(" ,;")
 
     if not role and not company:
         pieces = [piece.strip(" ,;") for piece in re.split(r"\s+(?:-|\u2013|\u2014)\s+", clean, maxsplit=1)]
@@ -614,10 +686,88 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
     return entries
 
 
+def _parse_education_line(line: str) -> dict[str, object] | None:
+    start, end = _split_date_range(line)
+    clean = _strip_date_range(line)
+    if not clean:
+        return {
+            "school": "",
+            "degree": "",
+            "location": "",
+            "start": start,
+            "end": end,
+            "notes": [],
+        } if start else None
+
+    segments = _role_company_segments(clean)
+    if len(segments) == 1:
+        pieces = [piece.strip(" ,;") for piece in re.split(r"\s+(?:-|\u2013|\u2014)\s+", clean) if piece.strip(" ,;")]
+        if len(pieces) >= 2:
+            segments = pieces
+
+    if len(segments) == 1 and "," in clean:
+        segments = [segment.strip(" ,;") for segment in re.split(r"\s*,\s*", clean) if segment.strip(" ,;")]
+
+    if not segments:
+        return None
+
+    degree_index = next(
+        (index for index, segment in enumerate(segments) if _looks_like_degree(segment)),
+        -1,
+    )
+
+    school = ""
+    degree = ""
+    location = ""
+    notes: list[str] = []
+
+    if degree_index >= 0:
+        degree = segments[degree_index]
+        school = next((segment for index, segment in enumerate(segments) if index != degree_index), "")
+        notes = [segment for index, segment in enumerate(segments) if index not in {degree_index} and segment != school]
+    elif len(segments) >= 2:
+        school, degree = segments[0], segments[1]
+        notes = segments[2:]
+    else:
+        if _looks_like_degree_or_school(segments[0]):
+            if _looks_like_degree(segments[0]):
+                degree = segments[0]
+            else:
+                school = segments[0]
+        else:
+            notes = [segments[0]]
+
+    if notes:
+        location = next((segment for segment in notes if "," in segment), "")
+        notes = [segment for segment in notes if segment != location]
+
+    if not any([school, degree, start, end]):
+        return None
+
+    return {
+        "school": school,
+        "degree": degree,
+        "location": location,
+        "start": start,
+        "end": end,
+        "notes": notes[:8],
+    }
+
+
 def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
     clean_lines = [line for line in lines if not _is_contact_line(line)]
     if not clean_lines:
         return []
+
+    compact_entries: list[dict[str, object]] = []
+    for line in clean_lines:
+        parsed = _parse_education_line(line)
+        if parsed and (parsed["school"] or parsed["degree"]) and (
+            len(_role_company_segments(_strip_date_range(line))) >= 2 or _looks_like_date_range(line)
+        ):
+            compact_entries.append(parsed)
+    if compact_entries:
+        return compact_entries[:6]
 
     date_line = next((line for line in clean_lines if _looks_like_date_range(line)), "")
     start, end = ("", "")

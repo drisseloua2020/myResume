@@ -135,6 +135,88 @@ describe('App import flow', () => {
     });
   });
 
+  it('maps flexible parsed resume JSON into live editor fields', async () => {
+    const user = userEvent.setup();
+    vi.mocked(generateResumeContent).mockResolvedValueOnce({
+      json: {
+        RESUME_JSON: {
+          header: {
+            full_name: 'Jordan Candidate',
+            title: 'Software Architect',
+            email: 'jordan@example.com',
+            phone: '555-555-0100',
+            location: 'Seattle, WA 98101',
+          },
+          professional_summary: 'Architect focused on AI-enabled delivery.',
+          technical_skills: {
+            core: 'Cloud Architecture | AI Engineering | Python',
+          },
+          work_experience: [
+            {
+              jobTitle: 'Software Architect',
+              employer: 'Slalom',
+              date_range: 'Jan 2022 - Present',
+              responsibilities: [
+                'Led AI accelerated engineering assessments.',
+                'Mapped modernization roadmaps for enterprise teams.',
+              ],
+            },
+          ],
+          education: [
+            {
+              institution: 'State University',
+              qualification: 'BS Computer Science',
+              years: '2012 - 2016',
+            },
+          ],
+        },
+      },
+    });
+
+    const { container } = render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await user.upload(fileInput, new File(['resume'], 'jordan-resume.pdf', { type: 'application/pdf' }));
+    await screen.findByText('jordan-resume.pdf');
+
+    await user.click(screen.getByRole('button', { name: /import to live editor/i }));
+
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = vi.mocked(saveResume).mock.calls[0][0];
+    expect(payload.title).toBe('Jordan Candidate - Software Architect');
+    expect(payload.content.targetRole).toBe('Software Architect');
+    expect(payload.content.personalDetails).toEqual(expect.objectContaining({
+      firstName: 'Jordan',
+      lastName: 'Candidate',
+      email: 'jordan@example.com',
+      phone: '555-555-0100',
+      city: 'Seattle',
+      state: 'WA',
+      postalCode: '98101',
+      summary: 'Architect focused on AI-enabled delivery.',
+    }));
+    expect(payload.content.experienceItems[0]).toEqual(expect.objectContaining({
+      role: 'Software Architect',
+      company: 'Slalom',
+      dates: 'Jan 2022 - Present',
+      description: '- Led AI accelerated engineering assessments.\n- Mapped modernization roadmaps for enterprise teams.',
+    }));
+    expect(payload.content.educationItems[0]).toEqual(expect.objectContaining({
+      school: 'State University',
+      degree: 'BS Computer Science',
+      dates: '2012 - 2016',
+    }));
+    expect(payload.content.skillItems[0]).toEqual(expect.objectContaining({
+      category: 'Core',
+      items: 'Cloud Architecture, AI Engineering, Python',
+    }));
+  });
+
   it('starts a fresh template flow without overwriting the loaded resume', async () => {
     const user = userEvent.setup();
     vi.mocked(getLatestResume).mockResolvedValue({
