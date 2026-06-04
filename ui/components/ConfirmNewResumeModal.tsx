@@ -15,7 +15,7 @@ const ConfirmNewResumeModal: React.FC<ConfirmNewResumeModalProps> = ({ onConfirm
 
       <div className="relative z-10 w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden border border-slate-100">
         <div className="bg-[#2e3d50] text-white px-6 py-4 flex items-center justify-between">
-          <div className="font-bold text-lg">Note!</div>
+          <div className="font-bold text-lg">Start New Resume</div>
           <button
             onClick={onCancel}
             className="text-white/80 hover:text-white transition"
@@ -30,7 +30,7 @@ const ConfirmNewResumeModal: React.FC<ConfirmNewResumeModalProps> = ({ onConfirm
 
         <div className="px-6 py-6">
           <p className="text-slate-700 text-base leading-relaxed">
-            Are you sure want to erase the current data for new resume?
+            Your existing saved resume will stay in your library. You will choose a new template and start a fresh resume draft.
           </p>
 
           <div className="mt-6 flex items-center justify-end gap-3">
@@ -39,14 +39,14 @@ const ConfirmNewResumeModal: React.FC<ConfirmNewResumeModalProps> = ({ onConfirm
               onClick={onCancel}
               className="px-5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition"
             >
-              No
+              Keep Editing
             </button>
             <button
               type="button"
               onClick={onConfirm}
               className="px-5 py-2.5 rounded-lg bg-[#1a91f0] text-white font-bold hover:bg-[#1170cd] shadow-sm transition"
             >
-              YES
+              Choose Template
             </button>
           </div>
         </div>

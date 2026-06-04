@@ -13,6 +13,7 @@ interface ResumeInputProps {
   onGenerate: (data: UserInputData, mode: AppMode) => void;
   onImport: (data: UserInputData) => void;
   onTemplateChange: (templateId: string) => void;
+  onNewResume?: () => void;
   onDraftChange?: (draft: UserInputData) => void;
   isLoading: boolean;
   role: UserRole;
@@ -51,6 +52,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   onGenerate, 
   onImport,
   onTemplateChange,
+  onNewResume,
   onDraftChange,
   isLoading, 
   role, 
@@ -391,6 +393,15 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     // Clear save pointer so next save creates a new record
     setSavedResumeId(null);
     setSaveMsg(null);
+  };
+
+  const requestNewResume = () => {
+    if (onNewResume) {
+      onNewResume();
+      return;
+    }
+
+    setShowNewResumeConfirm(true);
   };
 
   const hasText = (value?: string | null) => Boolean(value && value.trim().length > 0);
@@ -1044,7 +1055,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              {activeTab === 'create' && (
                <button
                  type="button"
-                 onClick={() => setShowNewResumeConfirm(true)}
+                 onClick={requestNewResume}
                  disabled={isLoading || isSavingResume}
                  className={`w-full bg-white border border-slate-300 text-slate-800 text-lg font-bold px-12 py-4 rounded-lg shadow-sm transition hover:-translate-y-1 hover:shadow-md flex items-center justify-center gap-2 ${(isLoading || isSavingResume) ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-50'}`}
                >
