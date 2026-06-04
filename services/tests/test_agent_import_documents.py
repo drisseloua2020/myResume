@@ -319,6 +319,67 @@ def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(clie
     assert resume_json["education"][0]["degree"] == "BS Computer Science"
 
 
+def test_generate_resume_parses_compact_pdf_rows_into_structured_fields(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _pdf_bytes([
+        "Jordan Candidate",
+        "Software Architect",
+        "jordan@example.com | 555-555-0100 | Seattle, WA 98101",
+        "PROFESSIONAL PROFILE",
+        "Architect focused on AI-enabled delivery and cloud modernization.",
+        "CORE COMPETENCIES",
+        "Cloud Architecture | AI Engineering | Python | AWS",
+        "WORK EXPERIENCE",
+        "Software Architect, Slalom, Seattle WA, Jan 2022 - Present",
+        "Led AI accelerated engineering assessments for enterprise teams.",
+        "Senior Engineer at Acme Corp | 2018 - 2021",
+        "Built resilient API platforms for customer-facing products.",
+        "EDUCATION",
+        "State University | BS Computer Science | 2012 - 2016",
+    ])
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": PDF_MIME,
+                    "name": "jordan-resume.pdf",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["header"]["name"] == "Jordan Candidate"
+    assert resume_json["header"]["title"] == "Software Architect"
+    assert resume_json["summary"] == "Architect focused on AI-enabled delivery and cloud modernization."
+    assert resume_json["skills"]["core"] == ["Cloud Architecture", "AI Engineering", "Python", "AWS"]
+    assert resume_json["experience"][0]["role"] == "Software Architect"
+    assert resume_json["experience"][0]["company"] == "Slalom"
+    assert resume_json["experience"][0]["location"] == "Seattle WA"
+    assert resume_json["experience"][0]["start"] == "Jan 2022"
+    assert resume_json["experience"][0]["end"] == "Present"
+    assert resume_json["experience"][1]["role"] == "Senior Engineer"
+    assert resume_json["experience"][1]["company"] == "Acme Corp"
+    assert resume_json["experience"][1]["start"] == "2018"
+    assert resume_json["experience"][1]["end"] == "2021"
+    assert resume_json["education"][0]["school"] == "State University"
+    assert resume_json["education"][0]["degree"] == "BS Computer Science"
+    assert resume_json["education"][0]["start"] == "2012"
+    assert resume_json["education"][0]["end"] == "2016"
+
+
 def test_generate_resume_collects_common_resume_date_formats_when_ai_fails(client, monkeypatch):
     token = _signup(client)
     fake_client = _FailingGeminiClient()

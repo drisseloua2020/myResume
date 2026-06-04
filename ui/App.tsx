@@ -32,21 +32,117 @@ import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPla
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
 const cleanImportedText = (value: unknown): string => {
-  if (typeof value !== 'string') return '';
-  return value.replace(IMPORT_TEXT_CONTROL_CHARS, '').replace(/\u00a0/g, ' ').trim();
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value).replace(IMPORT_TEXT_CONTROL_CHARS, '').replace(/\u00a0/g, ' ').trim();
+};
+
+const firstImportedText = (...values: unknown[]): string => {
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      const nested = firstImportedText(...value);
+      if (nested) return nested;
+      continue;
+    }
+    const text = cleanImportedText(value);
+    if (text) return text;
+  }
+  return '';
+};
+
+const importedField = (source: any, keys: string[]): unknown => {
+  if (!source || typeof source !== 'object') return undefined;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      return source[key];
+    }
+  }
+  return undefined;
+};
+
+const importedValues = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    return value
+      .split(/\n|;/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  if (value && typeof value === 'object') return Object.values(value);
+  return [];
+};
+
+const cleanImportedListItem = (value: unknown): string => {
+  const source = value && typeof value === 'object'
+    ? firstImportedText(
+      (value as any).bullet,
+      (value as any).description,
+      (value as any).text,
+      (value as any).achievement,
+      (value as any).responsibility,
+    )
+    : cleanImportedText(value);
+  return source.replace(/^[\s,;\-*\u2022\u00b7]+/, '').replace(/[\s,;]+$/, '').trim();
+};
+
+const importedBulletLines = (...sources: unknown[]): string => {
+  const lines = sources
+    .flatMap(importedValues)
+    .map(cleanImportedListItem)
+    .filter(Boolean);
+
+  if (lines.length > 0) {
+    return lines.map((line) => `- ${line}`).join('\n');
+  }
+
+  return cleanImportedListItem(firstImportedText(...sources));
 };
 
 const importedDateRange = (value: any): string => {
-  const explicit = cleanImportedText(value?.dates)
-    || cleanImportedText(value?.dateRange)
-    || cleanImportedText(value?.period)
-    || cleanImportedText(value?.date)
-    || cleanImportedText(value?.years);
+  const explicit = firstImportedText(
+    value?.dates,
+    value?.dateRange,
+    value?.date_range,
+    value?.period,
+    value?.date,
+    value?.years,
+    value?.duration,
+  );
   if (explicit) return explicit;
 
-  const start = cleanImportedText(value?.start);
-  const end = cleanImportedText(value?.end);
+  const start = firstImportedText(value?.start, value?.startDate, value?.start_date, value?.from);
+  const end = firstImportedText(value?.end, value?.endDate, value?.end_date, value?.to);
   return start && end ? `${start} - ${end}` : start || end;
+};
+
+const splitImportedCommaList = (items: unknown[]): string[] => {
+  const values: string[] = [];
+  items.forEach((item) => {
+    const raw = cleanImportedListItem(item);
+    raw
+      .split(/[,|/]/)
+      .map((part) => cleanImportedListItem(part))
+      .filter(Boolean)
+      .forEach((part) => {
+        if (!values.includes(part)) values.push(part);
+      });
+  });
+  return values;
+};
+
+const parseImportedLocation = (value: unknown): Pick<PersonalDetails, 'city' | 'state' | 'country' | 'postalCode'> => {
+  const location = cleanImportedText(value);
+  if (!location) return { city: '', state: '', country: '', postalCode: '' };
+
+  const parts = location.split(',').map((part) => part.trim()).filter(Boolean);
+  const city = parts[0] || '';
+  const statePostal = parts.length > 1 ? parts[1] : '';
+  const country = parts.length > 2 ? parts.slice(2).join(', ') : '';
+  const postalMatch = statePostal.match(/\b([A-Z]\d[A-Z]\s?\d[A-Z]\d|\d{4,6}(?:-\d{4})?)\b/i);
+  const postalCode = postalMatch?.[1] || '';
+  const state = statePostal.replace(postalCode, '').trim();
+
+  return { city, state, country, postalCode };
 };
 
 const DEFAULT_IMPORTED_TEMPLATE_ID = 'classic_pro';
@@ -304,64 +400,99 @@ const App: React.FC = () => {
   // Helper to map JSON to State
   const mapJsonToState = (json: any): Partial<UserInputData> => {
       if (!json) return {};
-      
-      const experiences: ExperienceItem[] = json.experience?.map((exp: any) => ({
-          id: Math.random().toString(),
-          role: cleanImportedText(exp.role),
-          company: cleanImportedText(exp.company),
-          dates: importedDateRange(exp),
-          description: exp.highlights?.map((h: any) => cleanImportedText(typeof h === 'string' ? h : h.bullet)).filter(Boolean).join('\n') || ''
-      })) || [];
 
-      const educations: EducationItem[] = json.education?.map((edu: any) => ({
-          id: Math.random().toString(),
-          degree: cleanImportedText(edu.degree),
-          school: cleanImportedText(edu.school),
-          dates: importedDateRange(edu)
-      })) || [];
+      const resumeJson = json.RESUME_JSON || json.resume_json || json.resumeJson || json.resume || json;
+      const header = resumeJson.header || resumeJson.personalDetails || resumeJson.personal || {};
+      const experienceSource = importedValues(
+        resumeJson.experience
+        || resumeJson.experiences
+        || resumeJson.workExperience
+        || resumeJson.work_experience
+        || resumeJson.professionalExperience
+        || resumeJson.employment
+      );
+      const educationSource = importedValues(
+        resumeJson.education
+        || resumeJson.educations
+        || resumeJson.academicBackground
+        || resumeJson.academic_background
+      );
+      
+      const experiences: ExperienceItem[] = experienceSource
+        .map((exp: any) => ({
+            id: Math.random().toString(),
+            role: firstImportedText(importedField(exp, ['role', 'title', 'position', 'jobTitle', 'job_title'])),
+            company: firstImportedText(importedField(exp, ['company', 'employer', 'organization', 'organisation', 'companyName', 'company_name'])),
+            dates: importedDateRange(exp),
+            description: importedBulletLines(
+              exp?.highlights,
+              exp?.bullets,
+              exp?.achievements,
+              exp?.responsibilities,
+              exp?.description,
+            ),
+        }))
+        .filter((exp) => exp.role || exp.company || exp.dates || exp.description);
+
+      const educations: EducationItem[] = educationSource
+        .map((edu: any) => ({
+            id: Math.random().toString(),
+            degree: firstImportedText(importedField(edu, ['degree', 'program', 'qualification', 'title'])),
+            school: firstImportedText(importedField(edu, ['school', 'institution', 'university', 'college', 'organization', 'organisation'])),
+            dates: importedDateRange(edu)
+        }))
+        .filter((edu) => edu.degree || edu.school || edu.dates);
 
       const skills: SkillItem[] = [];
-      if (json.skills) {
-          Object.entries(json.skills).forEach(([category, items]) => {
-              if (Array.isArray(items) && items.length > 0) {
-                  const cleanItems = items
-                    .map((item) => cleanImportedText(item).replace(/^[\s,;]+/, '').replace(/[\s,;]+$/, ''))
-                    .filter(Boolean);
-                  if (cleanItems.length === 0) return;
-                  skills.push({
-                      id: Math.random().toString(),
-                      category: category.charAt(0).toUpperCase() + category.slice(1),
-                      items: cleanItems.join(', ')
-                  });
-              }
-          });
+      const skillSource = resumeJson.skills || resumeJson.skillItems || resumeJson.technicalSkills || resumeJson.technical_skills;
+      const pushSkillGroup = (category: string, items: unknown) => {
+        const cleanItems = splitImportedCommaList(importedValues(items));
+        if (cleanItems.length === 0) return;
+        const label = cleanImportedText(category).replace(/_/g, ' ');
+        skills.push({
+            id: Math.random().toString(),
+            category: label ? label.charAt(0).toUpperCase() + label.slice(1) : 'Core',
+            items: cleanItems.join(', ')
+        });
+      };
+
+      if (Array.isArray(skillSource) || typeof skillSource === 'string') {
+        pushSkillGroup('Core', skillSource);
+      } else if (skillSource && typeof skillSource === 'object') {
+        Object.entries(skillSource).forEach(([category, items]) => pushSkillGroup(category, items));
       }
 
-      // Extract location data if possible (simple split)
-      const locationParts = cleanImportedText(json.header?.location).split(',');
-      const city = locationParts[0]?.trim() || '';
-      const state = locationParts[1]?.trim() || '';
+      const location = parseImportedLocation(firstImportedText(header.location, header.address, resumeJson.location));
 
       // Extract Name
-      const nameParts = cleanImportedText(json.header?.name).split(' ').filter(Boolean);
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      const fullName = firstImportedText(header.name, header.fullName, header.full_name, resumeJson.name);
+      const nameParts = fullName.split(' ').filter(Boolean);
+      const firstName = firstImportedText(header.firstName, header.first_name) || nameParts[0] || '';
+      const lastName = firstImportedText(header.lastName, header.last_name) || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
+      const targetRole = firstImportedText(
+        header.title,
+        header.role,
+        resumeJson.targetRole,
+        resumeJson.target_role,
+        resumeJson.title,
+        experiences[0]?.role,
+      );
 
       const personalDetails: PersonalDetails = {
           firstName: firstName,
           lastName: lastName,
-          email: cleanImportedText(json.header?.email),
-          phone: cleanImportedText(json.header?.phone),
-          address: '', // Resume parsers often miss street address, default empty
-          city: city,
-          state: state,
-          country: '',
-          postalCode: '',
-          summary: cleanImportedText(json.summary)
+          email: firstImportedText(header.email, resumeJson.email),
+          phone: firstImportedText(header.phone, resumeJson.phone),
+          address: firstImportedText(header.streetAddress, header.street_address),
+          city: location.city,
+          state: location.state,
+          country: location.country,
+          postalCode: location.postalCode,
+          summary: firstImportedText(resumeJson.summary, resumeJson.profile, resumeJson.professionalSummary, resumeJson.professional_summary)
       };
 
       return {
-          targetRole: '',
+          targetRole,
           preferences: {
             pages: '1-page',
             tone: 'modern',
