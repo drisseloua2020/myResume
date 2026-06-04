@@ -226,30 +226,41 @@ SECTION_ALIASES: dict[str, set[str]] = {
 ROLE_KEYWORDS = {
     "accountant",
     "administrator",
+    "advisor",
+    "agile",
     "analyst",
     "architect",
     "associate",
+    "coach",
     "consultant",
     "coordinator",
+    "devops",
     "developer",
     "designer",
     "director",
     "engineer",
+    "executive",
     "lead",
     "manager",
     "officer",
+    "operator",
     "owner",
     "principal",
     "product",
     "program",
     "project",
+    "qa",
     "recruiter",
+    "scrum",
     "scientist",
     "security",
     "software",
     "specialist",
+    "sre",
     "supervisor",
+    "support",
     "technician",
+    "tester",
 }
 
 DEGREE_KEYWORDS = {
@@ -478,6 +489,71 @@ def _looks_like_role_title(line: str) -> bool:
     return bool(words & ROLE_KEYWORDS)
 
 
+def _looks_like_location_line(line: str) -> bool:
+    clean = line.strip(" ,;")
+    if (
+        not clean
+        or len(clean) > 90
+        or _is_contact_line(clean)
+        or _section_for_heading(clean)
+        or _looks_like_date_range(clean)
+        or _looks_like_role_title(clean)
+    ):
+        return False
+
+    if clean.lower() in {"remote", "hybrid", "onsite", "on-site"}:
+        return True
+
+    if re.search(r"\b(remote|hybrid|onsite|on-site)\b", clean, flags=re.I) and len(clean.split()) <= 6:
+        return True
+
+    if "," in clean:
+        return bool(re.search(r"[A-Za-z]", clean)) and not re.search(r"\b(inc|llc|ltd|corp|corporation|company|group|solutions|systems|technologies)\b", clean, flags=re.I)
+
+    return bool(re.match(r"^[A-Za-z .'-]+(?:\s+[A-Z]{2}|,\s*[A-Z]{2})(?:\s+\d{4,6})?$", clean))
+
+
+def _looks_like_company_line(line: str) -> bool:
+    clean = line.strip(" ,;")
+    if (
+        not clean
+        or len(clean) > 100
+        or _is_contact_line(clean)
+        or _section_for_heading(clean)
+        or _looks_like_date_range(clean)
+        or _looks_like_role_title(clean)
+        or _looks_like_location_line(clean)
+    ):
+        return False
+
+    if re.search(r"\b(inc|llc|ltd|corp|corporation|company|group|solutions|systems|technologies|technology|consulting|partners|university|bank|health|labs)\b", clean, flags=re.I):
+        return True
+
+    words = re.findall(r"[A-Za-z0-9&]+", clean)
+    if not words or len(words) > 5 or clean.endswith("."):
+        return False
+
+    minor_words = {"of", "and", "the", "for"}
+    name_like_words = [
+        word for word in words
+        if word.lower() in minor_words or word[:1].isupper() or word.isupper() or any(char.isdigit() for char in word)
+    ]
+    return len(name_like_words) == len(words)
+
+
+def _split_company_location(value: str) -> tuple[str, str]:
+    segments = _role_company_segments(value)
+    if len(segments) <= 1:
+        return value.strip(" ,;"), ""
+
+    company = segments[0]
+    location_segments = [segment for segment in segments[1:] if _looks_like_location_line(segment)]
+    if location_segments:
+        return company, ", ".join(location_segments)
+
+    return value.strip(" ,;"), ""
+
+
 def _looks_like_degree_or_school(line: str) -> bool:
     words = set(re.findall(r"[A-Za-z]+", line.lower()))
     return bool(words & DEGREE_KEYWORDS)
@@ -520,9 +596,17 @@ def _assign_role_company_from_segments(segments: list[str]) -> tuple[str, str, s
         if len(remaining) > 1:
             location = ", ".join(remaining[1:])
     elif len(segments) >= 2:
-        company, role = segments[0], segments[1]
+        company = segments[0]
+        if _looks_like_location_line(segments[1]):
+            location = segments[1]
+        else:
+            role = segments[1]
         if len(segments) > 2:
-            location = ", ".join(segments[2:])
+            trailing_locations = [segment for segment in segments[2:] if _looks_like_location_line(segment)]
+            if trailing_locations:
+                location = ", ".join([location, *trailing_locations]).strip(" ,")
+            elif not location:
+                location = ", ".join(segments[2:])
     elif _looks_like_role_title(segments[0]):
         role = segments[0]
 
@@ -560,7 +644,7 @@ def _parse_role_company(line: str) -> dict[str, str] | None:
         match = re.match(r"(?P<role>.+?)\s+(?:at|with)\s+(?P<company>.+)$", clean, flags=re.I)
         if match and _looks_like_role_title(match.group("role")):
             role = match.group("role").strip(" ,;")
-            company = match.group("company").strip(" ,;")
+            company, location = _split_company_location(match.group("company"))
 
     if not role and not company:
         pieces = [piece.strip(" ,;") for piece in re.split(r"\s+(?:-|\u2013|\u2014)\s+", clean, maxsplit=1)]
@@ -592,19 +676,64 @@ def _experience_start_at(lines: list[str], index: int) -> tuple[dict[str, str], 
     line = lines[index]
     next_line = lines[index + 1] if index + 1 < len(lines) else ""
     third_line = lines[index + 2] if index + 2 < len(lines) else ""
+    fourth_line = lines[index + 3] if index + 3 < len(lines) else ""
 
     if _is_date_only_line(line):
         return None
 
+    if _looks_like_company_line(line) and _looks_like_location_line(next_line) and _looks_like_role_title(third_line):
+        parsed = {"company": line, "role": third_line, "location": next_line, "start": "", "end": ""}
+        consumed = 3
+        if _looks_like_date_range(fourth_line):
+            parsed["start"], parsed["end"] = _split_date_range(fourth_line)
+            consumed = 4
+        return parsed, consumed
+
+    if _looks_like_role_title(line) and _looks_like_company_line(next_line) and _looks_like_location_line(third_line):
+        parsed = {"company": next_line, "role": line, "location": third_line, "start": "", "end": ""}
+        consumed = 3
+        if _looks_like_date_range(fourth_line):
+            parsed["start"], parsed["end"] = _split_date_range(fourth_line)
+            consumed = 4
+        return parsed, consumed
+
+    if _looks_like_company_line(line) and _looks_like_date_range(next_line) and _looks_like_role_title(third_line):
+        start, end = _split_date_range(next_line)
+        return {"company": line, "role": third_line, "location": "", "start": start, "end": end}, 3
+
+    if _looks_like_role_title(line) and _looks_like_date_range(next_line) and _looks_like_company_line(third_line):
+        start, end = _split_date_range(next_line)
+        return {"company": third_line, "role": line, "location": "", "start": start, "end": end}, 3
+
     parsed = _parse_role_company(line)
+    if parsed and not parsed["role"] and parsed["company"] and _looks_like_role_title(next_line):
+        consumed = 2
+        parsed["role"] = next_line
+        if not parsed["start"] and _looks_like_date_range(third_line):
+            parsed["start"], parsed["end"] = _split_date_range(third_line)
+            consumed = 3
+        elif not parsed["start"] and _looks_like_location_line(third_line):
+            parsed["location"] = parsed["location"] or third_line
+            consumed = 3
+            if _looks_like_date_range(fourth_line):
+                parsed["start"], parsed["end"] = _split_date_range(fourth_line)
+                consumed = 4
+        return parsed, consumed
+
     if parsed and (parsed["company"] or _looks_like_date_range(next_line) or len(_detail_segments(line)) >= 2):
         consumed = 1
         if not parsed["start"] and _looks_like_date_range(next_line):
             parsed["start"], parsed["end"] = _split_date_range(next_line)
             consumed = 2
+        elif parsed["role"] and not parsed["location"] and _looks_like_location_line(next_line):
+            parsed["location"] = next_line
+            consumed = 2
+            if not parsed["start"] and _looks_like_date_range(third_line):
+                parsed["start"], parsed["end"] = _split_date_range(third_line)
+                consumed = 3
         return parsed, consumed
 
-    if next_line and _looks_like_role_title(next_line) and not _is_contact_line(line):
+    if next_line and _looks_like_role_title(next_line) and _looks_like_company_line(line):
         parsed = {"company": line, "role": next_line, "location": "", "start": "", "end": ""}
         consumed = 2
         if _looks_like_date_range(third_line):
@@ -612,15 +741,20 @@ def _experience_start_at(lines: list[str], index: int) -> tuple[dict[str, str], 
             consumed = 3
         return parsed, consumed
 
-    if _looks_like_role_title(line) and next_line and not _is_contact_line(next_line) and not _section_for_heading(next_line):
+    if _looks_like_role_title(line) and _looks_like_location_line(next_line):
+        parsed = {"company": "", "role": line, "location": next_line, "start": "", "end": ""}
+        consumed = 2
+        if _looks_like_date_range(third_line):
+            parsed["start"], parsed["end"] = _split_date_range(third_line)
+            consumed = 3
+        return parsed, consumed
+
+    if _looks_like_role_title(line) and _looks_like_company_line(next_line):
         parsed = {"company": next_line, "role": line, "location": "", "start": "", "end": ""}
         consumed = 2
         if _looks_like_date_range(third_line):
             parsed["start"], parsed["end"] = _split_date_range(third_line)
             consumed = 3
-        elif _looks_like_date_range(next_line):
-            parsed["company"] = ""
-            parsed["start"], parsed["end"] = _split_date_range(next_line)
         return parsed, consumed
 
     return None
@@ -676,6 +810,8 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
 
         if _looks_like_date_range(line) and current:
             current["start"], current["end"] = _split_date_range(line)
+        elif _looks_like_location_line(line) and current and not current.get("location"):
+            current["location"] = line
         elif line and not _is_contact_line(line):
             if current is None:
                 current = {"company": "", "role": "", "location": "", "start": "", "end": "", "highlights": []}
