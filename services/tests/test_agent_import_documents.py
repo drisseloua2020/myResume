@@ -380,6 +380,90 @@ def test_generate_resume_parses_compact_pdf_rows_into_structured_fields(client, 
     assert resume_json["education"][0]["end"] == "2016"
 
 
+def test_generate_resume_parses_multiline_pdf_job_details(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _pdf_bytes([
+        "Taylor Builder",
+        "Principal Architect",
+        "taylor@example.com | Denver, CO",
+        "EXPERIENCE",
+        "Contoso Ltd",
+        "New York, NY",
+        "Principal Architect",
+        "Mar 2021 - Present",
+        "Owned cloud modernization strategy across product teams.",
+        "Senior Engineer",
+        "Fabrikam Inc",
+        "Remote",
+        "2018 - 2021",
+        "Built resilient internal platform services.",
+        "Northwind Partners | Chicago, IL",
+        "QA Automation Lead",
+        "2016 - 2018",
+        "Reduced regression testing cycle time.",
+    ])
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": PDF_MIME,
+                    "name": "taylor-resume.pdf",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["experience"][0] == {
+        "company": "Contoso Ltd",
+        "role": "Principal Architect",
+        "location": "New York, NY",
+        "start": "Mar 2021",
+        "end": "Present",
+        "highlights": [
+            {
+                "bullet": "Owned cloud modernization strategy across product teams.",
+                "tags": [],
+                "metrics": [],
+            }
+        ],
+    }
+    assert resume_json["experience"][1] == {
+        "company": "Fabrikam Inc",
+        "role": "Senior Engineer",
+        "location": "Remote",
+        "start": "2018",
+        "end": "2021",
+        "highlights": [
+            {
+                "bullet": "Built resilient internal platform services.",
+                "tags": [],
+                "metrics": [],
+            }
+        ],
+    }
+    assert resume_json["experience"][2]["company"] == "Northwind Partners"
+    assert resume_json["experience"][2]["role"] == "QA Automation Lead"
+    assert resume_json["experience"][2]["location"] == "Chicago, IL"
+    assert resume_json["experience"][2]["start"] == "2016"
+    assert resume_json["experience"][2]["end"] == "2018"
+    assert [item["bullet"] for item in resume_json["experience"][2]["highlights"]] == [
+        "Reduced regression testing cycle time."
+    ]
+
+
 def test_generate_resume_collects_common_resume_date_formats_when_ai_fails(client, monkeypatch):
     token = _signup(client)
     fake_client = _FailingGeminiClient()
