@@ -314,7 +314,7 @@ def test_generate_resume_falls_back_to_local_import_parser_when_ai_fails(client,
     assert resume_json["header"]["title"] == "Senior Python Engineer"
     assert resume_json["header"]["email"] == "alex@example.com"
     assert "Python" in resume_json["skills"]["core"]
-    assert resume_json["experience"][0]["highlights"][0]["bullet"] == "Built APIs for internal users"
+    assert resume_json["experience"] == []
 
 
 def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(client, monkeypatch):
@@ -521,6 +521,76 @@ def test_generate_resume_parses_multiline_pdf_job_details(client, monkeypatch):
     assert resume_json["experience"][2]["end"] == "2018"
     assert [item["bullet"] for item in resume_json["experience"][2]["highlights"]] == [
         "Reduced regression testing cycle time."
+    ]
+
+
+def test_generate_resume_filters_unaligned_pdf_noise_from_template_json(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FakeGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _pdf_bytes([
+        "Taylor Builder",
+        "Principal Architect",
+        "taylor@example.com | Denver, CO",
+        "Page 1 of 2",
+        "SUMMARY",
+        "Principal architect with experience modernizing cloud platforms.",
+        "Download this resume at example.com",
+        "SKILLS",
+        "Python, AWS, Cloud Architecture",
+        "Page 1 of 2",
+        "EXPERIENCE",
+        "Contoso Ltd",
+        "New York, NY",
+        "Principal Architect",
+        "Mar 2021 - Present",
+        "Owned cloud modernization strategy across product teams.",
+        "Cloud Architecture | Python | AWS",
+        "Professional Experience",
+        "Taylor Builder",
+        "555-555-0100",
+        "2019 - 2020",
+        "References available upon request",
+        "EDUCATION",
+        "State University | BS Computer Science | 2012 - 2016",
+    ])
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": PDF_MIME,
+                    "name": "taylor-noisy.pdf",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    serialized = json.dumps(resume_json)
+    assert "Page 1 of 2" not in serialized
+    assert "Download this resume" not in serialized
+    assert "References available" not in serialized
+    assert "Cloud Architecture | Python | AWS" not in serialized
+    assert "555-555-0100" not in serialized
+
+    assert resume_json["summary"] == "Principal architect with experience modernizing cloud platforms."
+    assert resume_json["skills"]["core"] == ["Python", "AWS", "Cloud Architecture"]
+    assert len(resume_json["experience"]) == 1
+    assert resume_json["experience"][0]["company"] == "Contoso Ltd"
+    assert resume_json["experience"][0]["role"] == "Principal Architect"
+    assert resume_json["experience"][0]["location"] == "New York, NY"
+    assert [item["bullet"] for item in resume_json["experience"][0]["highlights"]] == [
+        "Owned cloud modernization strategy across product teams."
     ]
 
 
