@@ -1028,6 +1028,121 @@ COLD_EMAIL:
 N/A - no job description provided"""
 
 
+def _extract_resume_json_from_response(text: str) -> dict[str, object] | None:
+    start_marker = "RESUME_JSON:"
+    end_marker = "GAP_AND_FIX_LIST:"
+    start_index = text.find(start_marker)
+    if start_index < 0:
+        return None
+
+    start = start_index + len(start_marker)
+    end = text.find(end_marker, start)
+    json_blob = text[start:end if end >= 0 else len(text)].strip()
+    if not json_blob:
+        return None
+
+    try:
+        parsed = json.loads(json_blob)
+    except Exception:
+        return None
+
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _resume_json_quality_score(value: dict[str, object] | None) -> int:
+    if not isinstance(value, dict):
+        return -1
+
+    score = 0
+    header = value.get("header") if isinstance(value.get("header"), dict) else {}
+    if header:
+        for key in ("name", "title", "location", "phone", "email"):
+            if str(header.get(key) or "").strip():
+                score += 2
+
+    if str(value.get("summary") or "").strip():
+        score += 3
+
+    skills = value.get("skills") if isinstance(value.get("skills"), dict) else {}
+    if skills:
+        for items in skills.values():
+            if isinstance(items, list):
+                score += min(len([item for item in items if str(item).strip()]), 8)
+
+    experience = value.get("experience")
+    if isinstance(experience, list):
+        for entry in experience:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("role") or "").strip():
+                score += 5
+            if str(entry.get("company") or "").strip():
+                score += 5
+            if str(entry.get("start") or "").strip() or str(entry.get("end") or "").strip():
+                score += 3
+            if str(entry.get("location") or "").strip():
+                score += 1
+            highlights = entry.get("highlights")
+            if isinstance(highlights, list):
+                score += min(
+                    len([
+                        item for item in highlights
+                        if isinstance(item, dict) and str(item.get("bullet") or "").strip()
+                    ]),
+                    6,
+                )
+
+    education = value.get("education")
+    if isinstance(education, list):
+        for entry in education:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("school") or "").strip():
+                score += 3
+            if str(entry.get("degree") or "").strip():
+                score += 3
+            if str(entry.get("start") or "").strip() or str(entry.get("end") or "").strip():
+                score += 1
+
+    return score
+
+
+def _replace_response_resume_json(text: str, resume_json: dict[str, object]) -> str | None:
+    start_marker = "RESUME_JSON:"
+    end_marker = "GAP_AND_FIX_LIST:"
+    start_index = text.find(start_marker)
+    if start_index < 0:
+        return None
+
+    start = start_index + len(start_marker)
+    end = text.find(end_marker, start)
+    if end < 0:
+        return None
+
+    replacement = "\n" + json.dumps(resume_json, indent=2) + "\n\n"
+    return text[:start] + replacement + text[end:]
+
+
+def _response_with_understood_resume_json(
+    text: str,
+    understood_resume_json: dict[str, object] | None,
+    input_data: dict,
+) -> str:
+    if not understood_resume_json:
+        return text
+
+    understood_score = _resume_json_quality_score(understood_resume_json)
+    response_score = _resume_json_quality_score(_extract_resume_json_from_response(text))
+    if response_score >= understood_score:
+        return text
+
+    replaced = _replace_response_resume_json(text, understood_resume_json)
+    if replaced:
+        return replaced
+
+    return _build_local_import_resume_response(input_data) or text
+
+
 @router.get("/sources", response_model=DataSourcesEnvelope)
 def list_sources(
     current_user: User = Depends(get_current_user),
@@ -1101,6 +1216,7 @@ def generate_resume(
     input_data = dict(payload.input or {})
 
     parts: list[types.Part | str] = []
+    understood_resume_json: dict[str, object] | None = None
     file_data = input_data.get("fileData") or {}
     if file_data.get("data") and file_data.get("mimeType"):
         mime = str(file_data["mimeType"])
@@ -1148,6 +1264,18 @@ def generate_resume(
             else:
                 _raise_unreadable_import("Word document")
 
+    resume_text_for_understanding = _limit_resume_text(str(input_data.get("currentResumeText") or ""))
+    if payload.mode == "MODE_A" and resume_text_for_understanding:
+        understood_resume_json = _local_resume_json_from_text(resume_text_for_understanding)
+        input_data["parsedResumeJson"] = understood_resume_json
+        parts.append(
+            "UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS:\n"
+            f"{json.dumps(understood_resume_json, indent=2)}\n\n"
+            "Use this structured understanding as the source of truth for RESUME_JSON and template fields. "
+            "You may improve wording in resume sections, but do not move job titles, employers, dates, "
+            "locations, education, skills, or contact details into the wrong fields."
+        )
+
     profile_image_data = input_data.get("profileImageData") or {}
     if profile_image_data.get("data") and profile_image_data.get("mimeType"):
         decoded = _decode_upload_data(profile_image_data["data"])
@@ -1169,6 +1297,8 @@ def generate_resume(
             fallback = _build_local_import_resume_response(input_data)
             if fallback:
                 return GenerateResumeOut(text=fallback)
+        if payload.mode == "MODE_A":
+            text = _response_with_understood_resume_json(text, understood_resume_json, input_data)
         return GenerateResumeOut(text=text)
     except Exception as exc:
         if payload.mode == "MODE_A":

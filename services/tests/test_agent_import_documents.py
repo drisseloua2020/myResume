@@ -155,11 +155,71 @@ def test_generate_resume_extracts_docx_text_before_ai_parse(client, monkeypatch)
     contents = fake_client.models.calls[0]["contents"]
     joined = "\n".join(part for part in contents if isinstance(part, str))
     assert "EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT" in joined
+    assert "UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS" in joined
     assert "Alex Resume" in joined
     assert "Senior Python Engineer" in joined
     assert encoded_resume not in joined
     assert '"textExtracted": true' in joined
     assert '"name": "alex-resume.docx"' in joined
+    assert '"parsedResumeJson"' in joined
+
+
+def test_generate_resume_uses_understood_pdf_json_when_ai_json_is_weak(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FakeGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _pdf_bytes([
+        "Morgan Smart",
+        "Software Architect",
+        "morgan@example.com | Atlanta, GA",
+        "SUMMARY",
+        "Architect focused on AI delivery and platform modernization.",
+        "SKILLS",
+        "Python, AWS, Architecture",
+        "EXPERIENCE",
+        "Software Architect, Slalom, Atlanta GA, Jan 2022 - Present",
+        "Led AI engineering enablement for delivery teams.",
+    ])
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": PDF_MIME,
+                    "name": "morgan-resume.pdf",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+
+    contents = fake_client.models.calls[0]["contents"]
+    joined = "\n".join(part for part in contents if isinstance(part, str))
+    assert "EXTRACTED_RESUME_TEXT_FROM_PDF" in joined
+    assert "UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS" in joined
+    assert joined.index("EXTRACTED_RESUME_TEXT_FROM_PDF") < joined.index("UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS")
+
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["header"]["name"] == "Morgan Smart"
+    assert resume_json["header"]["title"] == "Software Architect"
+    assert resume_json["summary"] == "Architect focused on AI delivery and platform modernization."
+    assert resume_json["skills"]["core"] == ["Python", "AWS", "Architecture"]
+    assert resume_json["experience"][0]["role"] == "Software Architect"
+    assert resume_json["experience"][0]["company"] == "Slalom"
+    assert resume_json["experience"][0]["start"] == "Jan 2022"
+    assert resume_json["experience"][0]["end"] == "Present"
+    assert [item["bullet"] for item in resume_json["experience"][0]["highlights"]] == [
+        "Led AI engineering enablement for delivery teams."
+    ]
 
 
 def test_generate_resume_rejects_unsupported_import_file_type(client):
