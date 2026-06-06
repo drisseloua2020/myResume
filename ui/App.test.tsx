@@ -217,6 +217,74 @@ describe('App import flow', () => {
     }));
   });
 
+  it('keeps full street addresses and nested contact details in the right imported fields', async () => {
+    const user = userEvent.setup();
+    vi.mocked(generateResumeContent).mockResolvedValueOnce({
+      json: {
+        resume: {
+          personalDetails: {
+            firstName: 'Sam',
+            lastName: 'Structured',
+            title: 'Product Engineer',
+            contact: {
+              email: 'sam@example.com',
+              mobile: '(555) 123-4567',
+            },
+            address: '123 Main St, Austin, TX 78701',
+          },
+          summary: 'Engineer focused on product delivery.',
+          skills: ['React', 'TypeScript'],
+          experience: [
+            {
+              position: 'Product Engineer',
+              organization: 'Acme Products',
+              period: '2022 - Present',
+              achievements: ['Shipped customer-facing workflow improvements.'],
+            },
+          ],
+          education: [],
+        },
+      },
+    });
+
+    const { container } = render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await user.upload(fileInput, new File(['resume'], 'sam-resume.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    }));
+    await screen.findByText('sam-resume.docx');
+
+    await user.click(screen.getByRole('button', { name: /import to live editor/i }));
+
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = vi.mocked(saveResume).mock.calls[0][0];
+    expect(payload.title).toBe('Sam Structured - Product Engineer');
+    expect(payload.content.personalDetails).toEqual(expect.objectContaining({
+      firstName: 'Sam',
+      lastName: 'Structured',
+      email: 'sam@example.com',
+      phone: '(555) 123-4567',
+      address: '123 Main St',
+      city: 'Austin',
+      state: 'TX',
+      postalCode: '78701',
+      summary: 'Engineer focused on product delivery.',
+    }));
+    expect(payload.content.personalDetails.city).not.toBe('123 Main St');
+    expect(payload.content.experienceItems[0]).toEqual(expect.objectContaining({
+      role: 'Product Engineer',
+      company: 'Acme Products',
+      dates: '2022 - Present',
+      description: '- Shipped customer-facing workflow improvements.',
+    }));
+  });
+
   it('starts a fresh template flow without overwriting the loaded resume', async () => {
     const user = userEvent.setup();
     vi.mocked(getLatestResume).mockResolvedValue({

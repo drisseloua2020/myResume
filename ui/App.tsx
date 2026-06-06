@@ -130,20 +130,94 @@ const splitImportedCommaList = (items: unknown[]): string[] => {
   return values;
 };
 
-const parseImportedLocation = (value: unknown): Pick<PersonalDetails, 'city' | 'state' | 'country' | 'postalCode'> => {
-  const location = cleanImportedText(value);
-  if (!location) return { city: '', state: '', country: '', postalCode: '' };
+type ImportedAddressParts = Pick<PersonalDetails, 'address' | 'city' | 'state' | 'country' | 'postalCode'>;
 
-  const parts = location.split(',').map((part) => part.trim()).filter(Boolean);
-  const city = parts[0] || '';
-  const statePostal = parts.length > 1 ? parts[1] : '';
-  const country = parts.length > 2 ? parts.slice(2).join(', ') : '';
-  const postalMatch = statePostal.match(/\b([A-Z]\d[A-Z]\s?\d[A-Z]\d|\d{4,6}(?:-\d{4})?)\b/i);
+const EMPTY_IMPORTED_ADDRESS: ImportedAddressParts = {
+  address: '',
+  city: '',
+  state: '',
+  country: '',
+  postalCode: '',
+};
+
+const IMPORTED_POSTAL_CODE_RE = /\b([A-Z]\d[A-Z]\s?\d[A-Z]\d|\d{4,6}(?:-\d{4})?)\b/i;
+const IMPORTED_STREET_RE = /(?:^\d+\s+|\b(?:apt|apartment|ave|avenue|blvd|boulevard|building|ct|court|dr|drive|floor|ln|lane|pkwy|parkway|pl|place|rd|road|ste|suite|st|street|unit|way)\b)/i;
+
+const mergeImportedAddressParts = (...items: ImportedAddressParts[]): ImportedAddressParts => (
+  items.reduce<ImportedAddressParts>((merged, item) => ({
+    address: merged.address || item.address,
+    city: merged.city || item.city,
+    state: merged.state || item.state,
+    country: merged.country || item.country,
+    postalCode: merged.postalCode || item.postalCode,
+  }), { ...EMPTY_IMPORTED_ADDRESS })
+);
+
+const parseImportedAddressObject = (value: unknown): ImportedAddressParts => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { ...EMPTY_IMPORTED_ADDRESS };
+  const source = value as any;
+  return {
+    address: firstImportedText(
+      importedField(source, ['streetAddress', 'street_address', 'addressLine1', 'address_line_1', 'address1', 'street'])
+    ),
+    city: firstImportedText(importedField(source, ['city', 'town', 'municipality'])),
+    state: firstImportedText(importedField(source, ['state', 'province', 'region', 'stateRegion', 'state_region'])),
+    country: firstImportedText(importedField(source, ['country'])),
+    postalCode: firstImportedText(importedField(source, ['postalCode', 'postal_code', 'zip', 'zipCode', 'zip_code'])),
+  };
+};
+
+const parseImportedAddressText = (value: unknown): ImportedAddressParts => {
+  const addressText = cleanImportedText(value);
+  if (!addressText) return { ...EMPTY_IMPORTED_ADDRESS };
+
+  const parts = addressText.split(',').map((part) => part.trim()).filter(Boolean);
+  const address = parts[0] && IMPORTED_STREET_RE.test(parts[0]) ? parts[0] : '';
+  const locationParts = address ? parts.slice(1) : parts;
+
+  if (locationParts.length === 0) {
+    return { ...EMPTY_IMPORTED_ADDRESS, address };
+  }
+
+  if (locationParts.length === 1) {
+    const single = locationParts[0];
+    const postalMatch = single.match(IMPORTED_POSTAL_CODE_RE);
+    const postalCode = postalMatch?.[1] || '';
+    const withoutPostal = postalCode ? single.replace(postalCode, '').trim() : single;
+    const cityStateMatch = withoutPostal.match(/^(.+?)\s+([A-Z]{2})$/i);
+
+    if (cityStateMatch) {
+      return {
+        address,
+        city: cityStateMatch[1].trim(),
+        state: cityStateMatch[2].trim(),
+        country: '',
+        postalCode,
+      };
+    }
+
+    return {
+      address,
+      city: IMPORTED_STREET_RE.test(single) ? '' : withoutPostal,
+      state: '',
+      country: '',
+      postalCode,
+    };
+  }
+
+  const city = locationParts[0] || '';
+  const statePostal = locationParts[1] || '';
+  const country = locationParts.length > 2 ? locationParts.slice(2).join(', ') : '';
+  const postalMatch = statePostal.match(IMPORTED_POSTAL_CODE_RE);
   const postalCode = postalMatch?.[1] || '';
   const state = statePostal.replace(postalCode, '').trim();
 
-  return { city, state, country, postalCode };
+  return { address, city, state, country, postalCode };
 };
+
+const parseImportedAddress = (value: unknown): ImportedAddressParts => (
+  mergeImportedAddressParts(parseImportedAddressObject(value), parseImportedAddressText(value))
+);
 
 const DEFAULT_IMPORTED_TEMPLATE_ID = 'classic_pro';
 
@@ -403,6 +477,9 @@ const App: React.FC = () => {
 
       const resumeJson = json.RESUME_JSON || json.resume_json || json.resumeJson || json.resume || json;
       const header = resumeJson.header || resumeJson.personalDetails || resumeJson.personal || {};
+      const contact = importedField(header, ['contact', 'contactInfo', 'contact_info'])
+        || importedField(resumeJson, ['contact', 'contactInfo', 'contact_info'])
+        || {};
       const experienceSource = importedValues(
         resumeJson.experience
         || resumeJson.experiences
@@ -462,13 +539,34 @@ const App: React.FC = () => {
         Object.entries(skillSource).forEach(([category, items]) => pushSkillGroup(category, items));
       }
 
-      const location = parseImportedLocation(firstImportedText(header.location, header.address, resumeJson.location));
+      const location = mergeImportedAddressParts(
+        parseImportedAddress(header),
+        parseImportedAddress(resumeJson),
+        parseImportedAddress(importedField(header, ['location', 'currentLocation', 'current_location'])),
+        parseImportedAddress(importedField(resumeJson, ['location', 'currentLocation', 'current_location'])),
+        parseImportedAddress(importedField(header, ['address', 'mailingAddress', 'mailing_address'])),
+        parseImportedAddress(importedField(resumeJson, ['address', 'mailingAddress', 'mailing_address'])),
+      );
 
       // Extract Name
-      const fullName = firstImportedText(header.name, header.fullName, header.full_name, resumeJson.name);
+      const fullName = firstImportedText(
+        header.name,
+        header.fullName,
+        header.full_name,
+        importedField(contact, ['name', 'fullName', 'full_name']),
+        resumeJson.name,
+      );
       const nameParts = fullName.split(' ').filter(Boolean);
-      const firstName = firstImportedText(header.firstName, header.first_name) || nameParts[0] || '';
-      const lastName = firstImportedText(header.lastName, header.last_name) || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
+      const firstName = firstImportedText(
+        header.firstName,
+        header.first_name,
+        importedField(contact, ['firstName', 'first_name']),
+      ) || nameParts[0] || '';
+      const lastName = firstImportedText(
+        header.lastName,
+        header.last_name,
+        importedField(contact, ['lastName', 'last_name']),
+      ) || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
       const targetRole = firstImportedText(
         header.title,
         header.role,
@@ -481,9 +579,14 @@ const App: React.FC = () => {
       const personalDetails: PersonalDetails = {
           firstName: firstName,
           lastName: lastName,
-          email: firstImportedText(header.email, resumeJson.email),
-          phone: firstImportedText(header.phone, resumeJson.phone),
-          address: firstImportedText(header.streetAddress, header.street_address),
+          email: firstImportedText(header.email, importedField(contact, ['email']), resumeJson.email),
+          phone: firstImportedText(header.phone, importedField(contact, ['phone', 'telephone', 'mobile']), resumeJson.phone),
+          address: firstImportedText(
+            header.streetAddress,
+            header.street_address,
+            importedField(contact, ['streetAddress', 'street_address', 'addressLine1', 'address_line_1']),
+            location.address,
+          ),
           city: location.city,
           state: location.state,
           country: location.country,
