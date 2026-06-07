@@ -67,6 +67,57 @@ async function waitForImages(node: HTMLElement): Promise<void> {
   }));
 }
 
+function addCanvasToPdfPages(
+  pdf: any,
+  canvas: HTMLCanvasElement,
+  pageWidthMm: number,
+  pageHeightMm: number
+): void {
+  const pageHeightPx = Math.floor((canvas.width * pageHeightMm) / pageWidthMm);
+  if (pageHeightPx <= 0) {
+    throw new Error('The resume preview could not be paginated.');
+  }
+
+  for (let sourceY = 0, pageIndex = 0; sourceY < canvas.height; sourceY += pageHeightPx, pageIndex += 1) {
+    const sliceHeightPx = Math.min(pageHeightPx, canvas.height - sourceY);
+    const isSinglePage = sourceY === 0 && sliceHeightPx === canvas.height;
+    let imageData: string;
+
+    if (isSinglePage) {
+      imageData = canvas.toDataURL('image/jpeg', 0.98);
+    } else {
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sliceHeightPx;
+
+      const context = pageCanvas.getContext('2d');
+      if (!context) {
+        throw new Error('The resume PDF page could not be prepared.');
+      }
+
+      context.drawImage(
+        canvas,
+        0,
+        sourceY,
+        canvas.width,
+        sliceHeightPx,
+        0,
+        0,
+        canvas.width,
+        sliceHeightPx
+      );
+      imageData = pageCanvas.toDataURL('image/jpeg', 0.98);
+    }
+
+    if (pageIndex > 0) {
+      pdf.addPage();
+    }
+
+    const imageHeightMm = (sliceHeightPx * pageWidthMm) / canvas.width;
+    pdf.addImage(imageData, 'JPEG', 0, 0, pageWidthMm, imageHeightMm);
+  }
+}
+
 const ResumeInput: React.FC<ResumeInputProps> = ({ 
   onGenerate, 
   onImport,
@@ -388,17 +439,32 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
         resumePage.style.boxShadow = 'none';
         resumePage.style.margin = '0';
         resumePage.style.transform = 'none';
+        resumePage.style.width = '210mm';
+        resumePage.style.maxWidth = '210mm';
+        resumePage.style.minHeight = '297mm';
       }
 
       await waitForImages(exportNode);
+      const exportWidth = Math.ceil(Math.max(
+        exportNode.scrollWidth,
+        resumePage?.scrollWidth || 0,
+        exportNode.getBoundingClientRect().width
+      ));
+      const exportHeight = Math.ceil(Math.max(
+        exportNode.scrollHeight,
+        resumePage?.scrollHeight || 0,
+        exportNode.getBoundingClientRect().height
+      ));
 
       const canvas = await html2canvas(exportNode, {
         backgroundColor: '#ffffff',
         scale: Math.max(2, window.devicePixelRatio || 1),
         useCORS: true,
         logging: false,
-        windowWidth: exportNode.scrollWidth,
-        windowHeight: exportNode.scrollHeight,
+        width: exportWidth,
+        height: exportHeight,
+        windowWidth: exportWidth,
+        windowHeight: exportHeight,
       });
 
       if (!canvas.width || !canvas.height) {
@@ -408,20 +474,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imageData = canvas.toDataURL('image/jpeg', 0.98);
-      const imageHeight = (canvas.height * pageWidth) / canvas.width;
-
-      let offsetY = 0;
-      let remainingHeight = imageHeight;
-      pdf.addImage(imageData, 'JPEG', 0, offsetY, pageWidth, imageHeight);
-      remainingHeight -= pageHeight;
-
-      while (remainingHeight > 0) {
-        offsetY -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imageData, 'JPEG', 0, offsetY, pageWidth, imageHeight);
-        remainingHeight -= pageHeight;
-      }
+      addCanvasToPdfPages(pdf, canvas, pageWidth, pageHeight);
 
       pdf.save(`${slugifyFilename(computeResumeTitle({ role, plan: userPlan, targetRole, personalDetails }))}.pdf`);
     } catch (err: any) {
@@ -1200,8 +1253,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
          <div
             ref={resumeExportRef}
             aria-hidden="true"
-            className="fixed top-0 bg-white pointer-events-none overflow-hidden"
-            style={{ left: '-10000px', width: '210mm', minHeight: '297mm' }}
+            className="absolute top-0 bg-white pointer-events-none overflow-visible"
+            style={{ left: '-10000px', width: '210mm', minHeight: '297mm', height: 'auto', overflow: 'visible' }}
          >
             <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
          </div>
