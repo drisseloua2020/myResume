@@ -17,6 +17,42 @@ const pdfMocks = vi.hoisted(() => ({
   save: vi.fn(),
 }));
 
+function mockCreatedCanvases() {
+  const originalCreateElement = document.createElement.bind(document);
+  const drawImage = vi.fn();
+  const fillRect = vi.fn();
+  const toDataURL = vi.fn(() => 'data:image/jpeg;base64,resume-page');
+
+  const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+    if (tagName.toLowerCase() === 'canvas') {
+      let width = 0;
+      let height = 0;
+      const context = { drawImage, fillRect } as any;
+
+      return {
+        get width() {
+          return width;
+        },
+        set width(value: number) {
+          width = value;
+        },
+        get height() {
+          return height;
+        },
+        set height(value: number) {
+          height = value;
+        },
+        getContext: vi.fn(() => context),
+        toDataURL,
+      } as any;
+    }
+
+    return originalCreateElement(tagName, options);
+  });
+
+  return { createElementSpy, drawImage, fillRect, toDataURL };
+}
+
 vi.mock('html2canvas', () => ({
   default: pdfMocks.html2canvas,
 }));
@@ -60,6 +96,7 @@ vi.mock('../services/coverLetterService', () => ({
 
 describe('ResumeInput', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.mocked(saveResume).mockResolvedValue({ id: 'res_saved' });
     vi.mocked(generateCoverLetter).mockResolvedValue({
@@ -358,6 +395,7 @@ describe('ResumeInput', () => {
   it('downloads the live resume as a generated PDF without using browser print', async () => {
     const user = userEvent.setup();
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+    mockCreatedCanvases();
 
     render(
       <ResumeInput
@@ -394,6 +432,7 @@ describe('ResumeInput', () => {
 
   it('slices long resume captures into separate PDF pages without overlapping offsets', async () => {
     const user = userEvent.setup();
+    const { drawImage } = mockCreatedCanvases();
 
     pdfMocks.html2canvas.mockResolvedValueOnce({
       width: 1000,
@@ -423,21 +462,6 @@ describe('ResumeInput', () => {
       />
     );
 
-    const originalCreateElement = document.createElement.bind(document);
-    const drawImage = vi.fn();
-    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
-      if (tagName.toLowerCase() === 'canvas') {
-        return {
-          width: 0,
-          height: 0,
-          getContext: vi.fn(() => ({ drawImage })),
-          toDataURL: vi.fn(() => 'data:image/jpeg;base64,resume-page'),
-        } as any;
-      }
-
-      return originalCreateElement(tagName, options);
-    });
-
     await user.click(screen.getByRole('button', { name: /download pdf/i }));
 
     await waitFor(() => {
@@ -451,12 +475,11 @@ describe('ResumeInput', () => {
       expect(call[3]).toBeGreaterThanOrEqual(0);
     }
     expect(drawImage).toHaveBeenCalledTimes(3);
-
-    createElementSpy.mockRestore();
   });
 
   it('moves PDF page cuts to nearby quiet rows instead of slicing through content', async () => {
     const user = userEvent.setup();
+    const { drawImage } = mockCreatedCanvases();
     const quietRanges = [
       [256, 268],
       [516, 528],
@@ -513,21 +536,6 @@ describe('ResumeInput', () => {
       />
     );
 
-    const originalCreateElement = document.createElement.bind(document);
-    const drawImage = vi.fn();
-    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
-      if (tagName.toLowerCase() === 'canvas') {
-        return {
-          width: 0,
-          height: 0,
-          getContext: vi.fn(() => ({ drawImage })),
-          toDataURL: vi.fn(() => 'data:image/jpeg;base64,resume-page'),
-        } as any;
-      }
-
-      return originalCreateElement(tagName, options);
-    });
-
     await user.click(screen.getByRole('button', { name: /download pdf/i }));
 
     await waitFor(() => {
@@ -539,9 +547,52 @@ describe('ResumeInput', () => {
     expect(drawImage.mock.calls[0][4]).toBeGreaterThanOrEqual(256);
     expect(drawImage.mock.calls[1][2]).toBe(drawImage.mock.calls[0][4]);
     expect(drawImage.mock.calls[1][4]).toBeLessThan(289);
-    expect(pdfMocks.addImage.mock.calls[1][3]).toBe(8);
+    expect(drawImage.mock.calls[1][6]).toBe(8);
+  });
 
-    createElementSpy.mockRestore();
+  it('paints the modern template sidebar across every generated PDF page', async () => {
+    const user = userEvent.setup();
+    const { fillRect } = mockCreatedCanvases();
+
+    pdfMocks.html2canvas.mockResolvedValueOnce({
+      width: 1000,
+      height: 3000,
+      toDataURL: () => 'data:image/jpeg;base64,resume-full',
+    });
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="modern_tech"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /download pdf/i }));
+
+    await waitFor(() => {
+      expect(pdfMocks.addImage).toHaveBeenCalledTimes(3);
+    });
+
+    const sidebarFillCalls = fillRect.mock.calls.filter((call) => call[0] === 0 && call[1] === 0 && call[2] === 320);
+    expect(sidebarFillCalls).toHaveLength(3);
+    for (const call of sidebarFillCalls) {
+      expect(call[3]).toBe(1414);
+    }
   });
 
   it('creates and saves a cover letter from a job URL', async () => {
