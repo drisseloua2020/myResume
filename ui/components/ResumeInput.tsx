@@ -67,20 +67,136 @@ async function waitForImages(node: HTMLElement): Promise<void> {
   }));
 }
 
+type PdfPageSlice = {
+  sourceY: number;
+  heightPx: number;
+  topMarginMm: number;
+};
+
+const CONTINUATION_PAGE_TOP_MARGIN_MM = 8;
+const MIN_PDF_PAGE_FILL_RATIO = 0.68;
+
+function getPdfPageHeightPx(canvasWidthPx: number, pageWidthMm: number, usablePageHeightMm: number): number {
+  return Math.floor((canvasWidthPx * usablePageHeightMm) / pageWidthMm);
+}
+
+function findQuietHorizontalCut(
+  canvas: HTMLCanvasElement,
+  minEndY: number,
+  idealEndY: number
+): number | null {
+  if (typeof canvas.getContext !== 'function' || idealEndY <= minEndY) {
+    return null;
+  }
+
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) {
+    return null;
+  }
+
+  const searchHeight = idealEndY - minEndY;
+  const sampleStep = Math.max(2, Math.floor(canvas.width / 420));
+  const quietBandHeight = Math.max(6, Math.floor(canvas.width / 180));
+  const maxTransitionsPerRow = Math.max(10, Math.floor((canvas.width / sampleStep) * 0.035));
+
+  if (searchHeight < quietBandHeight) {
+    return null;
+  }
+
+  let imageData: ImageData;
+  try {
+    imageData = context.getImageData(0, minEndY, canvas.width, searchHeight);
+  } catch {
+    return null;
+  }
+
+  const rowScores: number[] = [];
+  for (let y = 0; y < searchHeight; y += 1) {
+    let transitions = 0;
+    let previousLum: number | null = null;
+
+    for (let x = 0; x < canvas.width; x += sampleStep) {
+      const index = ((y * canvas.width) + x) * 4;
+      const alpha = imageData.data[index + 3];
+      if (alpha < 20) {
+        continue;
+      }
+
+      const lum = (
+        imageData.data[index] * 0.299 +
+        imageData.data[index + 1] * 0.587 +
+        imageData.data[index + 2] * 0.114
+      );
+
+      if (previousLum !== null && Math.abs(lum - previousLum) > 34) {
+        transitions += 1;
+      }
+      previousLum = lum;
+    }
+
+    rowScores.push(transitions);
+  }
+
+  for (let y = searchHeight - quietBandHeight; y >= 0; y -= 1) {
+    const bandScore = rowScores
+      .slice(y, y + quietBandHeight)
+      .reduce((sum, score) => sum + score, 0);
+    const averageTransitions = bandScore / quietBandHeight;
+
+    if (averageTransitions <= maxTransitionsPerRow) {
+      return minEndY + y + Math.floor(quietBandHeight / 2);
+    }
+  }
+
+  return null;
+}
+
+function createPdfPageSlices(
+  canvas: HTMLCanvasElement,
+  pageWidthMm: number,
+  pageHeightMm: number
+): PdfPageSlice[] {
+  const slices: PdfPageSlice[] = [];
+  let sourceY = 0;
+
+  while (sourceY < canvas.height) {
+    const pageIndex = slices.length;
+    const topMarginMm = pageIndex > 0 ? CONTINUATION_PAGE_TOP_MARGIN_MM : 0;
+    const usablePageHeightMm = pageHeightMm - topMarginMm;
+    const pageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, usablePageHeightMm);
+
+    if (pageHeightPx <= 0) {
+      throw new Error('The resume preview could not be paginated.');
+    }
+
+    const remainingHeightPx = canvas.height - sourceY;
+    if (remainingHeightPx <= pageHeightPx) {
+      slices.push({ sourceY, heightPx: remainingHeightPx, topMarginMm });
+      break;
+    }
+
+    const idealEndY = sourceY + pageHeightPx;
+    const minEndY = sourceY + Math.floor(pageHeightPx * MIN_PDF_PAGE_FILL_RATIO);
+    const quietCutY = findQuietHorizontalCut(canvas, minEndY, idealEndY);
+    const cutY = quietCutY && quietCutY > sourceY ? quietCutY : idealEndY;
+
+    slices.push({ sourceY, heightPx: cutY - sourceY, topMarginMm });
+    sourceY = cutY;
+  }
+
+  return slices;
+}
+
 function addCanvasToPdfPages(
   pdf: any,
   canvas: HTMLCanvasElement,
   pageWidthMm: number,
   pageHeightMm: number
 ): void {
-  const pageHeightPx = Math.floor((canvas.width * pageHeightMm) / pageWidthMm);
-  if (pageHeightPx <= 0) {
-    throw new Error('The resume preview could not be paginated.');
-  }
+  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm);
 
-  for (let sourceY = 0, pageIndex = 0; sourceY < canvas.height; sourceY += pageHeightPx, pageIndex += 1) {
-    const sliceHeightPx = Math.min(pageHeightPx, canvas.height - sourceY);
-    const isSinglePage = sourceY === 0 && sliceHeightPx === canvas.height;
+  pageSlices.forEach(({ sourceY, heightPx, topMarginMm }, pageIndex) => {
+    const isSinglePage = pageSlices.length === 1;
     let imageData: string;
 
     if (isSinglePage) {
@@ -88,7 +204,7 @@ function addCanvasToPdfPages(
     } else {
       const pageCanvas = document.createElement('canvas');
       pageCanvas.width = canvas.width;
-      pageCanvas.height = sliceHeightPx;
+      pageCanvas.height = heightPx;
 
       const context = pageCanvas.getContext('2d');
       if (!context) {
@@ -100,11 +216,11 @@ function addCanvasToPdfPages(
         0,
         sourceY,
         canvas.width,
-        sliceHeightPx,
+        heightPx,
         0,
         0,
         canvas.width,
-        sliceHeightPx
+        heightPx
       );
       imageData = pageCanvas.toDataURL('image/jpeg', 0.98);
     }
@@ -113,9 +229,9 @@ function addCanvasToPdfPages(
       pdf.addPage();
     }
 
-    const imageHeightMm = (sliceHeightPx * pageWidthMm) / canvas.width;
-    pdf.addImage(imageData, 'JPEG', 0, 0, pageWidthMm, imageHeightMm);
-  }
+    const imageHeightMm = (heightPx * pageWidthMm) / canvas.width;
+    pdf.addImage(imageData, 'JPEG', 0, topMarginMm, pageWidthMm, imageHeightMm);
+  });
 }
 
 const ResumeInput: React.FC<ResumeInputProps> = ({ 
