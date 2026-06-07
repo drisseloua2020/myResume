@@ -6,6 +6,37 @@ import { saveResume } from '../services/resumeService';
 import { generateCoverLetter } from '../services/coverLetterService';
 import { SubscriptionPlan, UserRole } from '../types';
 
+const pdfMocks = vi.hoisted(() => ({
+  html2canvas: vi.fn(() => Promise.resolve({
+    width: 1000,
+    height: 1414,
+    toDataURL: () => 'data:image/jpeg;base64,resume',
+  })),
+  addImage: vi.fn(),
+  addPage: vi.fn(),
+  save: vi.fn(),
+}));
+
+vi.mock('html2canvas', () => ({
+  default: pdfMocks.html2canvas,
+}));
+
+vi.mock('jspdf', () => ({
+  jsPDF: vi.fn(function () {
+    return {
+    internal: {
+      pageSize: {
+        getWidth: () => 210,
+        getHeight: () => 297,
+      },
+    },
+    addImage: pdfMocks.addImage,
+    addPage: pdfMocks.addPage,
+    save: pdfMocks.save,
+    };
+  }),
+}));
+
 vi.mock('../services/locationService', () => ({
   locationService: {
     getCountries: vi.fn().mockResolvedValue(['United States']),
@@ -322,6 +353,43 @@ describe('ResumeInput', () => {
         }),
       }));
     });
+  });
+
+  it('downloads the live resume as a generated PDF without using browser print', async () => {
+    const user = userEvent.setup();
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /download pdf/i }));
+
+    await waitFor(() => {
+      expect(pdfMocks.html2canvas).toHaveBeenCalled();
+      expect(pdfMocks.save).toHaveBeenCalledWith('resume-user-resume.pdf');
+    });
+    expect(printSpy).not.toHaveBeenCalled();
+
+    printSpy.mockRestore();
   });
 
   it('creates and saves a cover letter from a job URL', async () => {
