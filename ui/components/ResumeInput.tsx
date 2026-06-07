@@ -48,6 +48,25 @@ function getImportDocumentMimeType(file: File): string | null {
   return null;
 }
 
+function slugifyFilename(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'resume';
+}
+
+async function waitForImages(node: HTMLElement): Promise<void> {
+  const images = Array.from(node.querySelectorAll('img'));
+  await Promise.all(images.map((img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+    });
+  }));
+}
+
 const ResumeInput: React.FC<ResumeInputProps> = ({ 
   onGenerate, 
   onImport,
@@ -69,11 +88,14 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
+  const resumeExportRef = useRef<HTMLDivElement>(null);
   
   // Saved resume (library) state
   const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
   const [isSavingResume, setIsSavingResume] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [pdfMsg, setPdfMsg] = useState<string | null>(null);
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
   const [coverLetterMsg, setCoverLetterMsg] = useState<string | null>(null);
   const [countries, setCountries] = useState<string[]>([]);
@@ -334,10 +356,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     setValidationMsg(null);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const computeResumeTitle = (data: UserInputData) => {
     const fn = (data.personalDetails?.firstName || '').trim();
     const ln = (data.personalDetails?.lastName || '').trim();
@@ -345,6 +363,75 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     const rolePart = (data.targetRole || '').trim();
     const raw = name && rolePart ? `${name} - ${rolePart}` : name ? `${name} Resume` : rolePart ? `Resume - ${rolePart}` : 'Resume';
     return raw.slice(0, 200);
+  };
+
+  const handleDownloadPdf = async () => {
+    const exportNode = resumeExportRef.current;
+    if (!exportNode) {
+      setPdfMsg('Resume preview is still loading. Try again in a moment.');
+      return;
+    }
+
+    setIsDownloadingPdf(true);
+    setPdfMsg(null);
+
+    const resumePage = exportNode.querySelector<HTMLElement>('.resume-page');
+    const previousInlineStyle = resumePage?.getAttribute('style') || '';
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      if (resumePage) {
+        resumePage.style.boxShadow = 'none';
+        resumePage.style.margin = '0';
+        resumePage.style.transform = 'none';
+      }
+
+      await waitForImages(exportNode);
+
+      const canvas = await html2canvas(exportNode, {
+        backgroundColor: '#ffffff',
+        scale: Math.max(2, window.devicePixelRatio || 1),
+        useCORS: true,
+        logging: false,
+        windowWidth: exportNode.scrollWidth,
+        windowHeight: exportNode.scrollHeight,
+      });
+
+      if (!canvas.width || !canvas.height) {
+        throw new Error('The resume preview could not be captured.');
+      }
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imageData = canvas.toDataURL('image/jpeg', 0.98);
+      const imageHeight = (canvas.height * pageWidth) / canvas.width;
+
+      let offsetY = 0;
+      let remainingHeight = imageHeight;
+      pdf.addImage(imageData, 'JPEG', 0, offsetY, pageWidth, imageHeight);
+      remainingHeight -= pageHeight;
+
+      while (remainingHeight > 0) {
+        offsetY -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imageData, 'JPEG', 0, offsetY, pageWidth, imageHeight);
+        remainingHeight -= pageHeight;
+      }
+
+      pdf.save(`${slugifyFilename(computeResumeTitle({ role, plan: userPlan, targetRole, personalDetails }))}.pdf`);
+    } catch (err: any) {
+      setPdfMsg(err?.message || 'Could not generate the resume PDF.');
+    } finally {
+      if (resumePage) {
+        resumePage.setAttribute('style', previousInlineStyle);
+      }
+      setIsDownloadingPdf(false);
+    }
   };
 
   const resetToNewResume = () => {
@@ -1079,36 +1166,43 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       </div>
 
       {/* --- RIGHT COLUMN: LIVE PREVIEW --- */}
-      <div className="flex-1 print-container mt-[1in] lg:sticky lg:top-[calc(6rem+1in)] self-start">
-         <div className="bg-slate-200/50 rounded-xl border-2 border-slate-200 p-4 lg:p-8 flex flex-col items-center min-h-[600px] no-print relative">
-            <div className="w-full flex justify-between items-center mb-6 max-w-[210mm]">
+      <div className="flex-1 mt-[1in] lg:sticky lg:top-[calc(6rem+1in)] self-start">
+         <div className="bg-slate-200/50 rounded-xl border-2 border-slate-200 p-4 lg:p-8 flex flex-col items-center h-[78vh] lg:h-[calc(100vh-7rem)] min-h-[560px] max-h-[920px] no-print relative">
+            <div className="w-full flex justify-between items-center mb-6 max-w-[210mm] flex-shrink-0">
                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                  Live Preview
                </h3>
                <button 
-                 onClick={handlePrint}
-                 className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 transition-colors"
+                 type="button"
+                 onClick={handleDownloadPdf}
+                 disabled={isDownloadingPdf}
+                 className={`bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 transition-colors ${isDownloadingPdf ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-700'}`}
                >
                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                 Download PDF
+                 {isDownloadingPdf ? 'Generating...' : 'Download PDF'}
                </button>
             </div>
             
-            {/* The Resume Document Component - Wrapped to handle overflow on smaller screens */}
-            <div className="w-full overflow-x-auto pb-4 flex justify-center custom-scrollbar">
+            {/* The Resume Document Component - Wrapped in its own scroll viewport */}
+            <div className="w-full flex-1 min-h-0 overflow-auto pb-4 flex justify-center custom-scrollbar">
                 <div className="transform origin-top transition-transform duration-200 scale-[0.55] sm:scale-[0.7] md:scale-[0.85] xl:scale-100">
                     <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
                 </div>
             </div>
 
-            <div className="mt-4 text-[10px] text-slate-400 text-center max-w-md">
-               Tip: This preview scales to fit your screen. The downloaded PDF will be 100% size (A4).
+            <div className="mt-4 text-[10px] text-slate-400 text-center max-w-md flex-shrink-0">
+               {pdfMsg || 'Tip: This preview scrolls independently. The downloaded PDF is generated from the full-size A4 resume.'}
             </div>
          </div>
          
-         {/* Hidden container for actual printing that sits outside the scaled view */}
-         <div className="hidden print:block print:absolute print:top-0 print:left-0 print:w-full">
+         {/* Full-size export target for client-side PDF generation. It is not displayed or printed. */}
+         <div
+            ref={resumeExportRef}
+            aria-hidden="true"
+            className="fixed top-0 bg-white pointer-events-none overflow-hidden"
+            style={{ left: '-10000px', width: '210mm', minHeight: '297mm' }}
+         >
             <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
          </div>
       </div>
