@@ -100,8 +100,10 @@ type VerticalRange = {
 };
 
 const CONTINUATION_PAGE_TOP_MARGIN_MM = 8;
+const PAGE_END_EMPTY_SPACE_MM = 18;
 const MIN_PDF_PAGE_FILL_RATIO = 0.68;
 const PDF_SAFE_CUT_PADDING_PX = 6;
+const JOB_BLOCK_START_GUARD_MM = 28;
 const MODERN_TECH_SIDEBAR_RATIO = 0.32;
 const MODERN_TECH_SIDEBAR_COLOR = '#0f172a';
 
@@ -173,6 +175,37 @@ function collectBlockRanges(node: HTMLElement): VerticalRange[] {
     })
     .filter((range) => range.endY > range.startY)
     .sort((a, b) => a.startY - b.startY);
+}
+
+function findSafeCutBeforeBlocks(
+  blockRanges: VerticalRange[],
+  minEndY: number,
+  idealEndY: number,
+  pageHeightPx: number,
+  guardPx: number
+): number | null {
+  if (!blockRanges.length || idealEndY <= minEndY) {
+    return null;
+  }
+
+  const guardedStartY = Math.max(minEndY, idealEndY - guardPx);
+  const relevantBlock = blockRanges.find((range) => {
+    const crossesPageEnd = range.startY < idealEndY && range.endY > idealEndY;
+    const startsTooLate = range.startY >= guardedStartY && range.startY < idealEndY;
+    const fitsOnNextPage = range.endY - range.startY <= pageHeightPx;
+    return fitsOnNextPage && range.startY > 0 && (crossesPageEnd || startsTooLate);
+  });
+
+  if (!relevantBlock) {
+    return null;
+  }
+
+  const cutY = Math.floor(relevantBlock.startY - PDF_SAFE_CUT_PADDING_PX);
+  if (cutY > minEndY) {
+    return cutY;
+  }
+
+  return null;
 }
 
 function findDomSafeCut(
@@ -274,7 +307,7 @@ function createPdfPageSlices(
   canvas: HTMLCanvasElement,
   pageWidthMm: number,
   pageHeightMm: number,
-  blockedRanges: VerticalRange[] = []
+  options: { blockRanges?: VerticalRange[]; textRanges?: VerticalRange[] } = {}
 ): PdfPageSlice[] {
   const slices: PdfPageSlice[] = [];
   let sourceY = 0;
@@ -282,7 +315,7 @@ function createPdfPageSlices(
   while (sourceY < canvas.height) {
     const pageIndex = slices.length;
     const topMarginMm = pageIndex > 0 ? CONTINUATION_PAGE_TOP_MARGIN_MM : 0;
-    const usablePageHeightMm = pageHeightMm - topMarginMm;
+    const usablePageHeightMm = pageHeightMm - topMarginMm - PAGE_END_EMPTY_SPACE_MM;
     const pageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, usablePageHeightMm);
 
     if (pageHeightPx <= 0) {
@@ -297,7 +330,11 @@ function createPdfPageSlices(
 
     const idealEndY = sourceY + pageHeightPx;
     const minEndY = sourceY + Math.floor(pageHeightPx * MIN_PDF_PAGE_FILL_RATIO);
-    const quietCutY = findDomSafeCut(blockedRanges, minEndY, idealEndY) ?? findQuietHorizontalCut(canvas, minEndY, idealEndY);
+    const guardPx = getPdfPageHeightPx(canvas.width, pageWidthMm, JOB_BLOCK_START_GUARD_MM);
+    const blockCutY = findSafeCutBeforeBlocks(options.blockRanges || [], minEndY, idealEndY, pageHeightPx, guardPx);
+    const quietCutY = blockCutY
+      ?? findDomSafeCut([...(options.blockRanges || []), ...(options.textRanges || [])], minEndY, idealEndY)
+      ?? findQuietHorizontalCut(canvas, minEndY, idealEndY);
     const cutY = quietCutY && quietCutY > sourceY ? quietCutY : idealEndY;
 
     slices.push({ sourceY, heightPx: cutY - sourceY, topMarginMm });
@@ -327,9 +364,12 @@ function addCanvasToPdfPages(
   canvas: HTMLCanvasElement,
   pageWidthMm: number,
   pageHeightMm: number,
-  options: { templateId?: string; blockedRanges?: VerticalRange[] } = {}
+  options: { templateId?: string; blockRanges?: VerticalRange[]; textRanges?: VerticalRange[] } = {}
 ): void {
-  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm, options.blockedRanges);
+  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm, {
+    blockRanges: options.blockRanges,
+    textRanges: options.textRanges,
+  });
   const fullPageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, pageHeightMm);
 
   if (fullPageHeightPx <= 0) {
@@ -752,7 +792,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const canvasScale = canvas.width / exportWidth;
       addCanvasToPdfPages(pdf, canvas, pageWidth, pageHeight, {
         templateId: selectedTemplateId,
-        blockedRanges: scaleVerticalRanges([...keepTogetherRanges, ...textLineRanges], canvasScale),
+        blockRanges: scaleVerticalRanges(keepTogetherRanges, canvasScale),
+        textRanges: scaleVerticalRanges(textLineRanges, canvasScale),
       });
 
       pdf.save(`${slugifyFilename(computeResumeTitle({ role, plan: userPlan, targetRole, personalDetails }))}.pdf`);

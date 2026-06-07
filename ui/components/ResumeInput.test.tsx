@@ -562,6 +562,8 @@ describe('ResumeInput', () => {
       expect(call[3]).toBeGreaterThanOrEqual(0);
     }
     expect(drawImage).toHaveBeenCalledTimes(3);
+    expect(drawImage.mock.calls[0][4]).toBeLessThan(1414);
+    expect(drawImage.mock.calls[0][4]).toBeLessThanOrEqual(1328);
   });
 
   it('moves PDF page cuts to nearby quiet rows instead of slicing through content', async () => {
