@@ -29,11 +29,9 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
 
   const phoneNumber = personalDetails?.phone || '';
   const summaryText = personalDetails?.summary || data.jobDescription || "Experienced professional with a proven track record of success in delivering high-quality results. Skilled in adapting to new challenges and utilizing industry best practices to drive efficiency and growth.";
-  const profileImageSrc = apiAssetUrl(data.profileImageUrl) || (
-    data.profileImageData
-      ? `data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`
-      : undefined
-  );
+  const profileImageSrc = data.profileImageData
+    ? `data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`
+    : apiAssetUrl(data.profileImageUrl);
 
   // --- TEMPLATE: CREATIVE BOLD ---
   if (templateId === 'creative_bold') {
@@ -85,7 +83,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                         <div className="space-y-6">
                             {experienceItems && experienceItems.length > 0 ? (
                                 experienceItems.map((exp, i) => (
-                                <div key={i} className="relative pl-6 border-l-2 border-purple-100">
+                                <div key={i} data-pdf-block className="relative pl-6 border-l-2 border-purple-100">
                                     <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 border-purple-500 bg-white"></div>
                                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-1">
                                         <h4 className="font-bold text-slate-800">{exp.role}</h4>
@@ -107,7 +105,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                         <h3 className="text-md font-bold text-purple-700 uppercase mb-4">Education</h3>
                         <div className="space-y-4">
                             {educationItems && educationItems.map((edu, i) => (
-                                <div key={i}>
+                                <div key={i} data-pdf-block>
                                     <div className="font-bold text-slate-800 text-sm">{edu.degree}</div>
                                     <div className="text-xs text-slate-500 mb-1">{edu.school}</div>
                                     <div className="text-xs text-purple-500 font-medium">{edu.dates}</div>
@@ -186,7 +184,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest border-b border-slate-300 mb-5 pb-1">Professional Experience</h3>
                 <div className="space-y-6">
                     {experienceItems && experienceItems.map((exp, i) => (
-                        <div key={i}>
+                        <div key={i} data-pdf-block>
                             <div className="flex justify-between items-baseline mb-1">
                                 <div className="text-lg font-bold text-slate-900">{exp.company}</div>
                                 <div className="text-sm font-bold text-slate-900">{exp.dates}</div>
@@ -250,7 +248,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
               <h3 className="text-slate-400 uppercase tracking-widest text-xs font-bold mb-3 border-b border-slate-700 pb-1">Education</h3>
               <div className="space-y-4">
                 {educationItems.map((edu, i) => (
-                  <div key={i}>
+                  <div key={i} data-pdf-block>
                     <div className="font-bold text-sm">{edu.degree}</div>
                     <div className="text-xs text-slate-400">{edu.school}</div>
                     <div className="text-xs text-slate-500 italic">{edu.dates}</div>
@@ -266,7 +264,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
               <h3 className="text-slate-400 uppercase tracking-widest text-xs font-bold mb-3 border-b border-slate-700 pb-1">Skills</h3>
               <div className="space-y-3">
                 {skillItems.map((skill, i) => (
-                  <div key={i}>
+                  <div key={i} data-pdf-block>
                     <div className="text-xs font-semibold text-blue-400 mb-1">{skill.category}</div>
                     <div className="text-xs leading-relaxed opacity-80">{skill.items}</div>
                   </div>
@@ -294,7 +292,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
             <div className="space-y-6">
               {experienceItems && experienceItems.length > 0 ? (
                 experienceItems.map((exp, i) => (
-                  <div key={i}>
+                  <div key={i} data-pdf-block>
                     <div className="flex justify-between items-baseline mb-1">
                       <h4 className="font-bold text-lg text-slate-800">{exp.role || "Job Title"}</h4>
                       <span className="text-sm font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{exp.dates || "Dates"}</span>
@@ -348,7 +346,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Experience</div>
            <div className="space-y-6">
               {experienceItems && experienceItems.map((exp, i) => (
-                  <div key={i}>
+                  <div key={i} data-pdf-block>
                       <div className="flex justify-between items-end mb-1">
                           <h3 className="font-bold text-slate-800 text-sm">{exp.role}</h3>
                           <span className="text-xs text-slate-400">{exp.dates}</span>
@@ -427,7 +425,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                    <h3 className="text-sm font-black text-orange-600 uppercase mb-3">Experience</h3>
                    <div className="space-y-4">
                        {experienceItems && experienceItems.map((exp, i) => (
-                           <div key={i} className="border-l-2 border-slate-200 pl-3">
+                           <div key={i} data-pdf-block className="border-l-2 border-slate-200 pl-3">
                                <div className="flex justify-between items-baseline">
                                    <div className="font-bold text-sm text-slate-800">{exp.role}</div>
                                    <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 rounded">{exp.dates}</div>
@@ -517,7 +515,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
         <h3 className="text-sm font-bold uppercase border-b border-slate-300 mb-4 pb-1 tracking-wider">Work Experience</h3>
         <div className="space-y-5">
           {experienceItems && experienceItems.map((exp, i) => (
-            <div key={i}>
+            <div key={i} data-pdf-block>
               <div className="flex justify-between items-end mb-1">
                 <div className="font-bold text-md">{exp.company}</div>
                 <div className="text-sm italic text-slate-600">{exp.dates}</div>

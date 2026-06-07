@@ -67,6 +67,27 @@ async function waitForImages(node: HTMLElement): Promise<void> {
   }));
 }
 
+function imageDataUrlFromProfileData(imageData?: { mimeType: string; data: string }): string | undefined {
+  return imageData ? `data:${imageData.mimeType};base64,${imageData.data}` : undefined;
+}
+
+async function readProfileImageData(file: File): Promise<{ mimeType: string; data: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const [, data] = result.split(',');
+      if (!data) {
+        reject(new Error('Could not read the selected photo.'));
+        return;
+      }
+      resolve({ mimeType: file.type, data });
+    };
+    reader.onerror = () => reject(new Error('Could not read the selected photo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 type PdfPageSlice = {
   sourceY: number;
   heightPx: number;
@@ -138,6 +159,20 @@ function scaleVerticalRanges(ranges: VerticalRange[], scale: number): VerticalRa
     startY: Math.floor(range.startY * scale),
     endY: Math.ceil(range.endY * scale),
   }));
+}
+
+function collectBlockRanges(node: HTMLElement): VerticalRange[] {
+  const rootRect = node.getBoundingClientRect();
+  return Array.from(node.querySelectorAll<HTMLElement>('[data-pdf-block]'))
+    .map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        startY: Math.max(0, rect.top - rootRect.top - PDF_SAFE_CUT_PADDING_PX),
+        endY: Math.max(0, rect.bottom - rootRect.top + PDF_SAFE_CUT_PADDING_PX),
+      };
+    })
+    .filter((range) => range.endY > range.startY)
+    .sort((a, b) => a.startY - b.startY);
 }
 
 function findDomSafeCut(
@@ -313,17 +348,32 @@ function addCanvasToPdfPages(
 
     const topMarginPx = Math.round((canvas.width * topMarginMm) / pageWidthMm);
     addTemplateBackgroundToPage(context, options.templateId, pageCanvas.width, pageCanvas.height);
-    context.drawImage(
-      canvas,
-      0,
-      sourceY,
-      canvas.width,
-      heightPx,
-      0,
-      topMarginPx,
-      canvas.width,
-      heightPx
-    );
+    if (options.templateId === 'modern_tech' && pageIndex > 0) {
+      const sidebarWidthPx = Math.round(canvas.width * MODERN_TECH_SIDEBAR_RATIO);
+      context.drawImage(
+        canvas,
+        sidebarWidthPx,
+        sourceY,
+        canvas.width - sidebarWidthPx,
+        heightPx,
+        sidebarWidthPx,
+        topMarginPx,
+        canvas.width - sidebarWidthPx,
+        heightPx
+      );
+    } else {
+      context.drawImage(
+        canvas,
+        0,
+        sourceY,
+        canvas.width,
+        heightPx,
+        0,
+        topMarginPx,
+        canvas.width,
+        heightPx
+      );
+    }
     const imageData = pageCanvas.toDataURL('image/jpeg', 0.98);
 
     if (pageIndex > 0) {
@@ -582,12 +632,19 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       setProfilePhotoError(null);
       setIsUploadingProfilePhoto(true);
       try {
-        const uploaded = await uploadProfilePhoto(file);
-        setProfileImageUrl(uploaded.url);
-        setLegacyProfileImageData(undefined);
-        setProfilePhotoName(file.name || uploaded.filename);
+        const imageData = await readProfileImageData(file);
+        setLegacyProfileImageData(imageData);
+        setProfilePhotoName(file.name || null);
+        try {
+          const uploaded = await uploadProfilePhoto(file);
+          setProfileImageUrl(uploaded.url);
+          setProfilePhotoName(file.name || uploaded.filename);
+        } catch (uploadErr: any) {
+          setProfileImageUrl(undefined);
+          setProfilePhotoError(uploadErr?.message ? `Photo kept in this resume. Upload failed: ${uploadErr.message}` : 'Photo kept in this resume, but upload failed.');
+        }
       } catch (err: any) {
-        setProfilePhotoError(err?.message || 'Failed to upload photo.');
+        setProfilePhotoError(err?.message || 'Failed to load photo.');
         if (profilePhotoRef.current) profilePhotoRef.current.value = '';
       } finally {
         setIsUploadingProfilePhoto(false);
@@ -661,6 +718,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       }
 
       await waitForImages(exportNode);
+      const keepTogetherRanges = collectBlockRanges(exportNode);
       const textLineRanges = collectTextLineRanges(exportNode);
       const exportWidth = Math.ceil(Math.max(
         exportNode.scrollWidth,
@@ -694,7 +752,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const canvasScale = canvas.width / exportWidth;
       addCanvasToPdfPages(pdf, canvas, pageWidth, pageHeight, {
         templateId: selectedTemplateId,
-        blockedRanges: scaleVerticalRanges(textLineRanges, canvasScale),
+        blockedRanges: scaleVerticalRanges([...keepTogetherRanges, ...textLineRanges], canvasScale),
       });
 
       pdf.save(`${slugifyFilename(computeResumeTitle({ role, plan: userPlan, targetRole, personalDetails }))}.pdf`);
@@ -946,11 +1004,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     educationItems: educations,
     skillItems: skills
   };
-  const profilePhotoSrc = apiAssetUrl(profileImageUrl) || (
-    legacyProfileImageData
-      ? `data:${legacyProfileImageData.mimeType};base64,${legacyProfileImageData.data}`
-      : undefined
-  );
+  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData) || apiAssetUrl(profileImageUrl);
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
