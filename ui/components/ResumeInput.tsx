@@ -67,17 +67,136 @@ async function waitForImages(node: HTMLElement): Promise<void> {
   }));
 }
 
+function imageDataUrlFromProfileData(imageData?: { mimeType: string; data: string }): string | undefined {
+  return imageData ? `data:${imageData.mimeType};base64,${imageData.data}` : undefined;
+}
+
+async function readProfileImageData(file: File): Promise<{ mimeType: string; data: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const [, data] = result.split(',');
+      if (!data) {
+        reject(new Error('Could not read the selected photo.'));
+        return;
+      }
+      resolve({ mimeType: file.type, data });
+    };
+    reader.onerror = () => reject(new Error('Could not read the selected photo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 type PdfPageSlice = {
   sourceY: number;
   heightPx: number;
   topMarginMm: number;
 };
 
+type VerticalRange = {
+  startY: number;
+  endY: number;
+};
+
 const CONTINUATION_PAGE_TOP_MARGIN_MM = 8;
 const MIN_PDF_PAGE_FILL_RATIO = 0.68;
+const PDF_SAFE_CUT_PADDING_PX = 6;
+const MODERN_TECH_SIDEBAR_RATIO = 0.32;
+const MODERN_TECH_SIDEBAR_COLOR = '#0f172a';
 
 function getPdfPageHeightPx(canvasWidthPx: number, pageWidthMm: number, usablePageHeightMm: number): number {
   return Math.floor((canvasWidthPx * usablePageHeightMm) / pageWidthMm);
+}
+
+function collectTextLineRanges(node: HTMLElement): VerticalRange[] {
+  const ranges: VerticalRange[] = [];
+  const rootRect = node.getBoundingClientRect();
+  const doc = node.ownerDocument;
+
+  function visit(child: ChildNode): void {
+    if (child.nodeType === Node.TEXT_NODE) {
+      if (!child.textContent?.trim()) {
+        return;
+      }
+
+      const range = doc.createRange();
+      try {
+        range.selectNodeContents(child);
+        if (typeof range.getClientRects !== 'function') {
+          return;
+        }
+
+        Array.from(range.getClientRects()).forEach((rect) => {
+          if (rect.height <= 0 || rect.width <= 0) {
+            return;
+          }
+
+          ranges.push({
+            startY: Math.max(0, rect.top - rootRect.top - PDF_SAFE_CUT_PADDING_PX),
+            endY: Math.max(0, rect.bottom - rootRect.top + PDF_SAFE_CUT_PADDING_PX),
+          });
+        });
+      } finally {
+        range.detach();
+      }
+      return;
+    }
+
+    child.childNodes.forEach(visit);
+  }
+
+  node.childNodes.forEach(visit);
+  return ranges.sort((a, b) => a.startY - b.startY);
+}
+
+function scaleVerticalRanges(ranges: VerticalRange[], scale: number): VerticalRange[] {
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return [];
+  }
+
+  return ranges.map((range) => ({
+    startY: Math.floor(range.startY * scale),
+    endY: Math.ceil(range.endY * scale),
+  }));
+}
+
+function collectBlockRanges(node: HTMLElement): VerticalRange[] {
+  const rootRect = node.getBoundingClientRect();
+  return Array.from(node.querySelectorAll<HTMLElement>('[data-pdf-block]'))
+    .map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        startY: Math.max(0, rect.top - rootRect.top - PDF_SAFE_CUT_PADDING_PX),
+        endY: Math.max(0, rect.bottom - rootRect.top + PDF_SAFE_CUT_PADDING_PX),
+      };
+    })
+    .filter((range) => range.endY > range.startY)
+    .sort((a, b) => a.startY - b.startY);
+}
+
+function findDomSafeCut(
+  blockedRanges: VerticalRange[],
+  minEndY: number,
+  idealEndY: number
+): number | null {
+  if (!blockedRanges.length || idealEndY <= minEndY) {
+    return null;
+  }
+
+  const relevantRanges = blockedRanges.filter((range) => range.endY >= minEndY && range.startY <= idealEndY);
+  if (!relevantRanges.length) {
+    return idealEndY;
+  }
+
+  for (let cutY = idealEndY; cutY >= minEndY; cutY -= 1) {
+    const intersectsText = relevantRanges.some((range) => cutY >= range.startY && cutY <= range.endY);
+    if (!intersectsText) {
+      return cutY;
+    }
+  }
+
+  return null;
 }
 
 function findQuietHorizontalCut(
@@ -154,7 +273,8 @@ function findQuietHorizontalCut(
 function createPdfPageSlices(
   canvas: HTMLCanvasElement,
   pageWidthMm: number,
-  pageHeightMm: number
+  pageHeightMm: number,
+  blockedRanges: VerticalRange[] = []
 ): PdfPageSlice[] {
   const slices: PdfPageSlice[] = [];
   let sourceY = 0;
@@ -177,7 +297,7 @@ function createPdfPageSlices(
 
     const idealEndY = sourceY + pageHeightPx;
     const minEndY = sourceY + Math.floor(pageHeightPx * MIN_PDF_PAGE_FILL_RATIO);
-    const quietCutY = findQuietHorizontalCut(canvas, minEndY, idealEndY);
+    const quietCutY = findDomSafeCut(blockedRanges, minEndY, idealEndY) ?? findQuietHorizontalCut(canvas, minEndY, idealEndY);
     const cutY = quietCutY && quietCutY > sourceY ? quietCutY : idealEndY;
 
     slices.push({ sourceY, heightPx: cutY - sourceY, topMarginMm });
@@ -187,30 +307,61 @@ function createPdfPageSlices(
   return slices;
 }
 
+function addTemplateBackgroundToPage(
+  context: CanvasRenderingContext2D,
+  templateId: string | undefined,
+  pageWidthPx: number,
+  pageHeightPx: number
+): void {
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, pageWidthPx, pageHeightPx);
+
+  if (templateId === 'modern_tech') {
+    context.fillStyle = MODERN_TECH_SIDEBAR_COLOR;
+    context.fillRect(0, 0, Math.round(pageWidthPx * MODERN_TECH_SIDEBAR_RATIO), pageHeightPx);
+  }
+}
+
 function addCanvasToPdfPages(
   pdf: any,
   canvas: HTMLCanvasElement,
   pageWidthMm: number,
-  pageHeightMm: number
+  pageHeightMm: number,
+  options: { templateId?: string; blockedRanges?: VerticalRange[] } = {}
 ): void {
-  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm);
+  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm, options.blockedRanges);
+  const fullPageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, pageHeightMm);
+
+  if (fullPageHeightPx <= 0) {
+    throw new Error('The resume preview could not be paginated.');
+  }
 
   pageSlices.forEach(({ sourceY, heightPx, topMarginMm }, pageIndex) => {
-    const isSinglePage = pageSlices.length === 1;
-    let imageData: string;
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = fullPageHeightPx;
 
-    if (isSinglePage) {
-      imageData = canvas.toDataURL('image/jpeg', 0.98);
+    const context = pageCanvas.getContext('2d');
+    if (!context) {
+      throw new Error('The resume PDF page could not be prepared.');
+    }
+
+    const topMarginPx = Math.round((canvas.width * topMarginMm) / pageWidthMm);
+    addTemplateBackgroundToPage(context, options.templateId, pageCanvas.width, pageCanvas.height);
+    if (options.templateId === 'modern_tech' && pageIndex > 0) {
+      const sidebarWidthPx = Math.round(canvas.width * MODERN_TECH_SIDEBAR_RATIO);
+      context.drawImage(
+        canvas,
+        sidebarWidthPx,
+        sourceY,
+        canvas.width - sidebarWidthPx,
+        heightPx,
+        sidebarWidthPx,
+        topMarginPx,
+        canvas.width - sidebarWidthPx,
+        heightPx
+      );
     } else {
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = heightPx;
-
-      const context = pageCanvas.getContext('2d');
-      if (!context) {
-        throw new Error('The resume PDF page could not be prepared.');
-      }
-
       context.drawImage(
         canvas,
         0,
@@ -218,19 +369,18 @@ function addCanvasToPdfPages(
         canvas.width,
         heightPx,
         0,
-        0,
+        topMarginPx,
         canvas.width,
         heightPx
       );
-      imageData = pageCanvas.toDataURL('image/jpeg', 0.98);
     }
+    const imageData = pageCanvas.toDataURL('image/jpeg', 0.98);
 
     if (pageIndex > 0) {
       pdf.addPage();
     }
 
-    const imageHeightMm = (heightPx * pageWidthMm) / canvas.width;
-    pdf.addImage(imageData, 'JPEG', 0, topMarginMm, pageWidthMm, imageHeightMm);
+    pdf.addImage(imageData, 'JPEG', 0, 0, pageWidthMm, pageHeightMm);
   });
 }
 
@@ -482,12 +632,19 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       setProfilePhotoError(null);
       setIsUploadingProfilePhoto(true);
       try {
-        const uploaded = await uploadProfilePhoto(file);
-        setProfileImageUrl(uploaded.url);
-        setLegacyProfileImageData(undefined);
-        setProfilePhotoName(file.name || uploaded.filename);
+        const imageData = await readProfileImageData(file);
+        setLegacyProfileImageData(imageData);
+        setProfilePhotoName(file.name || null);
+        try {
+          const uploaded = await uploadProfilePhoto(file);
+          setProfileImageUrl(uploaded.url);
+          setProfilePhotoName(file.name || uploaded.filename);
+        } catch (uploadErr: any) {
+          setProfileImageUrl(undefined);
+          setProfilePhotoError(uploadErr?.message ? `Photo kept in this resume. Upload failed: ${uploadErr.message}` : 'Photo kept in this resume, but upload failed.');
+        }
       } catch (err: any) {
-        setProfilePhotoError(err?.message || 'Failed to upload photo.');
+        setProfilePhotoError(err?.message || 'Failed to load photo.');
         if (profilePhotoRef.current) profilePhotoRef.current.value = '';
       } finally {
         setIsUploadingProfilePhoto(false);
@@ -561,6 +718,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       }
 
       await waitForImages(exportNode);
+      const keepTogetherRanges = collectBlockRanges(exportNode);
+      const textLineRanges = collectTextLineRanges(exportNode);
       const exportWidth = Math.ceil(Math.max(
         exportNode.scrollWidth,
         resumePage?.scrollWidth || 0,
@@ -590,7 +749,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      addCanvasToPdfPages(pdf, canvas, pageWidth, pageHeight);
+      const canvasScale = canvas.width / exportWidth;
+      addCanvasToPdfPages(pdf, canvas, pageWidth, pageHeight, {
+        templateId: selectedTemplateId,
+        blockedRanges: scaleVerticalRanges([...keepTogetherRanges, ...textLineRanges], canvasScale),
+      });
 
       pdf.save(`${slugifyFilename(computeResumeTitle({ role, plan: userPlan, targetRole, personalDetails }))}.pdf`);
     } catch (err: any) {
@@ -841,11 +1004,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     educationItems: educations,
     skillItems: skills
   };
-  const profilePhotoSrc = apiAssetUrl(profileImageUrl) || (
-    legacyProfileImageData
-      ? `data:${legacyProfileImageData.mimeType};base64,${legacyProfileImageData.data}`
-      : undefined
-  );
+  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData) || apiAssetUrl(profileImageUrl);
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
