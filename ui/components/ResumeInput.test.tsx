@@ -448,9 +448,98 @@ describe('ResumeInput', () => {
 
     for (const call of pdfMocks.addImage.mock.calls) {
       expect(call[2]).toBe(0);
-      expect(call[3]).toBe(0);
+      expect(call[3]).toBeGreaterThanOrEqual(0);
     }
     expect(drawImage).toHaveBeenCalledTimes(3);
+
+    createElementSpy.mockRestore();
+  });
+
+  it('moves PDF page cuts to nearby quiet rows instead of slicing through content', async () => {
+    const user = userEvent.setup();
+    const quietRanges = [
+      [256, 268],
+      [516, 528],
+    ];
+
+    const getImageData = vi.fn((_x: number, y: number, width: number, height: number) => {
+      const data = new Uint8ClampedArray(width * height * 4);
+
+      for (let row = 0; row < height; row += 1) {
+        const absoluteY = y + row;
+        const isQuietRow = quietRanges.some(([start, end]) => absoluteY >= start && absoluteY <= end);
+
+        for (let col = 0; col < width; col += 1) {
+          const index = ((row * width) + col) * 4;
+          const value = isQuietRow ? 255 : (col % 8 < 4 ? 30 : 245);
+          data[index] = value;
+          data[index + 1] = value;
+          data[index + 2] = value;
+          data[index + 3] = 255;
+        }
+      }
+
+      return { data, width, height } as ImageData;
+    });
+
+    const renderedCanvas = {
+      width: 210,
+      height: 620,
+      getContext: vi.fn(() => ({ getImageData })),
+      toDataURL: () => 'data:image/jpeg;base64,resume-full',
+    };
+
+    pdfMocks.html2canvas.mockResolvedValueOnce(renderedCanvas);
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    const originalCreateElement = document.createElement.bind(document);
+    const drawImage = vi.fn();
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      if (tagName.toLowerCase() === 'canvas') {
+        return {
+          width: 0,
+          height: 0,
+          getContext: vi.fn(() => ({ drawImage })),
+          toDataURL: vi.fn(() => 'data:image/jpeg;base64,resume-page'),
+        } as any;
+      }
+
+      return originalCreateElement(tagName, options);
+    });
+
+    await user.click(screen.getByRole('button', { name: /download pdf/i }));
+
+    await waitFor(() => {
+      expect(pdfMocks.addImage).toHaveBeenCalledTimes(3);
+      expect(pdfMocks.addPage).toHaveBeenCalledTimes(2);
+    });
+
+    expect(drawImage.mock.calls[0][4]).toBeLessThan(297);
+    expect(drawImage.mock.calls[0][4]).toBeGreaterThanOrEqual(256);
+    expect(drawImage.mock.calls[1][2]).toBe(drawImage.mock.calls[0][4]);
+    expect(drawImage.mock.calls[1][4]).toBeLessThan(289);
+    expect(pdfMocks.addImage.mock.calls[1][3]).toBe(8);
 
     createElementSpy.mockRestore();
   });
