@@ -392,6 +392,69 @@ describe('ResumeInput', () => {
     printSpy.mockRestore();
   });
 
+  it('slices long resume captures into separate PDF pages without overlapping offsets', async () => {
+    const user = userEvent.setup();
+
+    pdfMocks.html2canvas.mockResolvedValueOnce({
+      width: 1000,
+      height: 3000,
+      toDataURL: () => 'data:image/jpeg;base64,resume-full',
+    });
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    const originalCreateElement = document.createElement.bind(document);
+    const drawImage = vi.fn();
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      if (tagName.toLowerCase() === 'canvas') {
+        return {
+          width: 0,
+          height: 0,
+          getContext: vi.fn(() => ({ drawImage })),
+          toDataURL: vi.fn(() => 'data:image/jpeg;base64,resume-page'),
+        } as any;
+      }
+
+      return originalCreateElement(tagName, options);
+    });
+
+    await user.click(screen.getByRole('button', { name: /download pdf/i }));
+
+    await waitFor(() => {
+      expect(pdfMocks.addImage).toHaveBeenCalledTimes(3);
+      expect(pdfMocks.addPage).toHaveBeenCalledTimes(2);
+      expect(pdfMocks.save).toHaveBeenCalledWith('resume-user-resume.pdf');
+    });
+
+    for (const call of pdfMocks.addImage.mock.calls) {
+      expect(call[2]).toBe(0);
+      expect(call[3]).toBe(0);
+    }
+    expect(drawImage).toHaveBeenCalledTimes(3);
+
+    createElementSpy.mockRestore();
+  });
+
   it('creates and saves a cover letter from a job URL', async () => {
     const user = userEvent.setup();
 
