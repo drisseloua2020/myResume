@@ -5,7 +5,7 @@ import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
 import { saveResume, updateResume } from '../services/resumeService';
 import { locationService } from '../services/locationService';
-import { apiAssetUrl } from '../services/apiClient';
+import { fetchApiAssetDataUrl } from '../services/apiClient';
 import { uploadProfilePhoto } from '../services/uploadService';
 import { generateCoverLetter } from '../services/coverLetterService';
 
@@ -69,6 +69,12 @@ async function waitForImages(node: HTMLElement): Promise<void> {
 
 function imageDataUrlFromProfileData(imageData?: { mimeType: string; data: string }): string | undefined {
   return imageData ? `data:${imageData.mimeType};base64,${imageData.data}` : undefined;
+}
+
+function profileDataFromImageDataUrl(dataUrl: string): { mimeType: string; data: string } | undefined {
+  const match = dataUrl.match(/^data:([^;,]*);base64,(.+)$/);
+  if (!match) return undefined;
+  return { mimeType: match[1] || 'image/png', data: match[2] };
 }
 
 async function readProfileImageData(file: File): Promise<{ mimeType: string; data: string }> {
@@ -545,6 +551,30 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const [profilePhotoError, setProfilePhotoError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!profileImageUrl || legacyProfileImageData) return;
+
+    let alive = true;
+    (async () => {
+      try {
+        const dataUrl = await fetchApiAssetDataUrl(profileImageUrl);
+        const imageData = profileDataFromImageDataUrl(dataUrl);
+        if (alive && imageData) {
+          setLegacyProfileImageData(imageData);
+          setProfilePhotoError(null);
+        }
+      } catch {
+        if (alive) {
+          setProfilePhotoError('Could not load the saved profile photo. Please sign in again or upload it once more.');
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [profileImageUrl, legacyProfileImageData]);
+
   // Mode B State (Structured)
   const [experiences, setExperiences] = useState<ExperienceItem[]>([
     { id: '1', role: '', company: '', dates: '', description: '' }
@@ -957,6 +987,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       return;
     }
 
+    const profileImageDataForPersistence = profileImageUrl ? undefined : legacyProfileImageData;
     const payload: UserInputData = {
       role,
       plan: userPlan,
@@ -966,7 +997,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       preferences: activeTab === 'upload' ? { ...preferences!, photo: false } : preferences,
       profileImageUrl: activeTab === 'upload' ? undefined : profileImageUrl,
       profileImageName: activeTab === 'upload' ? undefined : profilePhotoName || undefined,
-      profileImageData: activeTab === 'upload' ? undefined : legacyProfileImageData,
+      profileImageData: activeTab === 'upload' ? undefined : profileImageDataForPersistence,
       templateId: selectedTemplateId,
       personalDetails
     };
@@ -1045,7 +1076,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     educationItems: educations,
     skillItems: skills
   };
-  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData) || apiAssetUrl(profileImageUrl);
+  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData);
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
@@ -1055,7 +1086,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
     const t = window.setTimeout(() => {
       try {
-        onDraftChange({ ...currentData, templateId: selectedTemplateId });
+        onDraftChange({
+          ...currentData,
+          profileImageData: profileImageUrl ? undefined : legacyProfileImageData,
+          templateId: selectedTemplateId,
+        });
       } catch {
         // ignore autosave errors at this layer
       }

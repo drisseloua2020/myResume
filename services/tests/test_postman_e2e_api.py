@@ -126,8 +126,19 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
     )
     assert uploaded_photo.status_code == 201, uploaded_photo.text
     uploaded_photo_json = uploaded_photo.json()
-    assert uploaded_photo_json["url"].startswith("/uploads/profile-photos/")
+    assert uploaded_photo_json["url"].startswith("/uploads/profile-photo/")
     assert uploaded_photo_json["contentType"] == "image/png"
+
+    public_photo = client.get(uploaded_photo_json["url"])
+    assert public_photo.status_code == 401
+
+    protected_photo = client.get(uploaded_photo_json["url"], headers=user_headers)
+    assert protected_photo.status_code == 200, protected_photo.text
+    assert protected_photo.content.startswith(b"\x89PNG")
+
+    other_signup = _signup(client, name=f"Other User {run_id}", email=f"other.{run_id}@example.com")
+    other_photo = client.get(uploaded_photo_json["url"], headers=_auth_headers(other_signup["token"]))
+    assert other_photo.status_code == 404
 
     created_resume = client.post(
         "/resumes",

@@ -17,3 +17,5 @@ pytest-cache-files-*/
 
 # User-uploaded files are runtime artifacts.
 uploads/
+protected_uploads/*
+!protected_uploads/.gitkeep

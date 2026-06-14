@@ -99,10 +99,11 @@ describe('ResumeInput', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    localStorage.clear();
     vi.mocked(saveResume).mockResolvedValue({ id: 'res_saved' });
     vi.mocked(uploadProfilePhoto).mockResolvedValue({
-      url: '/uploads/profile-photos/usr_1/profile.png',
-      filename: 'profile.png',
+      url: '/uploads/profile-photo/profile-abc123.png',
+      filename: 'profile-abc123.png',
       contentType: 'image/png',
       size: 128,
     });
@@ -145,8 +146,8 @@ describe('ResumeInput', () => {
         }}
         prefilledData={{
           targetRole: 'Senior Developer',
-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
-          profileImageName: 'profile.png',
+          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
+          profileImageName: 'profile-abc123.png',
           preferences: {
             pages: '1-page',
             tone: 'modern',
@@ -186,8 +187,8 @@ describe('ResumeInput', () => {
     await waitFor(() => {
       expect(saveResume).toHaveBeenCalledWith(expect.objectContaining({
         content: expect.objectContaining({
-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
-          profileImageName: 'profile.png',
+          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
+          profileImageName: 'profile-abc123.png',
           preferences: expect.objectContaining({
             photo: true,
           }),
@@ -196,7 +197,7 @@ describe('ResumeInput', () => {
     });
   });
 
-  it('saves uploaded profile photos with embedded image data for reload and PDF fallback', async () => {
+  it('saves uploaded profile photos with the protected app URL', async () => {
     const user = userEvent.setup();
 
     const { container } = render(
@@ -262,17 +263,65 @@ describe('ResumeInput', () => {
 
     await user.click(screen.getByRole('button', { name: /^save resume$/i }));
 
+    await waitFor(() => expect(saveResume).toHaveBeenCalled());
+    const savedContent = vi.mocked(saveResume).mock.calls.at(-1)?.[0].content;
+    expect(savedContent).toEqual(expect.objectContaining({
+      profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
+      profileImageName: 'avatar.png',
+    }));
+    expect(savedContent.profileImageData).toBeUndefined();
+  });
+
+  it('loads saved protected profile photos with the user session token', async () => {
+    localStorage.setItem('rf_token', 'session-token');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new Blob(['saved-avatar'], { type: 'image/png' }), {
+        status: 200,
+        headers: { 'Content-Type': 'image/png' },
+      })
+    );
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+        prefilledData={{
+          targetRole: 'Senior Developer',
+          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
+          profileImageName: 'profile-abc123.png',
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: true,
+          },
+        }}
+      />
+    );
+
     await waitFor(() => {
-      expect(saveResume).toHaveBeenCalledWith(expect.objectContaining({
-        content: expect.objectContaining({
-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
-          profileImageName: 'avatar.png',
-          profileImageData: expect.objectContaining({
-            mimeType: 'image/png',
-            data: expect.any(String),
-          }),
-        }),
-      }));
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'http://localhost:3000/uploads/profile-photo/profile-abc123.png',
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer session-token' },
+        })
+      );
+      expect(screen.getByAltText('Profile')).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/));
     });
   });
 
@@ -302,8 +351,8 @@ describe('ResumeInput', () => {
         {...baseProps}
         prefilledData={{
           targetRole: 'Senior Developer',
-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
-          profileImageName: 'profile.png',
+          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
+          profileImageName: 'profile-abc123.png',
           preferences: {
             pages: '1-page',
             tone: 'modern',
@@ -316,7 +365,7 @@ describe('ResumeInput', () => {
 
     const includePhoto = await screen.findByLabelText(/include photo/i);
     await waitFor(() => expect(includePhoto).toBeChecked());
-    expect(screen.getByText('profile.png')).toBeInTheDocument();
+    expect(screen.getByText('profile-abc123.png')).toBeInTheDocument();
 
     rerender(
       <ResumeInput
