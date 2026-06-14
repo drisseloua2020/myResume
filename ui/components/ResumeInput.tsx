@@ -5,7 +5,7 @@ import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
 import { saveResume, updateResume } from '../services/resumeService';
 import { locationService } from '../services/locationService';
-import { apiAssetUrl } from '../services/apiClient';
+import { fetchApiAssetDataUrl } from '../services/apiClient';
 import { uploadProfilePhoto } from '../services/uploadService';
 import { generateCoverLetter } from '../services/coverLetterService';
 
@@ -71,6 +71,12 @@ function imageDataUrlFromProfileData(imageData?: { mimeType: string; data: strin
   return imageData ? `data:${imageData.mimeType};base64,${imageData.data}` : undefined;
 }
 
+function profileDataFromImageDataUrl(dataUrl: string): { mimeType: string; data: string } | undefined {
+  const match = dataUrl.match(/^data:([^;,]*);base64,(.+)$/);
+  if (!match) return undefined;
+  return { mimeType: match[1] || 'image/png', data: match[2] };
+}
+
 async function readProfileImageData(file: File): Promise<{ mimeType: string; data: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -100,8 +106,10 @@ type VerticalRange = {
 };
 
 const CONTINUATION_PAGE_TOP_MARGIN_MM = 8;
+const PAGE_END_EMPTY_SPACE_MM = 18;
 const MIN_PDF_PAGE_FILL_RATIO = 0.68;
 const PDF_SAFE_CUT_PADDING_PX = 6;
+const JOB_BLOCK_START_GUARD_MM = 28;
 const MODERN_TECH_SIDEBAR_RATIO = 0.32;
 const MODERN_TECH_SIDEBAR_COLOR = '#0f172a';
 
@@ -173,6 +181,37 @@ function collectBlockRanges(node: HTMLElement): VerticalRange[] {
     })
     .filter((range) => range.endY > range.startY)
     .sort((a, b) => a.startY - b.startY);
+}
+
+function findSafeCutBeforeBlocks(
+  blockRanges: VerticalRange[],
+  minEndY: number,
+  idealEndY: number,
+  pageHeightPx: number,
+  guardPx: number
+): number | null {
+  if (!blockRanges.length || idealEndY <= minEndY) {
+    return null;
+  }
+
+  const guardedStartY = Math.max(minEndY, idealEndY - guardPx);
+  const relevantBlock = blockRanges.find((range) => {
+    const crossesPageEnd = range.startY < idealEndY && range.endY > idealEndY;
+    const startsTooLate = range.startY >= guardedStartY && range.startY < idealEndY;
+    const fitsOnNextPage = range.endY - range.startY <= pageHeightPx;
+    return fitsOnNextPage && range.startY > 0 && (crossesPageEnd || startsTooLate);
+  });
+
+  if (!relevantBlock) {
+    return null;
+  }
+
+  const cutY = Math.floor(relevantBlock.startY - PDF_SAFE_CUT_PADDING_PX);
+  if (cutY > minEndY) {
+    return cutY;
+  }
+
+  return null;
 }
 
 function findDomSafeCut(
@@ -274,7 +313,7 @@ function createPdfPageSlices(
   canvas: HTMLCanvasElement,
   pageWidthMm: number,
   pageHeightMm: number,
-  blockedRanges: VerticalRange[] = []
+  options: { blockRanges?: VerticalRange[]; textRanges?: VerticalRange[] } = {}
 ): PdfPageSlice[] {
   const slices: PdfPageSlice[] = [];
   let sourceY = 0;
@@ -282,7 +321,7 @@ function createPdfPageSlices(
   while (sourceY < canvas.height) {
     const pageIndex = slices.length;
     const topMarginMm = pageIndex > 0 ? CONTINUATION_PAGE_TOP_MARGIN_MM : 0;
-    const usablePageHeightMm = pageHeightMm - topMarginMm;
+    const usablePageHeightMm = pageHeightMm - topMarginMm - PAGE_END_EMPTY_SPACE_MM;
     const pageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, usablePageHeightMm);
 
     if (pageHeightPx <= 0) {
@@ -297,7 +336,11 @@ function createPdfPageSlices(
 
     const idealEndY = sourceY + pageHeightPx;
     const minEndY = sourceY + Math.floor(pageHeightPx * MIN_PDF_PAGE_FILL_RATIO);
-    const quietCutY = findDomSafeCut(blockedRanges, minEndY, idealEndY) ?? findQuietHorizontalCut(canvas, minEndY, idealEndY);
+    const guardPx = getPdfPageHeightPx(canvas.width, pageWidthMm, JOB_BLOCK_START_GUARD_MM);
+    const blockCutY = findSafeCutBeforeBlocks(options.blockRanges || [], minEndY, idealEndY, pageHeightPx, guardPx);
+    const quietCutY = blockCutY
+      ?? findDomSafeCut([...(options.blockRanges || []), ...(options.textRanges || [])], minEndY, idealEndY)
+      ?? findQuietHorizontalCut(canvas, minEndY, idealEndY);
     const cutY = quietCutY && quietCutY > sourceY ? quietCutY : idealEndY;
 
     slices.push({ sourceY, heightPx: cutY - sourceY, topMarginMm });
@@ -327,9 +370,12 @@ function addCanvasToPdfPages(
   canvas: HTMLCanvasElement,
   pageWidthMm: number,
   pageHeightMm: number,
-  options: { templateId?: string; blockedRanges?: VerticalRange[] } = {}
+  options: { templateId?: string; blockRanges?: VerticalRange[]; textRanges?: VerticalRange[] } = {}
 ): void {
-  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm, options.blockedRanges);
+  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm, {
+    blockRanges: options.blockRanges,
+    textRanges: options.textRanges,
+  });
   const fullPageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, pageHeightMm);
 
   if (fullPageHeightPx <= 0) {
@@ -504,6 +550,30 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const [profilePhotoName, setProfilePhotoName] = useState<string | null>(null);
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const [profilePhotoError, setProfilePhotoError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profileImageUrl || legacyProfileImageData) return;
+
+    let alive = true;
+    (async () => {
+      try {
+        const dataUrl = await fetchApiAssetDataUrl(profileImageUrl);
+        const imageData = profileDataFromImageDataUrl(dataUrl);
+        if (alive && imageData) {
+          setLegacyProfileImageData(imageData);
+          setProfilePhotoError(null);
+        }
+      } catch {
+        if (alive) {
+          setProfilePhotoError('Could not load the saved profile photo. Please sign in again or upload it once more.');
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [profileImageUrl, legacyProfileImageData]);
 
   // Mode B State (Structured)
   const [experiences, setExperiences] = useState<ExperienceItem[]>([
@@ -752,7 +822,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const canvasScale = canvas.width / exportWidth;
       addCanvasToPdfPages(pdf, canvas, pageWidth, pageHeight, {
         templateId: selectedTemplateId,
-        blockedRanges: scaleVerticalRanges([...keepTogetherRanges, ...textLineRanges], canvasScale),
+        blockRanges: scaleVerticalRanges(keepTogetherRanges, canvasScale),
+        textRanges: scaleVerticalRanges(textLineRanges, canvasScale),
       });
 
       pdf.save(`${slugifyFilename(computeResumeTitle({ role, plan: userPlan, targetRole, personalDetails }))}.pdf`);
@@ -916,6 +987,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       return;
     }
 
+    const profileImageDataForPersistence = profileImageUrl ? undefined : legacyProfileImageData;
     const payload: UserInputData = {
       role,
       plan: userPlan,
@@ -925,7 +997,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       preferences: activeTab === 'upload' ? { ...preferences!, photo: false } : preferences,
       profileImageUrl: activeTab === 'upload' ? undefined : profileImageUrl,
       profileImageName: activeTab === 'upload' ? undefined : profilePhotoName || undefined,
-      profileImageData: activeTab === 'upload' ? undefined : legacyProfileImageData,
+      profileImageData: activeTab === 'upload' ? undefined : profileImageDataForPersistence,
       templateId: selectedTemplateId,
       personalDetails
     };
@@ -1004,7 +1076,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     educationItems: educations,
     skillItems: skills
   };
-  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData) || apiAssetUrl(profileImageUrl);
+  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData);
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
@@ -1014,7 +1086,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
     const t = window.setTimeout(() => {
       try {
-        onDraftChange({ ...currentData, templateId: selectedTemplateId });
+        onDraftChange({
+          ...currentData,
+          profileImageData: profileImageUrl ? undefined : legacyProfileImageData,
+          templateId: selectedTemplateId,
+        });
       } catch {
         // ignore autosave errors at this layer
       }

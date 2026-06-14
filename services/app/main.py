@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from app.api.routes.admin import router as admin_router
 from app.api.routes.agent import router as agent_router
 from app.api.routes.auth import router as auth_router
@@ -34,4 +33,3 @@ app.include_router(profile_router)
 app.include_router(admin_router)
 app.include_router(uploads_router)
 Path(settings.upload_root).mkdir(parents=True, exist_ok=True)
-app.mount(settings.upload_url_prefix, StaticFiles(directory=settings.upload_root), name="uploads")

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_pass: str = ""
     smtp_from: str = "myresume_team@myresume.ai"
-    upload_dir: str = "uploads"
+    upload_dir: str = "protected_uploads"
     upload_url_prefix: str = "/uploads"
     max_profile_photo_bytes: int = 5 * 1024 * 1024
     @property

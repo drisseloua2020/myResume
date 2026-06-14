@@ -17,6 +17,46 @@ export function apiAssetUrl(url?: string | null): string | undefined {
   return `${baseUrl}${assetPath}`;
 }
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return `data:${blob.type || "application/octet-stream"};base64,${btoa(binary)}`;
+}
+
+export async function fetchApiAssetDataUrl(url: string): Promise<string> {
+  const assetUrl = apiAssetUrl(url);
+  const token = getToken();
+  if (!assetUrl || !token) {
+    throw new Error("Sign in again to load this protected asset.");
+  }
+
+  const res = await fetch(assetUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 401) {
+    try {
+      clearSession();
+    } catch {
+      // ignore
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    }
+  }
+
+  if (!res.ok) {
+    throw new Error(`Protected asset failed to load (${res.status})`);
+  }
+
+  return blobToDataUrl(await res.blob());
+}
+
 export function setSession(token: string, user: any) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
