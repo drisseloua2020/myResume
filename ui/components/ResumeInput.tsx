@@ -72,7 +72,7 @@ function imageDataUrlFromProfileData(imageData?: { mimeType: string; data: strin
 }
 
 function profileDataFromImageDataUrl(dataUrl: string): { mimeType: string; data: string } | undefined {
-  const match = dataUrl.match(/^data:([^;,]*);base64,(.+)$/);
+  const match = dataUrl.match(/^data:([^;,]*)(?:;[^,]*)*;base64,(.+)$/i);
   if (!match) return undefined;
   return { mimeType: match[1] || 'image/png', data: match[2] };
 }

@@ -18,6 +18,21 @@ export function apiAssetUrl(url?: string | null): string | undefined {
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
+  if (typeof blob.arrayBuffer !== "function") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+          return;
+        }
+        reject(new Error("Protected asset could not be read."));
+      };
+      reader.onerror = () => reject(new Error("Protected asset could not be read."));
+      reader.readAsDataURL(blob);
+    });
+  }
+
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
   const chunkSize = 0x8000;
