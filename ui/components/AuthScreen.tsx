@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { authService } from '../services/authService';
-import { API_URL } from '../services/apiClient';
 import { User, SubscriptionPlan } from '../types';
 import { PLAN_DETAILS } from '../constants';
 import TemplateSelector from './TemplateSelector';
@@ -20,6 +19,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [activeModal, setActiveModal] = useState<'none' | 'login' | 'pricing' | 'signup' | 'contact'>('none');
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>(SubscriptionPlan.FREE);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
+  const [oauthError, setOauthError] = useState<string | null>(null);
   const [publicPage, setPublicPage] = useState<
     'home' |
     'career_blog' |
@@ -39,6 +39,15 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get('authError');
+    if (!authError) return;
+    setOauthError(authError);
+    setActiveModal('login');
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }, []);
 
   useEffect(() => {
     if (publicPage !== 'home') return;
@@ -89,8 +98,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
     onLogin(user);
   };
-
-  // SSO/OAuth is intentionally disabled in this build.
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">
@@ -516,8 +523,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             <AuthModal
               mode={activeModal === 'login' ? 'login' : 'signup'}
               selectedPlan={selectedPlan}
-              onClose={() => setActiveModal('none')}
+              selectedTemplateId={selectedTemplateId}
+              initialError={oauthError}
+              onClose={() => {
+                setOauthError(null);
+                setActiveModal('none');
+              }}
               onSwitchMode={(mode) => {
+                setOauthError(null);
                 if (mode === 'signup') {
                   setSelectedPlan(SubscriptionPlan.FREE);
                   setSelectedTemplateId(undefined);
@@ -590,8 +603,16 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         <AuthModal 
            mode={activeModal}
            selectedPlan={selectedPlan}
-           onClose={() => setActiveModal('none')} 
-           onSwitchMode={(m) => setActiveModal(m)}
+           selectedTemplateId={selectedTemplateId}
+           initialError={oauthError}
+           onClose={() => {
+             setOauthError(null);
+             setActiveModal('none');
+           }}
+           onSwitchMode={(m) => {
+             setOauthError(null);
+             setActiveModal(m);
+           }}
            onAuthSuccess={handleAuthSuccess} 
         />
       )}
@@ -718,15 +739,17 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
 interface AuthModalProps {
   mode: 'login' | 'signup';
   selectedPlan: SubscriptionPlan;
+  selectedTemplateId?: string;
+  initialError?: string | null;
   onClose: () => void;
   onSwitchMode: (mode: 'login' | 'signup') => void;
   onAuthSuccess: (user: User, kind: 'login' | 'signup') => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSwitchMode, onAuthSuccess }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTemplateId, initialError, onClose, onSwitchMode, onAuthSuccess }) => {
   const isLogin = mode === 'login';
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError || null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -754,7 +777,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSw
     }
   };
 
-  // SSO/OAuth intentionally disabled in this build.
+  useEffect(() => {
+    setError(initialError || null);
+  }, [initialError]);
+
+  const handleOAuthLogin = (provider: 'google' | 'microsoft' | 'linkedin') => {
+    setLoading(true);
+    setError(null);
+    authService.startOAuthLogin(provider, selectedPlan, selectedTemplateId);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -779,10 +810,46 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, onClose, onSw
         </div>
 
         <div className="p-8">
-           {/* SSO intentionally disabled */}
-           <div className="bg-slate-50 border border-slate-200 text-slate-700 p-3 rounded mb-6 text-sm">
-             Single Sign-On (Google/Microsoft/GitHub/LinkedIn) is disabled in this build. Please continue with email.
-           </div>
+          <div className="grid grid-cols-1 gap-3 mb-6">
+            <button
+              type="button"
+              onClick={() => handleOAuthLogin('google')}
+              disabled={loading}
+              className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
+            >
+              <span className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-[#4285f4]">G</span>
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOAuthLogin('microsoft')}
+              disabled={loading}
+              className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
+            >
+              <span className="grid grid-cols-2 gap-0.5 w-5 h-5" aria-hidden="true">
+                <span className="bg-[#f25022]"></span>
+                <span className="bg-[#7fba00]"></span>
+                <span className="bg-[#00a4ef]"></span>
+                <span className="bg-[#ffb900]"></span>
+              </span>
+              Continue with Microsoft
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOAuthLogin('linkedin')}
+              disabled={loading}
+              className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
+            >
+              <span className="w-5 h-5 rounded-sm bg-[#0a66c2] text-white flex items-center justify-center text-xs font-bold">in</span>
+              Continue with LinkedIn
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 mb-6 text-xs font-semibold uppercase text-slate-400">
+            <div className="h-px bg-slate-200 flex-1"></div>
+            <span>or continue with email</span>
+            <div className="h-px bg-slate-200 flex-1"></div>
+          </div>
 
           {error && (
             <div className="bg-red-50 text-red-600 p-3 rounded mb-6 text-sm flex items-center gap-2">

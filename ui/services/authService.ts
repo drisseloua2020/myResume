@@ -1,4 +1,4 @@
-import { api, setSession, clearSession, getCachedUser, getToken } from "./apiClient";
+import { API_URL, api, setSession, clearSession, getCachedUser, getToken } from "./apiClient";
 
 
 
@@ -35,7 +35,7 @@ function normalizeUser(raw: any): User {
   return u as User;
 }
 
-type Provider = "google" | "linkedin" | "microsoft" | "github";
+type Provider = "google" | "linkedin" | "microsoft";
 
 class AuthService {
   async login(email: string, password: string): Promise<User> {
@@ -52,11 +52,14 @@ class AuthService {
     return user;
   }
 
-  async loginWithProvider(provider: Provider, plan?: SubscriptionPlan): Promise<User> {
-    const res = await api.post<{ token: string; user: User }>("/auth/provider", { provider, plan: toBackendPlan(plan) });
-    const user = normalizeUser(res.user);
-    setSession(res.token, user);
-    return user;
+  getOAuthStartUrl(provider: Provider, plan?: SubscriptionPlan, templateId?: string): string {
+    const params = new URLSearchParams({ plan: toBackendPlan(plan) });
+    if (templateId) params.set("templateId", templateId);
+    return `${API_URL}/auth/oauth/${provider}/start?${params.toString()}`;
+  }
+
+  startOAuthLogin(provider: Provider, plan?: SubscriptionPlan, templateId?: string): void {
+    window.location.assign(this.getOAuthStartUrl(provider, plan, templateId));
   }
 
   async logout(): Promise<void> {

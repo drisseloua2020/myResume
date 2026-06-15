@@ -21,12 +21,37 @@ paths:
       summary: Signup with email/password
       responses:
         '201': { description: Created }
+  /auth/oauth/{provider}/start:
+    get:
+      summary: Start Google, Microsoft, or LinkedIn OAuth login
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string, enum: [google, microsoft, linkedin] }
+        - in: query
+          name: plan
+          schema: { type: string, default: free }
+        - in: query
+          name: templateId
+          schema: { type: string }
+      responses:
+        '302': { description: Redirect to provider authorization page }
+  /auth/oauth/{provider}/callback:
+    get:
+      summary: OAuth provider callback
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema: { type: string, enum: [google, microsoft, linkedin] }
+      responses:
+        '302': { description: Redirect to frontend with app token or authError }
   /auth/provider:
     post:
-      summary: Mock SSO login/signup
+      summary: Deprecated mock SSO login/signup
       responses:
-        '200': { description: OK }
-        '201': { description: Created }
+        '410': { description: Gone }
   /auth/me:
     get:
       summary: Current user
