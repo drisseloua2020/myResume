@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     upload_dir: str = "protected_uploads"
     upload_url_prefix: str = "/uploads"
     max_profile_photo_bytes: int = 5 * 1024 * 1024
+    oauth_frontend_url: str = "http://localhost:4000"
+    oauth_redirect_base_url: str = ""
+    oauth_state_ttl_seconds: int = 600
+    oauth_cookie_secure: bool = False
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    microsoft_oauth_client_id: str = ""
+    microsoft_oauth_client_secret: str = ""
+    microsoft_oauth_tenant: str = "common"
+    linkedin_oauth_client_id: str = ""
+    linkedin_oauth_client_secret: str = ""
     @property
     def upload_root(self) -> Path:
         path = Path(self.upload_dir)

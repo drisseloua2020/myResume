@@ -96,8 +96,7 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
     assert plan.json()["user"]["plan"] == "free"
 
     provider = client.post("/auth/provider", json={"provider": "google", "plan": "free"})
-    assert provider.status_code in {200, 201}, provider.text
-    assert provider.json()["user"]["authProvider"] == "google"
+    assert provider.status_code == 410, provider.text
 
     contact = client.post(
         "/auth/contact",

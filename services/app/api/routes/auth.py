@@ -1,6 +1,7 @@
 from __future__ import annotations
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_token_payload, get_current_user, get_db, get_optional_token_payload, require_roles
@@ -11,8 +12,8 @@ from app.models.entities import ActivityLog, ContactMessage, User
 from app.schemas.auth import ActivityIn, ActivityLogsEnvelope, AdminUpdatePlanIn, ContactIn, LoginIn, ProviderIn, SignupIn, TokenResponse, UpdatePlanIn, UserEnvelope, UsersEnvelope
 from app.schemas.common import IdResponse, OkResponse
 from app.services.activity import log_activity, new_prefixed_id
+from app.services.oauth import create_oauth_start_redirect, deprecated_provider_response, handle_oauth_callback
 router = APIRouter(prefix="/auth", tags=["auth"])
-PROVIDER_VALUES = {"google", "linkedin", "microsoft", "github"}
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginIn, db: Session = Depends(get_db)) -> TokenResponse:
     user = db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
@@ -39,22 +40,27 @@ def signup(payload: SignupIn, db: Session = Depends(get_db)) -> TokenResponse:
     db.commit(); db.refresh(user)
     token = sign_token({"userId": user.id, "email": user.email, "role": user.role, "name": user.name})
     return TokenResponse(token=token, user=to_user_out(user))
-@router.post("/provider", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.get("/oauth/{provider}/start")
+def oauth_start(
+    provider: str,
+    request: Request,
+    plan: PlanEnum = Query(default=PlanEnum.free),
+    template_id: str | None = Query(default=None, alias="templateId"),
+) -> RedirectResponse:
+    return create_oauth_start_redirect(request, provider=provider, plan=plan, template_id=template_id)
+@router.get("/oauth/{provider}/callback", name="oauth_callback")
+async def oauth_callback(
+    provider: str,
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    return await handle_oauth_callback(request, provider=provider, code=code, state=state, error=error, db=db)
+@router.post("/provider", response_model=TokenResponse, status_code=status.HTTP_410_GONE)
 def provider_login(payload: ProviderIn, db: Session = Depends(get_db)) -> TokenResponse:
-    provider = payload.provider.strip().lower()
-    if provider not in PROVIDER_VALUES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
-    email = f"user@{provider}.com"
-    existing = db.scalar(select(User).where(func.lower(User.email) == email.lower()))
-    if existing:
-        log_activity(db, existing.id, "USER_LOGIN", details=f"via {provider}", user_name=existing.name)
-        db.commit(); token = sign_token({"userId": existing.id, "email": existing.email, "role": existing.role, "name": existing.name})
-        return TokenResponse(token=token, user=to_user_out(existing))
-    user = User(id=new_prefixed_id("u"), name=f"{provider.capitalize()} User", email=email, password_hash=None, role=RoleEnum.user.value, plan=PlanEnum.free.value, status="Active", paid_amount=Decimal("0.00"), auth_provider=provider)
-    db.add(user); db.flush(); log_activity(db, user.id, "USER_SIGNUP", details=f"via {provider} (Plan: free)", user_name=user.name)
-    db.commit(); db.refresh(user)
-    token = sign_token({"userId": user.id, "email": user.email, "role": user.role, "name": user.name})
-    return TokenResponse(token=token, user=to_user_out(user))
+    return deprecated_provider_response()
 @router.get("/me", response_model=UserEnvelope)
 def me(current_user: User = Depends(get_current_user)) -> UserEnvelope:
     return UserEnvelope(user=to_user_out(current_user))
