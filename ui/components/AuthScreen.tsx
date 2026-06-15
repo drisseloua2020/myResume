@@ -781,7 +781,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
     setError(initialError || null);
   }, [initialError]);
 
-  const handleOAuthLogin = (provider: 'google' | 'microsoft' | 'linkedin') => {
+  const handleOAuthLogin = (provider: 'google') => {
     setLoading(true);
     setError(null);
     authService.startOAuthLogin(provider, selectedPlan, selectedTemplateId);
@@ -819,29 +819,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
             >
               <span className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-[#4285f4]">G</span>
               Continue with Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOAuthLogin('microsoft')}
-              disabled={loading}
-              className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
-            >
-              <span className="grid grid-cols-2 gap-0.5 w-5 h-5" aria-hidden="true">
-                <span className="bg-[#f25022]"></span>
-                <span className="bg-[#7fba00]"></span>
-                <span className="bg-[#00a4ef]"></span>
-                <span className="bg-[#ffb900]"></span>
-              </span>
-              Continue with Microsoft
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOAuthLogin('linkedin')}
-              disabled={loading}
-              className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
-            >
-              <span className="w-5 h-5 rounded-sm bg-[#0a66c2] text-white flex items-center justify-center text-xs font-bold">in</span>
-              Continue with LinkedIn
             </button>
           </div>
 
