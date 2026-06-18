@@ -103,7 +103,7 @@ describe('App import flow', () => {
     await user.upload(fileInput, new File(['resume'], 'alex-resume.pdf', { type: 'application/pdf' }));
     await screen.findByText('alex-resume.pdf');
 
-    await user.click(screen.getByRole('button', { name: /import to live editor/i }));
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
 
     await waitFor(() => {
       expect(saveResume).toHaveBeenCalledTimes(1);
@@ -181,7 +181,7 @@ describe('App import flow', () => {
     await user.upload(fileInput, new File(['resume'], 'jordan-resume.pdf', { type: 'application/pdf' }));
     await screen.findByText('jordan-resume.pdf');
 
-    await user.click(screen.getByRole('button', { name: /import to live editor/i }));
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
 
     await waitFor(() => {
       expect(saveResume).toHaveBeenCalledTimes(1);
@@ -257,7 +257,7 @@ describe('App import flow', () => {
     }));
     await screen.findByText('sam-resume.docx');
 
-    await user.click(screen.getByRole('button', { name: /import to live editor/i }));
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
 
     await waitFor(() => {
       expect(saveResume).toHaveBeenCalledTimes(1);
@@ -345,13 +345,12 @@ describe('App import flow', () => {
 
     render(<App />);
 
-    await screen.findByText(/Loaded resume: Existing Resume/i);
+    await screen.findByDisplayValue('Tech Co');
 
     await user.click(screen.getAllByRole('button', { name: /new resume/i })[0]);
     await user.click(screen.getByRole('button', { name: /choose template/i }));
 
     expect(await screen.findByRole('heading', { name: /choose a template/i })).toBeInTheDocument();
-    expect(screen.queryByText(/Loaded resume: Existing Resume/i)).not.toBeInTheDocument();
     expect(saveResume).not.toHaveBeenCalled();
     expect(updateResume).not.toHaveBeenCalled();
   });

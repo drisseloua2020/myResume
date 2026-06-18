@@ -50,6 +50,11 @@ export interface ExperienceItem {
   role: string;
   company: string;
   dates: string;
+  startMonth?: string;
+  startYear?: string;
+  endMonth?: string;
+  endYear?: string;
+  isPresent?: boolean;
   description: string;
 }
 
@@ -58,6 +63,10 @@ export interface EducationItem {
   degree: string;
   school: string;
   dates: string;
+  startMonth?: string;
+  startYear?: string;
+  endMonth?: string;
+  endYear?: string;
 }
 
 export interface SkillItem {

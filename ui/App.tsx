@@ -5,7 +5,6 @@ import ResumeInput from './components/ResumeInput';
 import ResultsDisplay from './components/ResultsDisplay';
 import ResumeLibraryPage from './components/ResumeLibraryPage';
 import CoverLettersPage from './components/CoverLettersPage';
-import CoverLetterExamplesPage from './components/CoverLetterExamplesPage';
 import ProfileSyncPage from './components/ProfileSyncPage';
 import AdminActivityLogsPage from './components/AdminActivityLogsPage';
 import AdminAgentUpdatesPage from './components/AdminAgentUpdatesPage';
@@ -321,7 +320,7 @@ const App: React.FC = () => {
     setWorkspaceResetKey((k) => k + 1);
   };
 
-  // Load the newest saved resume when a user lands in the WorkSpace.
+  // Load the newest saved resume when a user lands in the editor.
   // If the user has no saved resume yet, fall back to the last autosaved draft.
   useEffect(() => {
     if (!currentUser || currentUser.role === 'admin') return;
@@ -427,7 +426,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // Default landing for users is the WorkSpace
+    // Default landing for users is the editor.
     setActiveTab('workspace');
     // Trigger agent check after login
     checkAgentUpdates();
@@ -686,7 +685,7 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
-    // NOTE: The "WorkSpace" is the primary resume editor experience.
+    // NOTE: The editor is the primary resume creation experience.
     // Dashboard is kept for legacy/demo but not shown in user tabs.
 
     if (activeTab === 'templates') {
@@ -729,21 +728,15 @@ const App: React.FC = () => {
     if (activeTab === 'cover_letters') {
       return (
         <div className="max-w-6xl mx-auto py-8 px-6">
-          <CoverLettersPage onOpenExamples={() => setActiveTab('cover_letter_examples')} />
+          <CoverLettersPage />
         </div>
-      );
-    }
-
-    if (activeTab === 'cover_letter_examples') {
-      return (
-        <CoverLetterExamplesPage onBack={() => setActiveTab('cover_letters')} />
       );
     }
 
     if (activeTab === 'resumes') {
       return (
         <div className="max-w-6xl mx-auto py-8 px-6">
-          <ResumeLibraryPage onLoadResume={openResumeInWorkspace} />
+          <ResumeLibraryPage onLoadResume={openResumeInWorkspace} user={currentUser} />
         </div>
       );
     }
@@ -794,41 +787,14 @@ const App: React.FC = () => {
     }
 
     if (activeTab !== 'workspace') {
-      // Fallback to WorkSpace
+      // Fallback to editor.
       setActiveTab('workspace');
       return null;
     }
 
-    // WorkSpace View - FULL WIDTH for Split Screen
+    // Editor View - FULL WIDTH for Split Screen
     return (
       <div className="w-full px-4 lg:px-8 py-8 space-y-4">
-        <div className="max-w-6xl mx-auto bg-white border border-slate-200 rounded p-4 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Sources</div>
-            <div className="text-xs text-slate-600">Connect & sync LinkedIn, GitHub, and Universal sources.</div>
-            {loadedResumeId && loadedResumeTitle && (
-              <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Loaded resume: {loadedResumeTitle}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowNewResumeConfirm(true)}
-              className="px-3 py-2 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-sm font-semibold"
-            >
-              New Resume
-            </button>
-            <button
-              onClick={() => setActiveTab('profile_sync')}
-              className="px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800 text-sm"
-            >
-              Manage Sources
-            </button>
-          </div>
-        </div>
-
         <ResumeInput 
           key={`resume-input-${workspaceResetKey}`}
           onGenerate={handleGenerate} 

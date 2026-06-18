@@ -14,12 +14,10 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
   const isAdmin = currentUser.role === 'admin';
 
   const userTabs: Tab[] = [
-    // User navigation (requested naming)
-    { key: 'workspace', label: 'WorkSpace' },
-    { key: 'resumes', label: 'Resumes' },
+    { key: 'resumes', label: 'View Resume' },
     { key: 'cover_letters', label: 'Cover Letters' },
-    { key: 'profile_sync', label: 'Profile Sync' },
     { key: 'account', label: 'Account' },
+    { key: 'workspace', label: 'Editor' },
   ];
 
   const adminTabs: Tab[] = [
