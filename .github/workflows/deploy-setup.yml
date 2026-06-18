@@ -1,0 +1,25 @@
+name: Deploy - Setup
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: Verify Project Layout
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify project layout
+        run: |
+          test -f services/requirements.txt
+          test -f services/pytest.ini
+          test -f ui/package.json
+          test -f ui/package-lock.json
+          test -f services/Dockerfile
+          test -f ui/Dockerfile

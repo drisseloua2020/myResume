@@ -1,0 +1,33 @@
+name: Deploy - Backend E2E
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-e2e-test:
+    name: Backend E2E Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: services/requirements.txt
+
+      - name: Install backend deps
+        run: |
+          cd services
+          python -m pip install -r requirements.txt
+
+      - name: Run backend API E2E tests
+        run: |
+          cd services
+          python -m pytest
