@@ -29,6 +29,13 @@ dist-ssr
 !.env.example
 !.env.sample
 
+# GitHub Actions workflows must stay tracked even if a broad local/global
+# ignore rule catches YAML files or dot directories.
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
+!.github/workflows/*.yaml
+
 # Terraform
 .terraform/
 *.exe

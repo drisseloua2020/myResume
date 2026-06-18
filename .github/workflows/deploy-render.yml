@@ -1,0 +1,24 @@
+name: Deploy - Render
+
+on:
+  workflow_call:
+    secrets:
+      RENDER_API_DEPLOY_HOOK:
+        required: true
+      RENDER_UI_DEPLOY_HOOK:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deployment:
+    name: Deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy Backend to Render
+        run: curl -X POST "${{ secrets.RENDER_API_DEPLOY_HOOK }}"
+
+      - name: Deploy UI to Render
+        run: curl -X POST "${{ secrets.RENDER_UI_DEPLOY_HOOK }}"
