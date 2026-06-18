@@ -28,6 +28,139 @@ interface ResumeInputProps {
 type TabType = 'upload' | 'create' | 'cover_letter';
 type JobSourceMode = 'url' | 'paste';
 
+const MONTH_OPTIONS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const MONTH_ALIASES: Record<string, string> = {
+  jan: 'January',
+  january: 'January',
+  feb: 'February',
+  february: 'February',
+  mar: 'March',
+  march: 'March',
+  apr: 'April',
+  april: 'April',
+  may: 'May',
+  jun: 'June',
+  june: 'June',
+  jul: 'July',
+  july: 'July',
+  aug: 'August',
+  august: 'August',
+  sep: 'September',
+  sept: 'September',
+  september: 'September',
+  oct: 'October',
+  october: 'October',
+  nov: 'November',
+  november: 'November',
+  dec: 'December',
+  december: 'December',
+};
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 70 }, (_, index) => String(CURRENT_YEAR + 1 - index));
+
+function formatMonthYear(month?: string, year?: string): string {
+  if (!month || !year) return '';
+  return `${month} ${year}`;
+}
+
+function parseMonthYear(value?: string, fallbackMonth = 'January'): { month: string; year: string } {
+  const text = (value || '').trim();
+  const year = text.match(/\b(19|20)\d{2}\b/)?.[0] || '';
+  const monthToken = text.match(/[A-Za-z]+/)?.[0]?.toLowerCase() || '';
+  return { month: MONTH_ALIASES[monthToken] || (year ? fallbackMonth : ''), year };
+}
+
+function hydrateExperienceItem(item: ExperienceItem, index = 0): ExperienceItem {
+  if (item.startMonth || item.startYear || item.endMonth || item.endYear || item.isPresent !== undefined || !item.dates) {
+    return item;
+  }
+
+  const [rawStart = '', rawEnd = ''] = item.dates.split(/\s+-\s+|\s+–\s+|\s+—\s+/);
+  const start = parseMonthYear(rawStart, 'January');
+  const isPresent = index === 0 && /present|current/i.test(rawEnd);
+  const end = isPresent ? { month: '', year: '' } : parseMonthYear(rawEnd, 'December');
+  return {
+    ...item,
+    startMonth: start.month,
+    startYear: start.year,
+    endMonth: end.month,
+    endYear: end.year,
+    isPresent,
+  };
+}
+
+function hydrateEducationItem(item: EducationItem): EducationItem {
+  if (item.startMonth || item.startYear || item.endMonth || item.endYear || !item.dates) {
+    return item;
+  }
+
+  const [rawStart = '', rawEnd = ''] = item.dates.split(/\s+-\s+|\s+–\s+|\s+—\s+/);
+  const start = parseMonthYear(rawStart, 'January');
+  const end = parseMonthYear(rawEnd, 'December');
+  return {
+    ...item,
+    startMonth: start.month,
+    startYear: start.year,
+    endMonth: end.month,
+    endYear: end.year,
+  };
+}
+
+function withExperienceDateText(item: ExperienceItem): ExperienceItem {
+  const start = formatMonthYear(item.startMonth, item.startYear);
+  const end = item.isPresent ? 'Present' : formatMonthYear(item.endMonth, item.endYear);
+  const hasStructuredDates = Boolean(item.startMonth || item.startYear || item.endMonth || item.endYear || item.isPresent);
+  const dates = start && end ? `${start} - ${end}` : hasStructuredDates ? '' : item.dates;
+  return { ...item, dates };
+}
+
+function withEducationDateText(item: EducationItem): EducationItem {
+  const start = formatMonthYear(item.startMonth, item.startYear);
+  const end = formatMonthYear(item.endMonth, item.endYear);
+  const hasStructuredDates = Boolean(item.startMonth || item.startYear || item.endMonth || item.endYear);
+  const dates = start && end ? `${start} - ${end}` : hasStructuredDates ? '' : item.dates;
+  return { ...item, dates };
+}
+
+const emptyExperience = (): ExperienceItem => ({
+  id: Math.random().toString(),
+  role: '',
+  company: '',
+  dates: '',
+  startMonth: '',
+  startYear: '',
+  endMonth: '',
+  endYear: '',
+  isPresent: false,
+  description: '',
+});
+
+const emptyEducation = (): EducationItem => ({
+  id: Math.random().toString(),
+  degree: '',
+  school: '',
+  dates: '',
+  startMonth: '',
+  startYear: '',
+  endMonth: '',
+  endYear: '',
+});
+
 const IMPORT_DOCUMENT_TYPES: Record<string, string> = {
   'application/pdf': '.pdf',
   'application/msword': '.doc',
@@ -504,8 +637,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   useEffect(() => {
     if (prefilledData) {
       if ('targetRole' in prefilledData) setTargetRole(prefilledData.targetRole || '');
-      if (prefilledData.experienceItems) setExperiences(prefilledData.experienceItems);
-      if (prefilledData.educationItems) setEducations(prefilledData.educationItems);
+      if (prefilledData.experienceItems) setExperiences(prefilledData.experienceItems.map(hydrateExperienceItem));
+      if (prefilledData.educationItems) setEducations(prefilledData.educationItems.map(hydrateEducationItem));
       if (prefilledData.skillItems) setSkills(prefilledData.skillItems);
       if (prefilledData.jobDescription) setJobDescription(prefilledData.jobDescription);
       if (prefilledData.jobUrl) setJobUrl(prefilledData.jobUrl);
@@ -577,10 +710,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
   // Mode B State (Structured)
   const [experiences, setExperiences] = useState<ExperienceItem[]>([
-    { id: '1', role: '', company: '', dates: '', description: '' }
+    { ...emptyExperience(), id: '1' }
   ]);
   const [educations, setEducations] = useState<EducationItem[]>([
-    { id: '1', degree: '', school: '', dates: '' }
+    { ...emptyEducation(), id: '1' }
   ]);
   const [skills, setSkills] = useState<SkillItem[]>([
     { id: '1', category: '', items: '' }
@@ -723,13 +856,28 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   };
 
   // Structured Data Handlers
-  const addExperience = () => setExperiences([...experiences, { id: Math.random().toString(), role: '', company: '', dates: '', description: '' }]);
+  const addExperience = () => setExperiences([...experiences, emptyExperience()]);
   const removeExperience = (id: string) => setExperiences(experiences.filter(i => i.id !== id));
-  const updateExperience = (id: string, field: keyof ExperienceItem, value: string) => setExperiences(experiences.map(i => i.id === id ? { ...i, [field]: value } : i));
+  const updateExperience = (id: string, field: keyof ExperienceItem, value: string | boolean) => {
+    setExperiences(experiences.map((item, index) => {
+      if (item.id !== id) return item;
+      const next = { ...item, [field]: value } as ExperienceItem;
+      if (field === 'isPresent' && value === true) {
+        next.endMonth = '';
+        next.endYear = '';
+      }
+      if (index > 0) {
+        next.isPresent = false;
+      }
+      return withExperienceDateText(next);
+    }));
+  };
 
-  const addEducation = () => setEducations([...educations, { id: Math.random().toString(), degree: '', school: '', dates: '' }]);
+  const addEducation = () => setEducations([...educations, emptyEducation()]);
   const removeEducation = (id: string) => setEducations(educations.filter(i => i.id !== id));
-  const updateEducation = (id: string, field: keyof EducationItem, value: string) => setEducations(educations.map(i => i.id === id ? { ...i, [field]: value } : i));
+  const updateEducation = (id: string, field: keyof EducationItem, value: string) => {
+    setEducations(educations.map(i => i.id === id ? withEducationDateText({ ...i, [field]: value }) : i));
+  };
 
   const addSkill = () => setSkills([...skills, { id: Math.random().toString(), category: '', items: '' }]);
   const removeSkill = (id: string) => setSkills(skills.filter(i => i.id !== id));
@@ -743,6 +891,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
       if (field === 'state') {
         return { ...prev, state: value, city: '' };
+      }
+
+      if (field === 'postalCode') {
+        return { ...prev, postalCode: value.replace(/\D/g, '').slice(0, 5) };
       }
 
       return { ...prev, [field]: value };
@@ -870,8 +1022,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     if (profilePhotoRef.current) profilePhotoRef.current.value = '';
 
     // Reset structured sections to blank starter items
-    setExperiences([{ id: '1', role: '', company: '', dates: '', description: '' }]);
-    setEducations([{ id: '1', degree: '', school: '', dates: '' }]);
+    setExperiences([{ ...emptyExperience(), id: '1' }]);
+    setEducations([{ ...emptyEducation(), id: '1' }]);
     setSkills([{ id: '1', category: '', items: '' }]);
 
     // Clear import state (if any)
@@ -936,6 +1088,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       if (!hasText(personalDetails[field])) missing.push(label);
     });
 
+    if (hasText(personalDetails.postalCode) && !/^\d{5}$/.test(personalDetails.postalCode)) {
+      missing.push('5-digit zip code');
+    }
+
     if (preferences?.photo && !profileImageUrl && !legacyProfileImageData) {
       missing.push('Profile photo');
     }
@@ -944,7 +1100,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const prefix = `Employment ${index + 1}`;
       if (!hasText(exp.role)) missing.push(`${prefix} job title`);
       if (!hasText(exp.company)) missing.push(`${prefix} employer`);
-      if (!hasText(exp.dates)) missing.push(`${prefix} dates`);
+      if (!hasText(withExperienceDateText(exp).dates)) missing.push(`${prefix} dates`);
       if (!hasText(exp.description)) missing.push(`${prefix} description`);
     });
 
@@ -952,7 +1108,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const prefix = `Education ${index + 1}`;
       if (!hasText(edu.school)) missing.push(`${prefix} school`);
       if (!hasText(edu.degree)) missing.push(`${prefix} degree`);
-      if (!hasText(edu.dates)) missing.push(`${prefix} dates`);
+      if (!hasText(withEducationDateText(edu).dates)) missing.push(`${prefix} dates`);
     });
 
     skills.forEach((skill, index) => {
@@ -1011,8 +1167,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     }
 
     // For Create & Cover Letter tabs, include structured blocks
-    payload.experienceItems = experiences;
-    payload.educationItems = educations;
+    payload.experienceItems = experiences.map(withExperienceDateText);
+    payload.educationItems = educations.map(withEducationDateText);
     payload.skillItems = skills;
 
     if (activeTab === 'cover_letter') {
@@ -1072,8 +1228,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     profileImageName: profilePhotoName || undefined,
     profileImageData: legacyProfileImageData,
     personalDetails,
-    experienceItems: experiences,
-    educationItems: educations,
+    experienceItems: experiences.map(withExperienceDateText),
+    educationItems: educations.map(withEducationDateText),
     skillItems: skills
   };
   const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData);
@@ -1126,7 +1282,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                onClick={() => setActiveTab('create')}
                className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-center ${activeTab === 'create' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
              >
-               Live Editor
+               Editor
              </button>
              <button
                type="button"
@@ -1134,13 +1290,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-center ${activeTab === 'upload' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
              >
               Import File
-             </button>
-             <button
-               type="button"
-               onClick={() => setActiveTab('cover_letter')}
-               className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex items-center justify-center gap-1 text-center ${activeTab === 'cover_letter' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-             >
-               <span>Cover Letter</span>
              </button>
           </div>
 
@@ -1360,6 +1509,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
                                placeholder="e.g. 94105"
                                autoComplete="postal-code"
+                               inputMode="numeric"
+                               maxLength={5}
+                               pattern="\d{5}"
+                               title="Enter a 5-digit zip code"
                                required
                              />
                          </div>
@@ -1399,8 +1552,66 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                   <input value={exp.company} onChange={e => updateExperience(exp.id, 'company', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" required />
                               </div>
                               <div className="md:col-span-2">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Dates</label>
-                                  <input value={exp.dates} onChange={e => updateExperience(exp.id, 'dates', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. Jan 2022 - Present" required />
+                                  <div className="flex items-center justify-between gap-3">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Dates</label>
+                                    {idx === 0 && (
+                                      <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                        <input
+                                          type="checkbox"
+                                          checked={Boolean(exp.isPresent)}
+                                          onChange={e => updateExperience(exp.id, 'isPresent', e.target.checked)}
+                                          className="rounded text-[#1a91f0] focus:ring-[#1a91f0]"
+                                        />
+                                        Present
+                                      </label>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                    <select
+                                      value={exp.startMonth || ''}
+                                      onChange={e => updateExperience(exp.id, 'startMonth', e.target.value)}
+                                      className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                      required
+                                    >
+                                      <option value="">Start month</option>
+                                      {MONTH_OPTIONS.map(month => <option key={month} value={month}>{month}</option>)}
+                                    </select>
+                                    <select
+                                      value={exp.startYear || ''}
+                                      onChange={e => updateExperience(exp.id, 'startYear', e.target.value)}
+                                      className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                      required
+                                    >
+                                      <option value="">Start year</option>
+                                      {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
+                                    </select>
+                                    {idx === 0 && exp.isPresent ? (
+                                      <div className="sm:col-span-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                                        {formatMonthYear(exp.startMonth, exp.startYear) ? `${formatMonthYear(exp.startMonth, exp.startYear)} - Present` : 'Select start date'}
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <select
+                                          value={exp.endMonth || ''}
+                                          onChange={e => updateExperience(exp.id, 'endMonth', e.target.value)}
+                                          className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                          required
+                                        >
+                                          <option value="">End month</option>
+                                          {MONTH_OPTIONS.map(month => <option key={month} value={month}>{month}</option>)}
+                                        </select>
+                                        <select
+                                          value={exp.endYear || ''}
+                                          onChange={e => updateExperience(exp.id, 'endYear', e.target.value)}
+                                          className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                          required
+                                        >
+                                          <option value="">End year</option>
+                                          {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
+                                        </select>
+                                      </>
+                                    )}
+                                  </div>
                               </div>
                            </div>
                            <div className="mb-2">
@@ -1433,7 +1644,44 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                               </div>
                                <div className="md:col-span-2">
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">Dates</label>
-                                  <input value={edu.dates} onChange={e => updateEducation(edu.id, 'dates', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm" required />
+                                  <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                    <select
+                                      value={edu.startMonth || ''}
+                                      onChange={e => updateEducation(edu.id, 'startMonth', e.target.value)}
+                                      className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                      required
+                                    >
+                                      <option value="">Start month</option>
+                                      {MONTH_OPTIONS.map(month => <option key={month} value={month}>{month}</option>)}
+                                    </select>
+                                    <select
+                                      value={edu.startYear || ''}
+                                      onChange={e => updateEducation(edu.id, 'startYear', e.target.value)}
+                                      className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                      required
+                                    >
+                                      <option value="">Start year</option>
+                                      {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
+                                    </select>
+                                    <select
+                                      value={edu.endMonth || ''}
+                                      onChange={e => updateEducation(edu.id, 'endMonth', e.target.value)}
+                                      className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                      required
+                                    >
+                                      <option value="">End month</option>
+                                      {MONTH_OPTIONS.map(month => <option key={month} value={month}>{month}</option>)}
+                                    </select>
+                                    <select
+                                      value={edu.endYear || ''}
+                                      onChange={e => updateEducation(edu.id, 'endYear', e.target.value)}
+                                      className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
+                                      required
+                                    >
+                                      <option value="">End year</option>
+                                      {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
+                                    </select>
+                                  </div>
                               </div>
                            </div>
                            {idx > 0 && <button type="button" onClick={() => removeEducation(edu.id)} className="text-red-400 text-xs mt-2">Remove</button>}
@@ -1536,7 +1784,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                 {activeTab === 'create' ? (isSavingResume ? 'Saving...' : 'Save Resume') : (
                   isLoading ? 'Processing...' : (
-                     activeTab === 'upload' ? 'Import to Live Editor' :
+                     activeTab === 'upload' ? 'Import to Editor' :
                      activeTab === 'cover_letter' ? (isSavingResume ? 'Generating...' : 'Generate & Save Cover Letter') :
                      'Save Resume'
                   )

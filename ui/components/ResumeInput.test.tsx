@@ -507,7 +507,7 @@ describe('ResumeInput', () => {
 
     expect(await screen.findByText('resume.docx')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /import to live editor/i }));
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
 
     await waitFor(() => {
       expect(onImport).toHaveBeenCalledWith(expect.objectContaining({

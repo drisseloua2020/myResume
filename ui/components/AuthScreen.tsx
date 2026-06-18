@@ -398,9 +398,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
              <div className="border-2 border-[#1a91f0] rounded-2xl p-8 shadow-2xl relative transform md:-translate-y-4 bg-white">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1a91f0] text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wide">Most Popular</div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{PLAN_DETAILS[SubscriptionPlan.MONTHLY].name}</h3>
-                 <div className="flex items-baseline gap-1 mb-6">
-                   <span className="text-4xl font-extrabold text-[#1a91f0]">$1.00</span>
-                   <span className="text-slate-500 font-medium">/ month</span>
+                 <div className="mb-6">
+                   <span className="text-4xl font-extrabold text-[#1a91f0]">{PLAN_DETAILS[SubscriptionPlan.MONTHLY].price}</span>
                 </div>
                 <p className="text-slate-500 text-sm mb-6 pb-6 border-b border-slate-100">
                   Full access to all features for less than a cup of coffee.
@@ -435,9 +434,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
              {/* YEARLY PLAN */}
              <div className="border border-slate-200 rounded-2xl p-8 hover:border-purple-400 hover:shadow-xl transition-all duration-300 relative bg-slate-50/50">
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{PLAN_DETAILS[SubscriptionPlan.YEARLY].name}</h3>
-                 <div className="flex items-baseline gap-1 mb-6">
-                   <span className="text-4xl font-extrabold text-purple-600">$9.00</span>
-                   <span className="text-slate-500 font-medium">/ year</span>
+                 <div className="mb-6">
+                   <span className="text-4xl font-extrabold text-purple-600">{PLAN_DETAILS[SubscriptionPlan.YEARLY].price}</span>
                 </div>
                 <p className="text-slate-500 text-sm mb-6 pb-6 border-b border-slate-200">
                   Best value for long-term career growth and maintenance.
@@ -675,7 +673,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
              >
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#1a91f0] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Most Popular</div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{PLAN_DETAILS[SubscriptionPlan.MONTHLY].name}</h3>
-                <div className="text-3xl font-extrabold text-[#1a91f0] mb-1">$1.00 <span className="text-sm font-medium text-slate-400">/ mo</span></div>
+                <div className="text-3xl font-extrabold text-[#1a91f0] mb-1">{PLAN_DETAILS[SubscriptionPlan.MONTHLY].price}</div>
                 <p className="text-sm text-slate-500 mb-6">{PLAN_DETAILS[SubscriptionPlan.MONTHLY].desc}</p>
                 <ul className="space-y-3 text-sm text-slate-600 mb-8">
                    <li className="flex items-center gap-2">
@@ -702,7 +700,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
                title="Coming soon"
              >
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{PLAN_DETAILS[SubscriptionPlan.YEARLY].name}</h3>
-                <div className="text-3xl font-extrabold text-purple-600 mb-1">$9.00 <span className="text-sm font-medium text-slate-400">/ yr</span></div>
+                <div className="text-3xl font-extrabold text-purple-600 mb-1">{PLAN_DETAILS[SubscriptionPlan.YEARLY].price}</div>
                 <p className="text-sm text-slate-500 mb-6">{PLAN_DETAILS[SubscriptionPlan.YEARLY].desc}</p>
                 <ul className="space-y-3 text-sm text-slate-600 mb-8">
                    <li className="flex items-center gap-2">
