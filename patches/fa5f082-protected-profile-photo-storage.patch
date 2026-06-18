@@ -1,0 +1,482 @@
+﻿From fa5f08275f2421e0d40b73dd3e6802fdbc3e6b2f Mon Sep 17 00:00:00 2001
+From: Driss oued <drisseloua2020@gmail.com>
+Date: Sun, 14 Jun 2026 10:09:00 -0400
+Subject: [PATCH] Store profile photos in protected app storage
+
+---
+ services/.gitignore                    |  2 +
+ services/app/api/routes/uploads.py     | 60 ++++++++++++++++-
+ services/app/core/config.py            |  2 +-
+ services/app/main.py                   |  2 -
+ services/protected_uploads/.gitkeep    |  1 +
+ services/tests/test_postman_e2e_api.py | 13 +++-
+ ui/components/ResumeInput.test.tsx     | 89 ++++++++++++++++++++------
+ ui/components/ResumeInput.tsx          | 43 +++++++++++--
+ ui/services/apiClient.ts               | 40 ++++++++++++
+ 9 files changed, 221 insertions(+), 31 deletions(-)
+ create mode 100644 services/protected_uploads/.gitkeep
+
+diff --git a/services/.gitignore b/services/.gitignore
+index 5321f5e..0eb5a22 100644
+--- a/services/.gitignore
++++ b/services/.gitignore
+@@ -17,3 +17,5 @@ pytest-cache-files-*/
+ 
+ # User-uploaded files are runtime artifacts.
+ uploads/
++protected_uploads/*
++!protected_uploads/.gitkeep
+diff --git a/services/app/api/routes/uploads.py b/services/app/api/routes/uploads.py
+index 5277432..208cd9e 100644
+--- a/services/app/api/routes/uploads.py
++++ b/services/app/api/routes/uploads.py
+@@ -1,9 +1,11 @@
+ from __future__ import annotations
+ 
++import mimetypes
+ from pathlib import Path
+ from uuid import uuid4
+ 
+ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
++from fastapi.responses import FileResponse
+ from sqlalchemy.orm import Session
+ 
+ from app.api.deps import get_current_user, get_db
+@@ -22,6 +24,37 @@ ALLOWED_PROFILE_PHOTO_TYPES = {
+ }
+ 
+ 
++def _ensure_private_dir(path: Path) -> None:
++    path.mkdir(parents=True, exist_ok=True)
++    try:
++        path.chmod(0o700)
++    except OSError:
++        pass
++
++
++def _safe_profile_filename(filename: str) -> str:
++    clean = Path(filename).name
++    if clean != filename or not clean.startswith("profile-") or Path(clean).suffix.lower() not in set(ALLOWED_PROFILE_PHOTO_TYPES.values()):
++        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
++    return clean
++
++
++def _profile_photo_response(user_id: str, filename: str) -> FileResponse:
++    clean_filename = _safe_profile_filename(filename)
++    user_upload_dir = (settings.upload_root / "profile-photos" / user_id).resolve()
++    target = (user_upload_dir / clean_filename).resolve()
++
++    if user_upload_dir not in target.parents or not target.is_file():
++        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
++
++    media_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
++    return FileResponse(
++        target,
++        media_type=media_type,
++        headers={"Cache-Control": "private, max-age=3600"},
++    )
++
++
+ @router.post("/profile-photo", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
+ async def upload_profile_photo(
+     file: UploadFile = File(...),
+@@ -42,17 +75,38 @@ async def upload_profile_photo(
+     if len(content) > settings.max_profile_photo_bytes:
+         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Profile photo is too large.")
+ 
++    _ensure_private_dir(settings.upload_root)
++    _ensure_private_dir(settings.upload_root / "profile-photos")
+     user_upload_dir = settings.upload_root / "profile-photos" / current_user.id
+-    user_upload_dir.mkdir(parents=True, exist_ok=True)
++    _ensure_private_dir(user_upload_dir)
+ 
+     filename = f"profile-{uuid4().hex}{extension}"
+     target = user_upload_dir / filename
+     target.write_bytes(content)
++    try:
++        target.chmod(0o600)
++    except OSError:
++        pass
+ 
+-    relative_path = Path("profile-photos") / current_user.id / filename
+-    url = f"{settings.upload_url_prefix.rstrip('/')}/{relative_path.as_posix()}"
++    url = f"{settings.upload_url_prefix.rstrip('/')}/profile-photo/{filename}"
+ 
+     log_activity(db, current_user.id, "PROFILE_PHOTO_UPLOAD", details=filename, user_name=current_user.name)
+     db.commit()
+ 
+     return UploadResponse(url=url, filename=filename, contentType=content_type, size=len(content))
++
++
++@router.get("/profile-photo/{filename}")
++def get_profile_photo(filename: str, current_user: User = Depends(get_current_user)) -> FileResponse:
++    return _profile_photo_response(current_user.id, filename)
++
++
++@router.get("/profile-photos/{user_id}/{filename}")
++def get_legacy_profile_photo(
++    user_id: str,
++    filename: str,
++    current_user: User = Depends(get_current_user),
++) -> FileResponse:
++    if current_user.id != user_id:
++        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
++    return _profile_photo_response(user_id, filename)
+diff --git a/services/app/core/config.py b/services/app/core/config.py
+index 5571c05..69ea48e 100644
+--- a/services/app/core/config.py
++++ b/services/app/core/config.py
+@@ -21,7 +21,7 @@ class Settings(BaseSettings):
+     smtp_user: str = ""
+     smtp_pass: str = ""
+     smtp_from: str = "myresume_team@myresume.ai"
+-    upload_dir: str = "uploads"
++    upload_dir: str = "protected_uploads"
+     upload_url_prefix: str = "/uploads"
+     max_profile_photo_bytes: int = 5 * 1024 * 1024
+     @property
+diff --git a/services/app/main.py b/services/app/main.py
+index 9072ad4..5b4d1b2 100644
+--- a/services/app/main.py
++++ b/services/app/main.py
+@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
+ from pathlib import Path
+ from fastapi import FastAPI
+ from fastapi.middleware.cors import CORSMiddleware
+-from fastapi.staticfiles import StaticFiles
+ from app.api.routes.admin import router as admin_router
+ from app.api.routes.agent import router as agent_router
+ from app.api.routes.auth import router as auth_router
+@@ -34,4 +33,3 @@ app.include_router(profile_router)
+ app.include_router(admin_router)
+ app.include_router(uploads_router)
+ Path(settings.upload_root).mkdir(parents=True, exist_ok=True)
+-app.mount(settings.upload_url_prefix, StaticFiles(directory=settings.upload_root), name="uploads")
+diff --git a/services/protected_uploads/.gitkeep b/services/protected_uploads/.gitkeep
+new file mode 100644
+index 0000000..8b13789
+--- /dev/null
++++ b/services/protected_uploads/.gitkeep
+@@ -0,0 +1 @@
++
+diff --git a/services/tests/test_postman_e2e_api.py b/services/tests/test_postman_e2e_api.py
+index bf170f0..7ece5b0 100644
+--- a/services/tests/test_postman_e2e_api.py
++++ b/services/tests/test_postman_e2e_api.py
+@@ -126,9 +126,20 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
+     )
+     assert uploaded_photo.status_code == 201, uploaded_photo.text
+     uploaded_photo_json = uploaded_photo.json()
+-    assert uploaded_photo_json["url"].startswith("/uploads/profile-photos/")
++    assert uploaded_photo_json["url"].startswith("/uploads/profile-photo/")
+     assert uploaded_photo_json["contentType"] == "image/png"
+ 
++    public_photo = client.get(uploaded_photo_json["url"])
++    assert public_photo.status_code == 401
++
++    protected_photo = client.get(uploaded_photo_json["url"], headers=user_headers)
++    assert protected_photo.status_code == 200, protected_photo.text
++    assert protected_photo.content.startswith(b"\x89PNG")
++
++    other_signup = _signup(client, name=f"Other User {run_id}", email=f"other.{run_id}@example.com")
++    other_photo = client.get(uploaded_photo_json["url"], headers=_auth_headers(other_signup["token"]))
++    assert other_photo.status_code == 404
++
+     created_resume = client.post(
+         "/resumes",
+         headers=user_headers,
+diff --git a/ui/components/ResumeInput.test.tsx b/ui/components/ResumeInput.test.tsx
+index af2f251..e817e2d 100644
+--- a/ui/components/ResumeInput.test.tsx
++++ b/ui/components/ResumeInput.test.tsx
+@@ -99,10 +99,11 @@ describe('ResumeInput', () => {
+   beforeEach(() => {
+     vi.restoreAllMocks();
+     vi.clearAllMocks();
++    localStorage.clear();
+     vi.mocked(saveResume).mockResolvedValue({ id: 'res_saved' });
+     vi.mocked(uploadProfilePhoto).mockResolvedValue({
+-      url: '/uploads/profile-photos/usr_1/profile.png',
+-      filename: 'profile.png',
++      url: '/uploads/profile-photo/profile-abc123.png',
++      filename: 'profile-abc123.png',
+       contentType: 'image/png',
+       size: 128,
+     });
+@@ -145,8 +146,8 @@ describe('ResumeInput', () => {
+         }}
+         prefilledData={{
+           targetRole: 'Senior Developer',
+-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
+-          profileImageName: 'profile.png',
++          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
++          profileImageName: 'profile-abc123.png',
+           preferences: {
+             pages: '1-page',
+             tone: 'modern',
+@@ -186,8 +187,8 @@ describe('ResumeInput', () => {
+     await waitFor(() => {
+       expect(saveResume).toHaveBeenCalledWith(expect.objectContaining({
+         content: expect.objectContaining({
+-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
+-          profileImageName: 'profile.png',
++          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
++          profileImageName: 'profile-abc123.png',
+           preferences: expect.objectContaining({
+             photo: true,
+           }),
+@@ -196,7 +197,7 @@ describe('ResumeInput', () => {
+     });
+   });
+ 
+-  it('saves uploaded profile photos with embedded image data for reload and PDF fallback', async () => {
++  it('saves uploaded profile photos with the protected app URL', async () => {
+     const user = userEvent.setup();
+ 
+     const { container } = render(
+@@ -262,17 +263,65 @@ describe('ResumeInput', () => {
+ 
+     await user.click(screen.getByRole('button', { name: /^save resume$/i }));
+ 
++    await waitFor(() => expect(saveResume).toHaveBeenCalled());
++    const savedContent = vi.mocked(saveResume).mock.calls.at(-1)?.[0].content;
++    expect(savedContent).toEqual(expect.objectContaining({
++      profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
++      profileImageName: 'avatar.png',
++    }));
++    expect(savedContent.profileImageData).toBeUndefined();
++  });
++
++  it('loads saved protected profile photos with the user session token', async () => {
++    localStorage.setItem('rf_token', 'session-token');
++    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
++      new Response(new Blob(['saved-avatar'], { type: 'image/png' }), {
++        status: 200,
++        headers: { 'Content-Type': 'image/png' },
++      })
++    );
++
++    render(
++      <ResumeInput
++        onGenerate={vi.fn()}
++        onImport={vi.fn()}
++        onTemplateChange={vi.fn()}
++        isLoading={false}
++        role={UserRole.USER}
++        userPlan={SubscriptionPlan.FREE}
++        selectedTemplateId="classic_pro"
++        user={{
++          id: 'usr_1',
++          name: 'Resume User',
++          email: 'resume@example.com',
++          role: UserRole.USER,
++          plan: SubscriptionPlan.FREE,
++          status: 'Active',
++          createdAt: '2026-05-25T00:00:00Z',
++          paidAmount: '$0.00',
++        }}
++        prefilledData={{
++          targetRole: 'Senior Developer',
++          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
++          profileImageName: 'profile-abc123.png',
++          preferences: {
++            pages: '1-page',
++            tone: 'modern',
++            region: 'US',
++            photo: true,
++          },
++        }}
++      />
++    );
++
+     await waitFor(() => {
+-      expect(saveResume).toHaveBeenCalledWith(expect.objectContaining({
+-        content: expect.objectContaining({
+-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
+-          profileImageName: 'avatar.png',
+-          profileImageData: expect.objectContaining({
+-            mimeType: 'image/png',
+-            data: expect.any(String),
+-          }),
+-        }),
+-      }));
++      expect(fetchSpy).toHaveBeenCalledWith(
++        'http://localhost:3000/uploads/profile-photo/profile-abc123.png',
++        expect.objectContaining({
++          headers: { Authorization: 'Bearer session-token' },
++        })
++      );
++      expect(screen.getByAltText('Profile')).toHaveAttribute('src', expect.stringMatching(/^data:image\/png;base64,/));
+     });
+   });
+ 
+@@ -302,8 +351,8 @@ describe('ResumeInput', () => {
+         {...baseProps}
+         prefilledData={{
+           targetRole: 'Senior Developer',
+-          profileImageUrl: '/uploads/profile-photos/usr_1/profile.png',
+-          profileImageName: 'profile.png',
++          profileImageUrl: '/uploads/profile-photo/profile-abc123.png',
++          profileImageName: 'profile-abc123.png',
+           preferences: {
+             pages: '1-page',
+             tone: 'modern',
+@@ -316,7 +365,7 @@ describe('ResumeInput', () => {
+ 
+     const includePhoto = await screen.findByLabelText(/include photo/i);
+     await waitFor(() => expect(includePhoto).toBeChecked());
+-    expect(screen.getByText('profile.png')).toBeInTheDocument();
++    expect(screen.getByText('profile-abc123.png')).toBeInTheDocument();
+ 
+     rerender(
+       <ResumeInput
+diff --git a/ui/components/ResumeInput.tsx b/ui/components/ResumeInput.tsx
+index 8df85fc..a9e5d9f 100644
+--- a/ui/components/ResumeInput.tsx
++++ b/ui/components/ResumeInput.tsx
+@@ -5,7 +5,7 @@ import LivePreview from './LivePreview';
+ import ConfirmNewResumeModal from './ConfirmNewResumeModal';
+ import { saveResume, updateResume } from '../services/resumeService';
+ import { locationService } from '../services/locationService';
+-import { apiAssetUrl } from '../services/apiClient';
++import { fetchApiAssetDataUrl } from '../services/apiClient';
+ import { uploadProfilePhoto } from '../services/uploadService';
+ import { generateCoverLetter } from '../services/coverLetterService';
+ 
+@@ -71,6 +71,12 @@ function imageDataUrlFromProfileData(imageData?: { mimeType: string; data: strin
+   return imageData ? `data:${imageData.mimeType};base64,${imageData.data}` : undefined;
+ }
+ 
++function profileDataFromImageDataUrl(dataUrl: string): { mimeType: string; data: string } | undefined {
++  const match = dataUrl.match(/^data:([^;,]*);base64,(.+)$/);
++  if (!match) return undefined;
++  return { mimeType: match[1] || 'image/png', data: match[2] };
++}
++
+ async function readProfileImageData(file: File): Promise<{ mimeType: string; data: string }> {
+   return new Promise((resolve, reject) => {
+     const reader = new FileReader();
+@@ -545,6 +551,30 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
+   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
+   const [profilePhotoError, setProfilePhotoError] = useState<string | null>(null);
+ 
++  useEffect(() => {
++    if (!profileImageUrl || legacyProfileImageData) return;
++
++    let alive = true;
++    (async () => {
++      try {
++        const dataUrl = await fetchApiAssetDataUrl(profileImageUrl);
++        const imageData = profileDataFromImageDataUrl(dataUrl);
++        if (alive && imageData) {
++          setLegacyProfileImageData(imageData);
++          setProfilePhotoError(null);
++        }
++      } catch {
++        if (alive) {
++          setProfilePhotoError('Could not load the saved profile photo. Please sign in again or upload it once more.');
++        }
++      }
++    })();
++
++    return () => {
++      alive = false;
++    };
++  }, [profileImageUrl, legacyProfileImageData]);
++
+   // Mode B State (Structured)
+   const [experiences, setExperiences] = useState<ExperienceItem[]>([
+     { id: '1', role: '', company: '', dates: '', description: '' }
+@@ -957,6 +987,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
+       return;
+     }
+ 
++    const profileImageDataForPersistence = profileImageUrl ? undefined : legacyProfileImageData;
+     const payload: UserInputData = {
+       role,
+       plan: userPlan,
+@@ -966,7 +997,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
+       preferences: activeTab === 'upload' ? { ...preferences!, photo: false } : preferences,
+       profileImageUrl: activeTab === 'upload' ? undefined : profileImageUrl,
+       profileImageName: activeTab === 'upload' ? undefined : profilePhotoName || undefined,
+-      profileImageData: activeTab === 'upload' ? undefined : legacyProfileImageData,
++      profileImageData: activeTab === 'upload' ? undefined : profileImageDataForPersistence,
+       templateId: selectedTemplateId,
+       personalDetails
+     };
+@@ -1045,7 +1076,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
+     educationItems: educations,
+     skillItems: skills
+   };
+-  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData) || apiAssetUrl(profileImageUrl);
++  const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData);
+ 
+   // Autosave workspace draft while editing (debounced)
+   useEffect(() => {
+@@ -1055,7 +1086,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
+ 
+     const t = window.setTimeout(() => {
+       try {
+-        onDraftChange({ ...currentData, templateId: selectedTemplateId });
++        onDraftChange({
++          ...currentData,
++          profileImageData: profileImageUrl ? undefined : legacyProfileImageData,
++          templateId: selectedTemplateId,
++        });
+       } catch {
+         // ignore autosave errors at this layer
+       }
+diff --git a/ui/services/apiClient.ts b/ui/services/apiClient.ts
+index aaae8a0..c16047d 100644
+--- a/ui/services/apiClient.ts
++++ b/ui/services/apiClient.ts
+@@ -17,6 +17,46 @@ export function apiAssetUrl(url?: string | null): string | undefined {
+   return `${baseUrl}${assetPath}`;
+ }
+ 
++async function blobToDataUrl(blob: Blob): Promise<string> {
++  const bytes = new Uint8Array(await blob.arrayBuffer());
++  let binary = "";
++  const chunkSize = 0x8000;
++  for (let index = 0; index < bytes.length; index += chunkSize) {
++    const chunk = bytes.subarray(index, index + chunkSize);
++    binary += String.fromCharCode(...chunk);
++  }
++  return `data:${blob.type || "application/octet-stream"};base64,${btoa(binary)}`;
++}
++
++export async function fetchApiAssetDataUrl(url: string): Promise<string> {
++  const assetUrl = apiAssetUrl(url);
++  const token = getToken();
++  if (!assetUrl || !token) {
++    throw new Error("Sign in again to load this protected asset.");
++  }
++
++  const res = await fetch(assetUrl, {
++    headers: { Authorization: `Bearer ${token}` },
++  });
++
++  if (res.status === 401) {
++    try {
++      clearSession();
++    } catch {
++      // ignore
++    }
++    if (typeof window !== "undefined") {
++      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
++    }
++  }
++
++  if (!res.ok) {
++    throw new Error(`Protected asset failed to load (${res.status})`);
++  }
++
++  return blobToDataUrl(await res.blob());
++}
++
+ export function setSession(token: string, user: any) {
+   localStorage.setItem(TOKEN_KEY, token);
+   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+-- 
+2.54.0.windows.1
+
