@@ -43,4 +43,6 @@ jobs:
     needs: version-images
     if: github.ref_type == 'branch'
     uses: ./.github/workflows/deploy-render.yml
-    secrets: inherit
+    secrets:
+      RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+      RENDER_UI_DEPLOY_HOOK: ${{ secrets.RENDER_UI_DEPLOY_HOOK }}
