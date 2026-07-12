@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MyResume site icon">
+  <rect width="64" height="64" rx="14" fill="#1453ff"/>
+  <path d="M19 10h23l8 8v36H19z" fill="#ffffff"/>
+  <path d="M42 10v9h8z" fill="#dbe7ff"/>
+  <rect x="25" y="26" width="25" height="4" rx="2" fill="#18243a"/>
+  <rect x="25" y="36" width="20" height="4" rx="2" fill="#18243a"/>
+  <rect x="25" y="46" width="14" height="4" rx="2" fill="#18243a"/>
+  <circle cx="19" cy="30" r="5" fill="#00b87a"/>
+  <path d="M16.8 29.9l1.6 1.6 3.1-3.7" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
