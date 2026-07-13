@@ -14,6 +14,8 @@ export default defineConfig(() => {
         port: 4000,          // match your start script if using 4000
         allowedHosts: [
           "myresume-5pjy.onrender.com",
+          "www.myresumes.net",
+          "myresumes.net",
           "localhost",
           "127.0.0.1",
         ],
