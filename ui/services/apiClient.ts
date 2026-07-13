@@ -1,4 +1,5 @@
-export const API_URL = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:3000";
+const RAW_API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:3000";
+export const API_URL = RAW_API_URL.replace(/\/+$/, "");
 
 export const SESSION_EXPIRED_EVENT = "rf:session-expired";
 

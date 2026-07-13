@@ -10,6 +10,7 @@ import ResumeExamplesPage from './ResumeExamplesPage';
 import CookiesPage from './CookiesPage';
 import CookiesPrivacyPolicyPage from './CookiesPrivacyPolicyPage';
 import CookiesTermsOfUsePage from './CookiesTermsOfUsePage';
+import { isOAuthCallbackPath } from '../services/oauthRedirect';
 
 interface AuthScreenProps {
   onLogin: (user: User, initialTemplateId?: string) => void;
@@ -46,7 +47,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     if (!authError) return;
     setOauthError(authError);
     setActiveModal('login');
-    window.history.replaceState({}, document.title, window.location.pathname);
+    const cleanPath = isOAuthCallbackPath(window.location.pathname) ? '/' : window.location.pathname;
+    window.history.replaceState({}, document.title, cleanPath);
   }, []);
 
   useEffect(() => {
