@@ -99,6 +99,14 @@ https://api.myresumes.net/auth/oauth/google/callback
 
 In Google Cloud Console, the value under **Authorized redirect URIs** must match the `redirect_uri` exactly, including scheme, host, path, and absence of a port.
 
+To verify the deployed backend value, open:
+
+```text
+https://myresume-services-04rb.onrender.com/auth/oauth/google/diagnostics
+```
+
+The `googleAuthorizedRedirectUri` value in that response is the value that must exist in Google Cloud Console.
+
 If Google has already been configured to redirect to the UI origin, the frontend also supports forwarding this path to the API callback:
 
 ```text
