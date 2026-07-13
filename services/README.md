@@ -44,3 +44,37 @@ http://localhost:3000/auth/oauth/linkedin/callback
 ```
 
 Use your deployed API origin instead of `http://localhost:3000` in production, and set `OAUTH_COOKIE_SECURE=true` when the callback is served over HTTPS.
+
+For Render, do not add local development ports to HTTPS public service URLs. Use the browser-visible origins:
+
+```bash
+# UI static site / web service
+VITE_API_URL=https://<your-api-service>.onrender.com
+
+# Backend web service
+OAUTH_FRONTEND_URL=https://myresume-rrcy.onrender.com
+OAUTH_REDIRECT_BASE_URL=https://<your-api-service>.onrender.com
+OAUTH_COOKIE_SECURE=true
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
+```
+
+Then register this Google Authorized redirect URI:
+
+```text
+https://<your-api-service>.onrender.com/auth/oauth/google/callback
+```
+
+If Google has already been configured to redirect to the UI origin, the frontend also supports forwarding this path to the API callback:
+
+```text
+https://myresume-rrcy.onrender.com/auth/oauth/google/callback
+```
+
+For a Render Static Site, add a rewrite rule for SPA callback paths:
+
+```text
+Source: /auth/oauth/*
+Destination: /index.html
+Action: Rewrite
+```

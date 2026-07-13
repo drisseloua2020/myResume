@@ -23,6 +23,7 @@ import ConfirmNewResumeModal from './components/ConfirmNewResumeModal';
 import { generateResumeContent } from './services/geminiService';
 import { authService } from './services/authService';
 import { setSession, clearSession, SESSION_EXPIRED_EVENT } from './services/apiClient';
+import { getOAuthBackendCallbackRedirect, isOAuthCallbackPath } from './services/oauthRedirect';
 import { agentService } from './services/agentService';
 import { saveDraft, getLatestDraft, getLatestResume, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
@@ -369,6 +370,12 @@ const App: React.FC = () => {
 
   // Check for existing session on load
   useEffect(() => {
+    const backendCallbackRedirect = getOAuthBackendCallbackRedirect(window.location);
+    if (backendCallbackRedirect) {
+      window.location.replace(backendCallbackRedirect);
+      return;
+    }
+
     // OAuth callback: backend redirects to frontend with ?token=JWT
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -389,7 +396,8 @@ const App: React.FC = () => {
           }
         })
         .finally(() => {
-          window.history.replaceState({}, document.title, window.location.pathname);
+          const cleanPath = isOAuthCallbackPath(window.location.pathname) ? '/' : window.location.pathname;
+          window.history.replaceState({}, document.title, cleanPath);
         });
       return;
     }
