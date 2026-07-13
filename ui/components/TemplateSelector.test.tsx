@@ -11,8 +11,10 @@ describe('TemplateSelector', () => {
     for (const template of AVAILABLE_TEMPLATES) {
       expect(screen.getByText(template.name)).toBeInTheDocument();
       expect(screen.getByText(template.description)).toBeInTheDocument();
+      expect(screen.getByTestId(`template-preview-${template.id}`)).toBeInTheDocument();
     }
 
+    expect(screen.queryByTestId('template-preview-fallback')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /selected/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /use template/i })).toHaveLength(AVAILABLE_TEMPLATES.length - 1);
   });
