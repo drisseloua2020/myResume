@@ -42,6 +42,29 @@ def test_oauth_start_redirect_sets_state_cookie(client, monkeypatch):
     assert 'rf_oauth_state_google=' in response.headers['set-cookie']
 
 
+def test_oauth_start_uses_configured_public_redirect_base(client, monkeypatch):
+    monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
+    monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
+    monkeypatch.setattr(settings, 'oauth_redirect_base_url', 'https://myresume-api.onrender.com')
+
+    response = client.get('/auth/oauth/google/start', follow_redirects=False)
+
+    assert response.status_code == 302
+    query = parse_qs(urlparse(response.headers['location']).query)
+    assert query['redirect_uri'] == ['https://myresume-api.onrender.com/auth/oauth/google/callback']
+
+
+def test_oauth_start_rejects_render_redirect_base_with_port(client, monkeypatch):
+    monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
+    monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
+    monkeypatch.setattr(settings, 'oauth_redirect_base_url', 'https://myresume-rrcy.onrender.com:3000')
+
+    response = client.get('/auth/oauth/google/start', follow_redirects=False)
+
+    assert response.status_code == 503
+    assert 'OAUTH_REDIRECT_BASE_URL must not include :3000' in response.json()['detail']
+
+
 def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_session, monkeypatch):
     monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
     monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
