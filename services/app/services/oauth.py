@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 import secrets
 
 import httpx
@@ -92,14 +92,31 @@ def _state_cookie_name(provider: str) -> str:
     return f"rf_oauth_state_{provider}"
 
 
+def _validate_render_public_url(setting_name: str, value: str) -> None:
+    if not value.strip():
+        return
+    parsed = urlparse(value)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme == "https" and hostname.endswith(".onrender.com") and parsed.port:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"{setting_name} must not include :{parsed.port} for a Render public URL. "
+                f"Use https://{hostname} instead."
+            ),
+        )
+
+
 def _callback_url(request: Request, provider: str) -> str:
     if settings.oauth_redirect_base_url.strip():
+        _validate_render_public_url("OAUTH_REDIRECT_BASE_URL", settings.oauth_redirect_base_url)
         base_url = settings.oauth_redirect_base_url.rstrip("/")
         return f"{base_url}/auth/oauth/{provider}/callback"
     return str(request.url_for("oauth_callback", provider=provider))
 
 
 def _frontend_redirect(params: dict[str, str]) -> str:
+    _validate_render_public_url("OAUTH_FRONTEND_URL", settings.oauth_frontend_url)
     base_url = settings.oauth_frontend_url.rstrip("/") or "http://localhost:4000"
     return f"{base_url}/?{urlencode(params)}"
 

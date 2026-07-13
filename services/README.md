@@ -59,11 +59,20 @@ GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
 ```
 
+These are wrong in production and will cause Google `403` / `redirect_uri_mismatch` errors:
+
+```bash
+OAUTH_FRONTEND_URL=https://myresume-rrcy.onrender.com:4000
+OAUTH_REDIRECT_BASE_URL=https://myresume-rrcy.onrender.com:3000
+```
+
 Then register this Google Authorized redirect URI:
 
 ```text
 https://<your-api-service>.onrender.com/auth/oauth/google/callback
 ```
+
+In Google Cloud Console, the value under **Authorized redirect URIs** must match the `redirect_uri` exactly, including scheme, host, path, and absence of a port.
 
 If Google has already been configured to redirect to the UI origin, the frontend also supports forwarding this path to the API callback:
 
