@@ -53,11 +53,11 @@ npm run dev
 
 ##  Environment Variables
 
-DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/DB  
-JWT_SECRET=your_secret  
-APP_ENV=development  
+DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/DB
+JWT_SECRET=your_secret
+APP_ENV=development
 
-VITE_API_URL=https://your-backend-url  
+VITE_API_URL=https://myresume-services-04rb.onrender.com
 
 ---
 

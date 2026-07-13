@@ -49,11 +49,11 @@ For Render, do not add local development ports to HTTPS public service URLs. Use
 
 ```bash
 # UI static site / web service
-VITE_API_URL=https://<your-api-service>.onrender.com
+VITE_API_URL=https://myresume-services-04rb.onrender.com
 
 # Backend web service
 OAUTH_FRONTEND_URL=https://www.myresumes.net
-OAUTH_REDIRECT_BASE_URL=https://<your-api-service>.onrender.com
+OAUTH_REDIRECT_BASE_URL=https://myresume-services-04rb.onrender.com
 CORS_ORIGINS=https://www.myresumes.net,https://myresumes.net
 OAUTH_COOKIE_SECURE=true
 GOOGLE_OAUTH_CLIENT_ID=...
@@ -70,7 +70,20 @@ OAUTH_REDIRECT_BASE_URL=https://myresume-rrcy.onrender.com:3000
 Then register this Google Authorized redirect URI:
 
 ```text
-https://<your-api-service>.onrender.com/auth/oauth/google/callback
+https://myresume-services-04rb.onrender.com/auth/oauth/google/callback
+```
+
+This is the exact `redirect_uri` currently sent by the app. If Google returns `redirect_uri_mismatch`, add or correct this exact value in the same Google OAuth client ID used by `GOOGLE_OAUTH_CLIENT_ID`.
+
+Recommended Google OAuth client settings:
+
+```text
+Authorized JavaScript origins:
+https://www.myresumes.net
+https://myresume-rrcy.onrender.com
+
+Authorized redirect URIs:
+https://myresume-services-04rb.onrender.com/auth/oauth/google/callback
 ```
 
 If the API also gets a custom domain, use that API domain consistently instead:
