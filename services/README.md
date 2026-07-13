@@ -52,8 +52,9 @@ For Render, do not add local development ports to HTTPS public service URLs. Use
 VITE_API_URL=https://<your-api-service>.onrender.com
 
 # Backend web service
-OAUTH_FRONTEND_URL=https://myresume-rrcy.onrender.com
+OAUTH_FRONTEND_URL=https://www.myresumes.net
 OAUTH_REDIRECT_BASE_URL=https://<your-api-service>.onrender.com
+CORS_ORIGINS=https://www.myresumes.net,https://myresumes.net
 OAUTH_COOKIE_SECURE=true
 GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
@@ -72,12 +73,23 @@ Then register this Google Authorized redirect URI:
 https://<your-api-service>.onrender.com/auth/oauth/google/callback
 ```
 
+If the API also gets a custom domain, use that API domain consistently instead:
+
+```bash
+VITE_API_URL=https://api.myresumes.net
+OAUTH_REDIRECT_BASE_URL=https://api.myresumes.net
+```
+
+```text
+https://api.myresumes.net/auth/oauth/google/callback
+```
+
 In Google Cloud Console, the value under **Authorized redirect URIs** must match the `redirect_uri` exactly, including scheme, host, path, and absence of a port.
 
 If Google has already been configured to redirect to the UI origin, the frontend also supports forwarding this path to the API callback:
 
 ```text
-https://myresume-rrcy.onrender.com/auth/oauth/google/callback
+https://www.myresumes.net/auth/oauth/google/callback
 ```
 
 For a Render Static Site, add a rewrite rule for SPA callback paths:

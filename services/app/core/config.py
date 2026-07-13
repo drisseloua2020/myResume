@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-flash-preview"
     gemini_temperature: float = 0.4
-    cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000,https://myresume-rrcy.onrender.com")
+    cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000,https://myresume-rrcy.onrender.com,https://www.myresumes.net,https://myresumes.net")
     smtp_host: str = ""
     smtp_port: int | None = None
     smtp_secure: bool = False
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
         return path if path.is_absolute() else Path.cwd() / path
     @property
     def allowed_origins(self) -> list[str]:
-        defaults = ["http://localhost:4000", "http://127.0.0.1:4000", "https://myresume-rrcy.onrender.com"]
+        defaults = ["http://localhost:4000", "http://127.0.0.1:4000", "https://myresume-rrcy.onrender.com", "https://www.myresumes.net", "https://myresumes.net"]
         extras = [item.strip() for item in self.cors_origins.split(",") if item.strip()]
         seen: list[str] = []
         for origin in defaults + extras:
