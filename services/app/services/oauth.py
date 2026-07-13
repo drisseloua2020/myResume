@@ -186,6 +186,25 @@ def create_oauth_start_redirect(
     return response
 
 
+def oauth_diagnostics(request: Request, provider: str) -> dict[str, Any]:
+    config = _provider_or_404(provider)
+    redirect_uri = _callback_url(request, config.key)
+    frontend_url = settings.oauth_frontend_url.rstrip("/") or "http://localhost:4000"
+    return {
+        "provider": config.key,
+        "configured": bool(config.client_id and config.client_secret),
+        "clientIdConfigured": bool(config.client_id),
+        "clientSecretConfigured": bool(config.client_secret),
+        "authorizationUrl": config.authorization_url,
+        "redirectUri": redirect_uri,
+        "frontendRedirectBaseUrl": frontend_url,
+        "stateCookieName": _state_cookie_name(config.key),
+        "stateCookiePath": "/auth/oauth",
+        "stateCookieSecure": settings.oauth_cookie_secure,
+        "googleAuthorizedRedirectUri": redirect_uri if config.key == "google" else None,
+    }
+
+
 def _error_redirect(provider: str, message: str) -> RedirectResponse:
     return RedirectResponse(
         _frontend_redirect({"authError": f"{provider}: {message}"}),

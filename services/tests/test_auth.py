@@ -65,6 +65,26 @@ def test_oauth_start_rejects_render_redirect_base_with_port(client, monkeypatch)
     assert 'OAUTH_REDIRECT_BASE_URL must not include :3000' in response.json()['detail']
 
 
+def test_oauth_diagnostics_reports_public_redirect_uri_without_secret(client, monkeypatch):
+    monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
+    monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
+    monkeypatch.setattr(settings, 'oauth_redirect_base_url', 'https://myresume-services-04rb.onrender.com')
+    monkeypatch.setattr(settings, 'oauth_frontend_url', 'https://www.myresumes.net')
+    monkeypatch.setattr(settings, 'oauth_cookie_secure', True)
+
+    response = client.get('/auth/oauth/google/diagnostics')
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data['provider'] == 'google'
+    assert data['configured'] is True
+    assert data['redirectUri'] == 'https://myresume-services-04rb.onrender.com/auth/oauth/google/callback'
+    assert data['googleAuthorizedRedirectUri'] == data['redirectUri']
+    assert data['frontendRedirectBaseUrl'] == 'https://www.myresumes.net'
+    assert data['stateCookieSecure'] is True
+    assert 'google-secret' not in response.text
+
+
 def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_session, monkeypatch):
     monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
     monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')

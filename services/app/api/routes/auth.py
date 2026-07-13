@@ -12,7 +12,7 @@ from app.models.entities import ActivityLog, ContactMessage, User
 from app.schemas.auth import ActivityIn, ActivityLogsEnvelope, AdminUpdatePlanIn, ContactIn, LoginIn, ProviderIn, SignupIn, TokenResponse, UpdatePlanIn, UserEnvelope, UsersEnvelope
 from app.schemas.common import IdResponse, OkResponse
 from app.services.activity import log_activity, new_prefixed_id
-from app.services.oauth import create_oauth_start_redirect, deprecated_provider_response, handle_oauth_callback
+from app.services.oauth import create_oauth_start_redirect, deprecated_provider_response, handle_oauth_callback, oauth_diagnostics
 router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginIn, db: Session = Depends(get_db)) -> TokenResponse:
@@ -48,6 +48,9 @@ def oauth_start(
     template_id: str | None = Query(default=None, alias="templateId"),
 ) -> RedirectResponse:
     return create_oauth_start_redirect(request, provider=provider, plan=plan, template_id=template_id)
+@router.get("/oauth/{provider}/diagnostics")
+def oauth_provider_diagnostics(provider: str, request: Request) -> dict[str, object]:
+    return oauth_diagnostics(request, provider)
 @router.get("/oauth/{provider}/callback", name="oauth_callback")
 async def oauth_callback(
     provider: str,
