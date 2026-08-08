@@ -45,32 +45,34 @@ http://localhost:3000/auth/oauth/linkedin/callback
 
 Use your deployed API origin instead of `http://localhost:3000` in production, and set `OAUTH_COOKIE_SECURE=true` when the callback is served over HTTPS.
 
-For Render, do not add local development ports to HTTPS public service URLs. Use the browser-visible origins:
+For Render, do not add local development ports to HTTPS public service URLs. Use the browser-visible origins, and keep the real values in Render environment variables or a private runbook:
 
 ```bash
 # UI static site / web service
-VITE_API_URL=https://myresume-services-04rb.onrender.com
+VITE_API_URL=<API_ORIGIN>
 
 # Backend web service
-OAUTH_FRONTEND_URL=https://www.myresumes.net
-OAUTH_REDIRECT_BASE_URL=https://myresume-services-04rb.onrender.com
-CORS_ORIGINS=https://www.myresumes.net,https://myresumes.net
+OAUTH_FRONTEND_URL=<FRONTEND_ORIGIN>
+OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>
+CORS_ORIGINS=<FRONTEND_ORIGIN>,<ROOT_ORIGIN>
 OAUTH_COOKIE_SECURE=true
 GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
 ```
 
+Do not use domain-provider **forwarding with masking** for the app domain. Masking can serve a small frame page and load the Render app inside it, which breaks OAuth redirects and hides the real app origin from the browser. Add the root domain and `www` subdomain as custom domains on the Render UI service and point DNS records to Render instead.
+
 These are wrong in production and will cause Google `403` / `redirect_uri_mismatch` errors:
 
 ```bash
-OAUTH_FRONTEND_URL=https://myresume-rrcy.onrender.com:4000
-OAUTH_REDIRECT_BASE_URL=https://myresume-rrcy.onrender.com:3000
+OAUTH_FRONTEND_URL=<FRONTEND_ORIGIN>:4000
+OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>:3000
 ```
 
 Then register this Google Authorized redirect URI:
 
 ```text
-https://myresume-services-04rb.onrender.com/auth/oauth/google/callback
+<API_ORIGIN>/auth/oauth/google/callback
 ```
 
 This is the exact `redirect_uri` currently sent by the app. If Google returns `redirect_uri_mismatch`, add or correct this exact value in the same Google OAuth client ID used by `GOOGLE_OAUTH_CLIENT_ID`.
@@ -79,22 +81,22 @@ Recommended Google OAuth client settings:
 
 ```text
 Authorized JavaScript origins:
-https://www.myresumes.net
-https://myresume-rrcy.onrender.com
+<FRONTEND_ORIGIN>
+<ROOT_ORIGIN>
 
 Authorized redirect URIs:
-https://myresume-services-04rb.onrender.com/auth/oauth/google/callback
+<API_ORIGIN>/auth/oauth/google/callback
 ```
 
 If the API also gets a custom domain, use that API domain consistently instead:
 
 ```bash
-VITE_API_URL=https://api.myresumes.net
-OAUTH_REDIRECT_BASE_URL=https://api.myresumes.net
+VITE_API_URL=<API_ORIGIN>
+OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>
 ```
 
 ```text
-https://api.myresumes.net/auth/oauth/google/callback
+<API_ORIGIN>/auth/oauth/google/callback
 ```
 
 In Google Cloud Console, the value under **Authorized redirect URIs** must match the `redirect_uri` exactly, including scheme, host, path, and absence of a port.
@@ -102,7 +104,7 @@ In Google Cloud Console, the value under **Authorized redirect URIs** must match
 To verify the deployed backend value, open:
 
 ```text
-https://myresume-services-04rb.onrender.com/auth/oauth/google/diagnostics
+<API_ORIGIN>/auth/oauth/google/diagnostics
 ```
 
 The `googleAuthorizedRedirectUri` value in that response is the value that must exist in Google Cloud Console.
@@ -110,7 +112,7 @@ The `googleAuthorizedRedirectUri` value in that response is the value that must 
 If Google has already been configured to redirect to the UI origin, the frontend also supports forwarding this path to the API callback:
 
 ```text
-https://www.myresumes.net/auth/oauth/google/callback
+<FRONTEND_ORIGIN>/auth/oauth/google/callback
 ```
 
 For a Render Static Site, add a rewrite rule for SPA callback paths:

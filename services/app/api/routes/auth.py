@@ -46,8 +46,9 @@ def oauth_start(
     request: Request,
     plan: PlanEnum = Query(default=PlanEnum.free),
     template_id: str | None = Query(default=None, alias="templateId"),
+    return_to: str | None = Query(default=None, alias="returnTo"),
 ) -> RedirectResponse:
-    return create_oauth_start_redirect(request, provider=provider, plan=plan, template_id=template_id)
+    return create_oauth_start_redirect(request, provider=provider, plan=plan, template_id=template_id, frontend_origin=return_to)
 @router.get("/oauth/{provider}/diagnostics")
 def oauth_provider_diagnostics(provider: str, request: Request) -> dict[str, object]:
     return oauth_diagnostics(request, provider)

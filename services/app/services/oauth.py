@@ -107,6 +107,49 @@ def _validate_render_public_url(setting_name: str, value: str) -> None:
         )
 
 
+def _url_origin(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    parsed = urlparse(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return None
+    if parsed.username or parsed.password or parsed.params or parsed.query or parsed.fragment:
+        return None
+    if parsed.path and parsed.path != "/":
+        return None
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+
+    hostname = parsed.hostname.lower()
+    if hostname not in {"localhost", "127.0.0.1"} and parsed.scheme != "https":
+        return None
+
+    is_default_port = (parsed.scheme == "http" and port == 80) or (parsed.scheme == "https" and port == 443)
+    host = hostname if not port or is_default_port else f"{hostname}:{port}"
+    return f"{parsed.scheme}://{host}"
+
+
+def _allowed_frontend_origins() -> set[str]:
+    origins: set[str] = set()
+    for origin in [settings.oauth_frontend_url, *settings.allowed_origins]:
+        normalized = _url_origin(origin)
+        if normalized:
+            origins.add(normalized)
+    return origins
+
+
+def _validated_frontend_origin(value: str | None) -> str | None:
+    origin = _url_origin(value)
+    if not origin:
+        return None
+    if origin not in _allowed_frontend_origins():
+        return None
+    return origin
+
+
 def _callback_url(request: Request, provider: str) -> str:
     if settings.oauth_redirect_base_url.strip():
         _validate_render_public_url("OAUTH_REDIRECT_BASE_URL", settings.oauth_redirect_base_url)
@@ -115,13 +158,19 @@ def _callback_url(request: Request, provider: str) -> str:
     return str(request.url_for("oauth_callback", provider=provider))
 
 
-def _frontend_redirect(params: dict[str, str]) -> str:
-    _validate_render_public_url("OAUTH_FRONTEND_URL", settings.oauth_frontend_url)
-    base_url = settings.oauth_frontend_url.rstrip("/") or "http://localhost:4000"
+def _frontend_redirect(params: dict[str, str], frontend_origin: str | None = None) -> str:
+    base_url = (frontend_origin or settings.oauth_frontend_url).rstrip("/") or "http://localhost:4000"
+    _validate_render_public_url("OAUTH_FRONTEND_URL", base_url)
     return f"{base_url}/?{urlencode(params)}"
 
 
-def _signed_state(provider: str, nonce: str, plan: PlanEnum, template_id: str | None) -> str:
+def _signed_state(
+    provider: str,
+    nonce: str,
+    plan: PlanEnum,
+    template_id: str | None,
+    frontend_origin: str | None,
+) -> str:
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "purpose": OAUTH_STATE_PURPOSE,
@@ -133,6 +182,8 @@ def _signed_state(provider: str, nonce: str, plan: PlanEnum, template_id: str | 
     }
     if template_id:
         payload["templateId"] = template_id
+    if frontend_origin:
+        payload["frontendOrigin"] = frontend_origin
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
@@ -156,12 +207,14 @@ def create_oauth_start_redirect(
     provider: str,
     plan: PlanEnum,
     template_id: str | None,
+    frontend_origin: str | None = None,
 ) -> RedirectResponse:
     config = _provider_or_404(provider)
     _require_configured(config)
 
     nonce = secrets.token_urlsafe(32)
-    state = _signed_state(config.key, nonce, plan, template_id)
+    validated_frontend_origin = _validated_frontend_origin(frontend_origin)
+    state = _signed_state(config.key, nonce, plan, template_id, validated_frontend_origin)
     params = {
         "client_id": config.client_id,
         "redirect_uri": _callback_url(request, config.key),
@@ -198,6 +251,7 @@ def oauth_diagnostics(request: Request, provider: str) -> dict[str, Any]:
         "authorizationUrl": config.authorization_url,
         "redirectUri": redirect_uri,
         "frontendRedirectBaseUrl": frontend_url,
+        "allowedFrontendRedirectOrigins": sorted(_allowed_frontend_origins()),
         "stateCookieName": _state_cookie_name(config.key),
         "stateCookiePath": "/auth/oauth",
         "stateCookieSecure": settings.oauth_cookie_secure,
@@ -359,10 +413,11 @@ async def handle_oauth_callback(
         db.refresh(user)
         app_token = sign_token({"userId": user.id, "email": user.email, "role": user.role, "name": user.name})
         redirect_params = {"token": app_token}
+        frontend_origin = _validated_frontend_origin(str(state_payload.get("frontendOrigin") or ""))
         template_id = str(state_payload.get("templateId") or "").strip()
         if template_id:
             redirect_params["templateId"] = template_id
-        response = RedirectResponse(_frontend_redirect(redirect_params), status_code=status.HTTP_302_FOUND)
+        response = RedirectResponse(_frontend_redirect(redirect_params, frontend_origin), status_code=status.HTTP_302_FOUND)
     except HTTPException as exc:
         db.rollback()
         response = _error_redirect(config.key, str(exc.detail))
