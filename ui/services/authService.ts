@@ -37,6 +37,20 @@ function normalizeUser(raw: any): User {
 
 type Provider = "google" | "linkedin" | "microsoft";
 
+function getOAuthReturnOrigin(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    if (window.top !== window.self && document.referrer) {
+      return new URL(document.referrer).origin;
+    }
+  } catch {
+    // Cross-origin frame access can fail. Fall back to the app frame origin.
+  }
+
+  return window.location.origin;
+}
+
 class AuthService {
   async login(email: string, password: string): Promise<User> {
     const res = await api.post<{ token: string; user: User }>("/auth/login", { email, password });
@@ -52,14 +66,24 @@ class AuthService {
     return user;
   }
 
-  getOAuthStartUrl(provider: Provider, plan?: SubscriptionPlan, templateId?: string): string {
+  getOAuthStartUrl(provider: Provider, plan?: SubscriptionPlan, templateId?: string, returnTo?: string): string {
     const params = new URLSearchParams({ plan: toBackendPlan(plan) });
     if (templateId) params.set("templateId", templateId);
+    if (returnTo) params.set("returnTo", returnTo);
     return `${API_URL}/auth/oauth/${provider}/start?${params.toString()}`;
   }
 
   startOAuthLogin(provider: Provider, plan?: SubscriptionPlan, templateId?: string): void {
-    window.location.assign(this.getOAuthStartUrl(provider, plan, templateId));
+    const url = this.getOAuthStartUrl(provider, plan, templateId, getOAuthReturnOrigin());
+    try {
+      if (window.top && window.top !== window.self) {
+        window.top.location.assign(url);
+        return;
+      }
+    } catch {
+      // Fall back to navigating the current frame.
+    }
+    window.location.assign(url);
   }
 
   async logout(): Promise<void> {

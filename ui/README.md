@@ -2,7 +2,7 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1lgwf3xrHNiKW5x4Q-gwfOeQKRwVJjGVn
+If this project is imported from AI Studio, keep generated preview or drive URLs private unless they are intentionally shared.
 
 ## Run Locally
 
@@ -31,4 +31,3 @@ This project now calls Gemini from the backend (`site_backend`) so your API key 
 - Frontend: `npm i && npm run dev`
 
 Also: never commit `.env` files containing secrets.
-
