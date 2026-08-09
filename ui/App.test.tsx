@@ -314,6 +314,60 @@ describe('App import flow', () => {
     }));
   });
 
+  it('folds undated imported job fragments into the previous dated job description', async () => {
+    const user = userEvent.setup();
+    vi.mocked(generateResumeContent).mockResolvedValueOnce({
+      json: {
+        RESUME_JSON: {
+          header: {
+            name: 'Riley Defender',
+            title: 'Security Analyst',
+            email: 'riley@example.com',
+          },
+          experience: [
+            {
+              role: 'Security Analyst',
+              company: 'Acme Security',
+              start: '2021',
+              end: 'Present',
+              highlights: [{ bullet: 'Improved alert triage coverage.' }],
+            },
+            {
+              title: 'blue-team',
+              date: '',
+            },
+          ],
+          education: [],
+          skills: [],
+        },
+      },
+    });
+
+    const { container } = render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await user.upload(fileInput, new File(['resume'], 'riley-resume.pdf', { type: 'application/pdf' }));
+    await screen.findByText('riley-resume.pdf');
+
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
+
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = vi.mocked(saveResume).mock.calls[0][0];
+    expect(payload.content.experienceItems).toHaveLength(1);
+    expect(payload.content.experienceItems[0]).toEqual(expect.objectContaining({
+      role: 'Security Analyst',
+      company: 'Acme Security',
+      dates: '2021 - Present',
+      description: '- Improved alert triage coverage.\n- blue-team',
+    }));
+    expect(payload.content.experienceItems.some((exp: any) => exp.role === 'blue-team')).toBe(false);
+  });
+
   it('keeps full street addresses and nested contact details in the right imported fields', async () => {
     const user = userEvent.setup();
     vi.mocked(generateResumeContent).mockResolvedValueOnce({

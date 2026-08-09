@@ -631,7 +631,21 @@ const App: React.FC = () => {
               importedField(exp, ['description', 'details', 'summary']),
             ),
         }))
-        .filter((exp) => exp.role || exp.company || exp.dates || exp.description);
+        .reduce<ExperienceItem[]>((items, exp) => {
+          if (!exp.role && !exp.company && !exp.dates && !exp.description) return items;
+
+          if (!exp.dates) {
+            const detail = importedBulletLines(exp.role, exp.company, exp.description);
+            const previous = items[items.length - 1];
+            if (detail && previous) {
+              previous.description = [previous.description, detail].filter(Boolean).join('\n');
+            }
+            return items;
+          }
+
+          items.push(exp);
+          return items;
+        }, []);
 
       const educations: EducationItem[] = educationSource
         .map((edu: any) => ({

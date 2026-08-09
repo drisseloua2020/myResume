@@ -283,6 +283,27 @@ ROLE_KEYWORDS = {
     "therapist",
 }
 
+ROLE_DESCRIPTOR_KEYWORDS = {
+    "agile",
+    "devops",
+    "product",
+    "program",
+    "project",
+    "qa",
+    "scrum",
+    "security",
+    "software",
+    "sre",
+}
+
+CORE_ROLE_KEYWORDS = ROLE_KEYWORDS - ROLE_DESCRIPTOR_KEYWORDS
+
+COMPANY_KEYWORD_RE = re.compile(
+    r"\b(inc|llc|ltd|corp|corporation|company|group|solutions|systems|technologies|"
+    r"technology|consulting|partners|university|bank|health|labs|security)\b",
+    flags=re.I,
+)
+
 DEGREE_KEYWORDS = {
     "bachelor",
     "master",
@@ -499,7 +520,7 @@ def _skill_values(lines: list[str]) -> list[str]:
 def _highlight_items(lines: list[str]) -> list[dict[str, object]]:
     highlights: list[dict[str, object]] = []
     for line in lines:
-        if not _is_experience_highlight_line(line):
+        if not (_is_experience_highlight_line(line) or _is_experience_detail_line(line)):
             continue
         metrics = re.findall(r"\b\d+(?:[.,]\d+)?%?\b", line)[:4]
         highlights.append({"bullet": line, "tags": [], "metrics": metrics})
@@ -552,6 +573,16 @@ def _starts_with_action_verb(line: str) -> bool:
     return bool(ACTION_VERB_RE.match(line.strip()))
 
 
+def _looks_like_detail_fragment(line: str) -> bool:
+    clean = line.strip(" -|,;")
+    if not clean or _is_contact_line(clean) or _section_for_heading(clean) or _looks_like_date_range(clean):
+        return False
+    words = re.findall(r"[A-Za-z0-9+#.-]+", clean)
+    if len(words) > 4:
+        return False
+    return bool(re.fullmatch(r"[A-Za-z0-9+#.]+(?:[-/][A-Za-z0-9+#.]+)+", clean))
+
+
 def _looks_like_title_case_phrase(line: str) -> bool:
     words = re.findall(r"[A-Za-z]+", line.strip())
     if not words:
@@ -602,22 +633,27 @@ def _looks_like_location_line(line: str) -> bool:
 
 def _looks_like_company_line(line: str) -> bool:
     clean = line.strip(" ,;")
+    words = re.findall(r"[A-Za-z0-9&]+", clean)
+    word_set = {word.lower() for word in words}
+    has_company_keyword = bool(COMPANY_KEYWORD_RE.search(clean))
+
     if (
         not clean
         or len(clean) > 100
         or _is_contact_line(clean)
         or _section_for_heading(clean)
         or _looks_like_date_range(clean)
-        or _looks_like_role_title(clean)
         or _looks_like_location_line(clean)
         or _looks_like_skill_list_line(clean)
     ):
         return False
 
-    if re.search(r"\b(inc|llc|ltd|corp|corporation|company|group|solutions|systems|technologies|technology|consulting|partners|university|bank|health|labs)\b", clean, flags=re.I):
+    if has_company_keyword and not (word_set & CORE_ROLE_KEYWORDS):
         return True
 
-    words = re.findall(r"[A-Za-z0-9&]+", clean)
+    if _looks_like_role_title(clean):
+        return False
+
     if not words or len(words) > 5 or clean.endswith("."):
         return False
 
@@ -689,6 +725,8 @@ def _is_summary_line(line: str, header_values: set[str]) -> bool:
 
 def _is_experience_highlight_line(line: str) -> bool:
     clean = line.strip()
+    if _looks_like_detail_fragment(clean):
+        return True
     if _starts_with_action_verb(clean):
         if (
             _looks_like_pdf_artifact(clean)
@@ -707,6 +745,34 @@ def _is_experience_highlight_line(line: str) -> bool:
         return False
     words = re.findall(r"[A-Za-z0-9+#.-]+", clean)
     if len(words) < 3 or len(clean) < 12:
+        return False
+    if len(words) <= 4 and not ACTION_VERB_RE.search(clean) and not re.search(r"\d|%", clean):
+        return False
+    return True
+
+
+def _is_experience_detail_line(line: str) -> bool:
+    clean = line.strip()
+    if (
+        not clean
+        or _looks_like_pdf_artifact(clean)
+        or _section_for_heading(clean)
+        or _is_contact_line(clean)
+        or _is_date_only_line(clean)
+        or _looks_like_date_range(clean)
+        or _looks_like_location_line(clean)
+        or _looks_like_degree_or_school(clean)
+        or _looks_like_skill_list_line(clean)
+    ):
+        return False
+
+    if _looks_like_detail_fragment(clean) or _starts_with_action_verb(clean):
+        return True
+    if _looks_like_role_title(clean) or _looks_like_company_line(clean):
+        return True
+
+    words = re.findall(r"[A-Za-z0-9+#.-]+", clean)
+    if len(words) < 3 or len(clean) < 10:
         return False
     if len(words) <= 4 and not ACTION_VERB_RE.search(clean) and not re.search(r"\d|%", clean):
         return False
@@ -989,6 +1055,13 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
         current = None
         current_highlights = []
 
+    def append_current_details(detail_lines: list[str]) -> None:
+        if current is None:
+            return
+        for detail_line in detail_lines:
+            if _is_experience_detail_line(detail_line) and detail_line not in current_highlights:
+                current_highlights.append(detail_line)
+
     while index < len(lines):
         line = lines[index]
         if _is_date_only_line(line):
@@ -1004,8 +1077,14 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
 
         start = _experience_start_at(lines, index)
         if start:
-            flush_current()
             parsed, consumed = start
+            has_associated_date = bool(parsed.get("start") or parsed.get("end") or pending_start or pending_end)
+            if not has_associated_date:
+                append_current_details(lines[index:index + consumed])
+                index += consumed
+                continue
+
+            flush_current()
             current = {
                 "company": parsed.get("company", ""),
                 "role": parsed.get("role", ""),
@@ -1024,6 +1103,8 @@ def _parse_experience_entries(lines: list[str]) -> list[dict[str, object]]:
         elif _looks_like_location_line(line) and current and not current.get("location"):
             current["location"] = line
         elif current is not None and _is_experience_highlight_line(line):
+            current_highlights.append(line)
+        elif current is not None and _is_experience_detail_line(line):
             current_highlights.append(line)
         index += 1
 
@@ -1179,7 +1260,11 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
     summary_lines = [line for line in sections.get("summary", []) if _is_summary_line(line, header_values)]
     summary = " ".join(summary_lines[:3]).strip()
 
-    experience = _parse_experience_entries([line for line in sections.get("experience", []) if not _is_contact_line(line)])
+    header_name = str(header.get("name") or "")
+    experience = _parse_experience_entries([
+        line for line in sections.get("experience", [])
+        if not _is_contact_line(line) and line != header_name
+    ])
     education = _parse_education_entries([line for line in sections.get("education", []) if not _is_contact_line(line)])
     projects = _parse_project_entries([line for line in sections.get("projects", []) if not _is_contact_line(line)])
 
