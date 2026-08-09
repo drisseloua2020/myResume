@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResumeLibraryPage from './ResumeLibraryPage';
-import { getResume, listResumes } from '../services/resumeService';
+import { deleteResume, getResume, listResumes } from '../services/resumeService';
 
 vi.mock('../services/resumeService', () => ({
   deleteResume: vi.fn(),
@@ -12,6 +12,7 @@ vi.mock('../services/resumeService', () => ({
 
 describe('ResumeLibraryPage', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(listResumes).mockResolvedValue([
       {
         id: 'res_123',
@@ -29,6 +30,7 @@ describe('ResumeLibraryPage', () => {
       updatedAt: '2026-05-20T12:00:00Z',
       content: { targetRole: 'Senior Developer' },
     });
+    vi.mocked(deleteResume).mockResolvedValue(undefined);
   });
 
   it('loads a selected saved resume into the editor', async () => {
@@ -46,6 +48,23 @@ describe('ResumeLibraryPage', () => {
         id: 'res_123',
         content: { targetRole: 'Senior Developer' },
       }));
+    });
+  });
+
+  it('notifies the editor when a saved resume is deleted', async () => {
+    const user = userEvent.setup();
+    const onResumeDeleted = vi.fn();
+
+    render(<ResumeLibraryPage onResumeDeleted={onResumeDeleted} />);
+
+    expect(await screen.findByText('Senior Developer Resume')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /delete/i }));
+    await user.click(screen.getByRole('button', { name: /yes/i }));
+
+    await waitFor(() => {
+      expect(deleteResume).toHaveBeenCalledWith('res_123');
+      expect(onResumeDeleted).toHaveBeenCalledWith('res_123');
     });
   });
 });

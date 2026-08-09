@@ -716,3 +716,53 @@ def test_generate_resume_recognizes_title_first_header_and_non_tech_roles(client
     assert resume_json["education"][0]["degree"] == "BS Nursing"
     assert resume_json["education"][0]["start"] == "2015"
     assert resume_json["education"][0]["end"] == "2019"
+
+
+def test_generate_resume_keeps_short_action_lines_as_job_description(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Jordan Product",
+            "Product Manager",
+            "jordan@example.com",
+            "EXPERIENCE",
+            "Product Manager",
+            "Acme Products",
+            "Jan 2021 - Present",
+            "Led product launches",
+            "Managed software backlog",
+            "Improved customer adoption by 18%",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "jordan-product.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert len(resume_json["experience"]) == 1
+    assert resume_json["experience"][0]["role"] == "Product Manager"
+    assert resume_json["experience"][0]["company"] == "Acme Products"
+    assert [item["bullet"] for item in resume_json["experience"][0]["highlights"]] == [
+        "Led product launches",
+        "Managed software backlog",
+        "Improved customer adoption by 18%",
+    ]

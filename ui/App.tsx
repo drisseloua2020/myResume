@@ -367,6 +367,20 @@ const App: React.FC = () => {
     setWorkspaceResetKey((k) => k + 1);
   };
 
+  const resetEditorForDeletedResume = (deletedResumeId: string) => {
+    if (loadedResumeId !== deletedResumeId) return;
+
+    setResults(null);
+    setError(null);
+    setEditorData(null);
+    setLoadedResumeId(null);
+    setLoadedResumeTitle(null);
+    setSelectedTemplateId(undefined);
+    setGeneratorTab('create');
+    initialResumeLoadUserRef.current = currentUser?.id ?? null;
+    setWorkspaceResetKey((k) => k + 1);
+  };
+
   // Load the newest saved resume when a user lands in the editor.
   // If the user has no saved resume yet, fall back to the last autosaved draft.
   useEffect(() => {
@@ -887,7 +901,11 @@ const App: React.FC = () => {
     if (activeTab === 'resumes') {
       return (
         <div className="max-w-6xl mx-auto py-8 px-6">
-          <ResumeLibraryPage onLoadResume={openResumeInWorkspace} user={currentUser} />
+          <ResumeLibraryPage
+            onLoadResume={openResumeInWorkspace}
+            onResumeDeleted={resetEditorForDeletedResume}
+            user={currentUser}
+          />
         </div>
       );
     }

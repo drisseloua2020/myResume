@@ -20,6 +20,7 @@ function safeFilename(value: string): string {
 
 type ResumeLibraryPageProps = {
   onLoadResume?: (resume: ResumeRecord) => void | Promise<void>;
+  onResumeDeleted?: (resumeId: string) => void | Promise<void>;
   user?: User;
 };
 
@@ -35,7 +36,7 @@ const fallbackUser: User = {
   authProvider: 'email',
 };
 
-export default function ResumeLibraryPage({ onLoadResume, user = fallbackUser }: ResumeLibraryPageProps) {
+export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user = fallbackUser }: ResumeLibraryPageProps) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ResumeListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -145,10 +146,12 @@ export default function ResumeLibraryPage({ onLoadResume, user = fallbackUser }:
 
   async function confirmDelete() {
     if (!deleteConfirmId) return;
+    const deletedResumeId = deleteConfirmId;
     setIsDeleting(true);
     try {
-      await deleteResume(deleteConfirmId);
-      if (selectedResume?.id === deleteConfirmId) setSelectedResume(null);
+      await deleteResume(deletedResumeId);
+      if (selectedResume?.id === deletedResumeId) setSelectedResume(null);
+      await onResumeDeleted?.(deletedResumeId);
       await refresh();
     } catch (e: any) {
       alert(e?.message || 'Delete failed');
