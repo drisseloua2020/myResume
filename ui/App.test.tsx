@@ -3,7 +3,16 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { generateResumeContent } from './services/geminiService';
-import { saveResume, updateResume, saveDraft, getLatestDraft, getLatestResume } from './services/resumeService';
+import {
+  deleteResume,
+  getLatestDraft,
+  getLatestResume,
+  getResume,
+  listResumes,
+  saveDraft,
+  saveResume,
+  updateResume,
+} from './services/resumeService';
 import { SubscriptionPlan, UserRole } from './types';
 
 const testUser = {
@@ -37,6 +46,9 @@ vi.mock('./services/geminiService', () => ({
 }));
 
 vi.mock('./services/resumeService', () => ({
+  deleteResume: vi.fn(),
+  getResume: vi.fn(),
+  listResumes: vi.fn(),
   getLatestResume: vi.fn(),
   getLatestDraft: vi.fn(),
   saveDraft: vi.fn(),
@@ -65,6 +77,9 @@ describe('App import flow', () => {
     vi.clearAllMocks();
     vi.mocked(getLatestResume).mockResolvedValue(null);
     vi.mocked(getLatestDraft).mockResolvedValue(null);
+    vi.mocked(listResumes).mockResolvedValue([]);
+    vi.mocked(getResume).mockRejectedValue(new Error('Unexpected resume lookup'));
+    vi.mocked(deleteResume).mockResolvedValue(undefined);
     vi.mocked(saveDraft).mockResolvedValue(undefined);
     vi.mocked(saveResume).mockResolvedValue({ id: 'res_imported' });
     vi.mocked(generateResumeContent).mockResolvedValue({
@@ -435,5 +450,95 @@ describe('App import flow', () => {
     expect(await screen.findByRole('heading', { name: /choose a template/i })).toBeInTheDocument();
     expect(saveResume).not.toHaveBeenCalled();
     expect(updateResume).not.toHaveBeenCalled();
+  });
+
+  it('resets the editor when the currently loaded resume is deleted from the library', async () => {
+    const user = userEvent.setup();
+    const loadedResume = {
+      id: 'res_existing',
+      templateId: 'modern_tech',
+      title: 'Existing Resume',
+      content: {
+        role: UserRole.USER,
+        plan: SubscriptionPlan.FREE,
+        templateId: 'modern_tech',
+        targetRole: 'Software Architect',
+        preferences: {
+          pages: '1-page',
+          tone: 'modern',
+          region: 'US',
+          photo: false,
+        },
+        personalDetails: {
+          firstName: 'Alex',
+          lastName: 'Resume',
+          email: 'alex@example.com',
+          phone: '555-0100',
+          address: '1 Main St',
+          city: 'Austin',
+          state: 'TX',
+          country: 'United States',
+          postalCode: '78701',
+          summary: 'Software architect.',
+        },
+        experienceItems: [
+          {
+            id: 'exp_1',
+            role: 'Software Architect',
+            company: 'Tech Co',
+            dates: '2021 - Present',
+            description: 'Led platform architecture.',
+          },
+        ],
+        educationItems: [
+          {
+            id: 'edu_1',
+            school: 'State University',
+            degree: 'BS Computer Science',
+            dates: '2012 - 2016',
+          },
+        ],
+        skillItems: [
+          {
+            id: 'skill_1',
+            category: 'Core',
+            items: 'Architecture, AI',
+          },
+        ],
+      },
+      createdAt: '2026-05-01T00:00:00Z',
+      updatedAt: '2026-05-02T00:00:00Z',
+    };
+
+    vi.mocked(getLatestResume).mockResolvedValue(loadedResume);
+    vi.mocked(listResumes).mockResolvedValue([{
+      id: loadedResume.id,
+      templateId: loadedResume.templateId,
+      title: loadedResume.title,
+      createdAt: loadedResume.createdAt,
+      updatedAt: loadedResume.updatedAt,
+    }]);
+
+    render(<App />);
+
+    await screen.findByDisplayValue('Tech Co');
+
+    await user.click(screen.getByRole('button', { name: /view resume/i }));
+    expect(await screen.findByText('Existing Resume')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /delete/i }));
+    await user.click(screen.getByRole('button', { name: /yes/i }));
+
+    await waitFor(() => {
+      expect(deleteResume).toHaveBeenCalledWith('res_existing');
+    });
+
+    await user.click(screen.getByRole('button', { name: /^editor$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByDisplayValue('Tech Co')).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Software Architect')).not.toBeInTheDocument();
+    });
+    expect(screen.getByDisplayValue('resume@example.com')).toBeInTheDocument();
   });
 });

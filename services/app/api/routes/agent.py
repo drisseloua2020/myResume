@@ -548,6 +548,20 @@ def _is_date_only_line(line: str) -> bool:
     return not DATE_VALUE_RE.sub("", clean).strip(" -|,;()")
 
 
+def _starts_with_action_verb(line: str) -> bool:
+    return bool(ACTION_VERB_RE.match(line.strip()))
+
+
+def _looks_like_title_case_phrase(line: str) -> bool:
+    words = re.findall(r"[A-Za-z]+", line.strip())
+    if not words:
+        return False
+    significant = [word for word in words if len(word) > 2][:4]
+    if not significant:
+        return False
+    return all(word.isupper() or word[:1].isupper() for word in significant)
+
+
 def _looks_like_role_title(line: str) -> bool:
     if len(line) > 110 or _is_contact_line(line) or _section_for_heading(line) or _looks_like_date_range(line):
         return False
@@ -556,6 +570,8 @@ def _looks_like_role_title(line: str) -> bool:
     if len(words) > 9:
         return False
     if clean.endswith(".") or (ACTION_VERB_RE.search(clean) and len(words) > 4):
+        return False
+    if _starts_with_action_verb(clean) and not _looks_like_title_case_phrase(clean):
         return False
     return bool(set(words) & ROLE_KEYWORDS)
 
@@ -673,6 +689,18 @@ def _is_summary_line(line: str, header_values: set[str]) -> bool:
 
 def _is_experience_highlight_line(line: str) -> bool:
     clean = line.strip()
+    if _starts_with_action_verb(clean):
+        if (
+            _looks_like_pdf_artifact(clean)
+            or _section_for_heading(clean)
+            or _is_contact_line(clean)
+            or _is_date_only_line(clean)
+            or _looks_like_degree_or_school(clean)
+            or _looks_like_skill_list_line(clean)
+        ):
+            return False
+        words = re.findall(r"[A-Za-z0-9+#.-]+", clean)
+        return len(words) >= 3 and len(clean) >= 10
     if _is_template_noise_line(clean):
         return False
     if _looks_like_degree_or_school(clean) or _looks_like_skill_list_line(clean):

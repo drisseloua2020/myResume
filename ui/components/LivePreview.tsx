@@ -8,6 +8,162 @@ interface LivePreviewProps {
   templateId?: string;
 }
 
+type CategoryResumeLayout = 'single' | 'sidebar' | 'split' | 'timeline';
+
+type CategoryResumeTemplate = {
+  label: string;
+  accent: string;
+  soft: string;
+  layout: CategoryResumeLayout;
+  summaryLabel: string;
+  experienceLabel: string;
+  skillsLabel: string;
+  educationLabel: string;
+};
+
+const CATEGORY_RESUME_TEMPLATES: Record<string, CategoryResumeTemplate> = {
+  ats_single_column: {
+    label: 'ATS',
+    accent: '#3f3f46',
+    soft: '#f4f4f5',
+    layout: 'single',
+    summaryLabel: 'Professional Summary',
+    experienceLabel: 'Professional Experience',
+    skillsLabel: 'Skills',
+    educationLabel: 'Education',
+  },
+  consulting_case: {
+    label: 'Consulting',
+    accent: '#0e7490',
+    soft: '#ecfeff',
+    layout: 'split',
+    summaryLabel: 'Consultant Profile',
+    experienceLabel: 'Selected Impact',
+    skillsLabel: 'Capabilities',
+    educationLabel: 'Education',
+  },
+  finance_ledger: {
+    label: 'Finance',
+    accent: '#15803d',
+    soft: '#f0fdf4',
+    layout: 'timeline',
+    summaryLabel: 'Finance Profile',
+    experienceLabel: 'Experience & Results',
+    skillsLabel: 'Technical Strengths',
+    educationLabel: 'Credentials',
+  },
+  healthcare_clinical: {
+    label: 'Healthcare',
+    accent: '#0d9488',
+    soft: '#f0fdfa',
+    layout: 'sidebar',
+    summaryLabel: 'Clinical Profile',
+    experienceLabel: 'Clinical Experience',
+    skillsLabel: 'Clinical Skills',
+    educationLabel: 'Credentials',
+  },
+  product_manager: {
+    label: 'Product',
+    accent: '#4f46e5',
+    soft: '#eef2ff',
+    layout: 'split',
+    summaryLabel: 'Product Profile',
+    experienceLabel: 'Product Impact',
+    skillsLabel: 'Product Toolkit',
+    educationLabel: 'Education',
+  },
+  data_science: {
+    label: 'Data',
+    accent: '#0369a1',
+    soft: '#f0f9ff',
+    layout: 'sidebar',
+    summaryLabel: 'Data Profile',
+    experienceLabel: 'Analytics Experience',
+    skillsLabel: 'Models, Tools & Data',
+    educationLabel: 'Education',
+  },
+  sales_growth: {
+    label: 'Sales',
+    accent: '#e11d48',
+    soft: '#fff1f2',
+    layout: 'timeline',
+    summaryLabel: 'Revenue Profile',
+    experienceLabel: 'Sales Performance',
+    skillsLabel: 'Growth Skills',
+    educationLabel: 'Education',
+  },
+  operations_lean: {
+    label: 'Operations',
+    accent: '#4d7c0f',
+    soft: '#f7fee7',
+    layout: 'split',
+    summaryLabel: 'Operations Profile',
+    experienceLabel: 'Operational Improvements',
+    skillsLabel: 'Process Strengths',
+    educationLabel: 'Education',
+  },
+  teacher_education: {
+    label: 'Education',
+    accent: '#d97706',
+    soft: '#fffbeb',
+    layout: 'sidebar',
+    summaryLabel: 'Teaching Profile',
+    experienceLabel: 'Teaching Experience',
+    skillsLabel: 'Instructional Skills',
+    educationLabel: 'Education & Licensure',
+  },
+  legal_associate: {
+    label: 'Legal',
+    accent: '#44403c',
+    soft: '#fafaf9',
+    layout: 'single',
+    summaryLabel: 'Legal Profile',
+    experienceLabel: 'Legal Experience',
+    skillsLabel: 'Practice Strengths',
+    educationLabel: 'Education',
+  },
+  engineering_systems: {
+    label: 'Engineering',
+    accent: '#a21caf',
+    soft: '#fdf4ff',
+    layout: 'sidebar',
+    summaryLabel: 'Engineering Profile',
+    experienceLabel: 'Systems Experience',
+    skillsLabel: 'Technical Stack',
+    educationLabel: 'Education',
+  },
+  marketing_brand: {
+    label: 'Marketing',
+    accent: '#db2777',
+    soft: '#fdf2f8',
+    layout: 'split',
+    summaryLabel: 'Brand Profile',
+    experienceLabel: 'Campaign Impact',
+    skillsLabel: 'Marketing Skills',
+    educationLabel: 'Education',
+  },
+  early_career: {
+    label: 'Early Career',
+    accent: '#ca8a04',
+    soft: '#fefce8',
+    layout: 'timeline',
+    summaryLabel: 'Career Objective',
+    experienceLabel: 'Experience & Projects',
+    skillsLabel: 'Skills',
+    educationLabel: 'Education',
+  },
+  academic_cv: {
+    label: 'Academic',
+    accent: '#6d28d9',
+    soft: '#f5f3ff',
+    layout: 'single',
+    summaryLabel: 'Academic Profile',
+    experienceLabel: 'Research & Teaching',
+    skillsLabel: 'Areas of Expertise',
+    educationLabel: 'Education',
+  },
+};
+
 const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'classic_pro' }) => {
   const { experienceItems, educationItems, skillItems, targetRole, preferences, personalDetails } = data;
 
@@ -32,6 +188,257 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
   const profileImageSrc = data.profileImageData
     ? `data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`
     : apiAssetUrl(data.profileImageUrl);
+
+  const categoryTemplate = CATEGORY_RESUME_TEMPLATES[templateId];
+  const contactItems = [displayEmail, phoneNumber, fullAddress || preferences?.region].filter(Boolean);
+  const skillTokens = (skillItems || [])
+    .flatMap((skill) => skill.items.split(',').map((item) => item.trim()).filter(Boolean));
+
+  const SectionTitle: React.FC<{ children: React.ReactNode; subtle?: boolean }> = ({ children, subtle }) => (
+    <h3
+      className={`text-xs font-black uppercase tracking-[0.18em] mb-3 ${subtle ? 'text-white/80' : ''}`}
+      style={subtle ? undefined : { color: categoryTemplate?.accent }}
+    >
+      {children}
+    </h3>
+  );
+
+  const ExperienceList: React.FC<{ compact?: boolean; timeline?: boolean }> = ({ compact = false, timeline = false }) => (
+    <div className={compact ? 'space-y-4' : 'space-y-5'}>
+      {experienceItems && experienceItems.length > 0 ? experienceItems.map((exp, i) => (
+        <div key={i} data-pdf-block className={timeline ? 'relative pl-6' : ''}>
+          {timeline && (
+            <>
+              <span className="absolute left-0 top-1.5 h-full w-px" style={{ backgroundColor: categoryTemplate?.soft }}></span>
+              <span className="absolute left-[-5px] top-1.5 h-3 w-3 rounded-full border-2 bg-white" style={{ borderColor: categoryTemplate?.accent }}></span>
+            </>
+          )}
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <div className={compact ? 'text-sm font-bold text-slate-900' : 'text-base font-bold text-slate-900'}>
+              {exp.role || 'Job Title'}
+            </div>
+            <div className="text-xs font-semibold text-slate-500">{exp.dates}</div>
+          </div>
+          <div className="text-sm font-semibold mb-2" style={{ color: categoryTemplate?.accent }}>
+            {exp.company || 'Company'}
+          </div>
+          <p className={`${compact ? 'text-xs' : 'text-sm'} leading-relaxed text-slate-700 whitespace-pre-wrap`}>
+            {exp.description}
+          </p>
+        </div>
+      )) : (
+        <div className="text-sm text-slate-400 italic">No experience added yet.</div>
+      )}
+    </div>
+  );
+
+  const EducationList: React.FC<{ subtle?: boolean }> = ({ subtle = false }) => (
+    <div className="space-y-3">
+      {educationItems && educationItems.map((edu, i) => (
+        <div key={i} data-pdf-block>
+          <div className={`text-sm font-bold ${subtle ? 'text-white' : 'text-slate-900'}`}>{edu.degree}</div>
+          <div className={`text-xs ${subtle ? 'text-white/75' : 'text-slate-600'}`}>{edu.school}</div>
+          <div className={`text-xs ${subtle ? 'text-white/55' : 'text-slate-400'}`}>{edu.dates}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const SkillList: React.FC<{ pills?: boolean; subtle?: boolean }> = ({ pills = false, subtle = false }) => {
+    if (pills) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          {skillTokens.map((skill, i) => (
+            <span key={i} className="rounded-full px-2 py-1 text-xs font-semibold" style={{ backgroundColor: categoryTemplate?.soft, color: categoryTemplate?.accent }}>
+              {skill}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {skillItems && skillItems.map((skill, i) => (
+          <div key={i}>
+            <div className={`text-xs font-bold uppercase tracking-wide ${subtle ? 'text-white/80' : 'text-slate-500'}`}>{skill.category}</div>
+            <div className={`text-xs leading-relaxed ${subtle ? 'text-white/70' : 'text-slate-700'}`}>{skill.items}</div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderCategoryResumeTemplate = (config: CategoryResumeTemplate) => {
+    if (config.layout === 'sidebar') {
+      return (
+        <div
+          data-testid={`live-preview-${templateId}`}
+          className="resume-page bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto shadow-2xl flex text-slate-900 font-sans print:shadow-none"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          <aside className="w-[32%] p-7 text-white flex flex-col gap-6" style={{ backgroundColor: config.accent }}>
+            {preferences?.photo && profileImageSrc && (
+              <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-white/30 bg-white/20">
+                <img src={profileImageSrc} className="h-full w-full object-cover" />
+              </div>
+            )}
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-3">{config.label}</div>
+              <h1 className="text-3xl font-black uppercase leading-tight">{displayName}</h1>
+              <div className="mt-2 text-sm font-semibold text-white/75">{targetRole || 'Target Role'}</div>
+            </div>
+            <div className="space-y-1.5 text-xs text-white/75">
+              {contactItems.map((item, i) => <div key={i} className="break-words">{item}</div>)}
+            </div>
+            <section>
+              <SectionTitle subtle>{config.skillsLabel}</SectionTitle>
+              <SkillList subtle />
+            </section>
+            <section>
+              <SectionTitle subtle>{config.educationLabel}</SectionTitle>
+              <EducationList subtle />
+            </section>
+          </aside>
+          <main className="flex-1 p-9 space-y-8">
+            <section>
+              <SectionTitle>{config.summaryLabel}</SectionTitle>
+              <p className="text-sm leading-7 text-slate-700">{summaryText}</p>
+            </section>
+            <section>
+              <SectionTitle>{config.experienceLabel}</SectionTitle>
+              <ExperienceList />
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    if (config.layout === 'split') {
+      return (
+        <div
+          data-testid={`live-preview-${templateId}`}
+          className="resume-page bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto shadow-2xl p-[20mm] text-slate-900 font-sans print:shadow-none"
+          style={{ fontFamily: "'Inter', sans-serif", borderTop: `8px solid ${config.accent}` }}
+        >
+          <header className="mb-8 grid grid-cols-[1.4fr_1fr] gap-8 items-end">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] mb-3" style={{ color: config.accent }}>{config.label}</div>
+              <h1 className="text-4xl font-black text-slate-950 uppercase leading-tight">{displayName}</h1>
+              <div className="mt-2 text-lg font-semibold text-slate-600">{targetRole || 'Target Role'}</div>
+            </div>
+            <div className="rounded-sm p-4 text-xs leading-relaxed" style={{ backgroundColor: config.soft }}>
+              {contactItems.map((item, i) => <div key={i}>{item}</div>)}
+            </div>
+          </header>
+
+          <div className="grid grid-cols-[1.55fr_0.9fr] gap-8">
+            <main className="space-y-7">
+              <section>
+                <SectionTitle>{config.summaryLabel}</SectionTitle>
+                <p className="text-sm leading-7 text-slate-700">{summaryText}</p>
+              </section>
+              <section>
+                <SectionTitle>{config.experienceLabel}</SectionTitle>
+                <ExperienceList />
+              </section>
+            </main>
+            <aside className="space-y-7 border-l border-slate-100 pl-6">
+              <section>
+                <SectionTitle>{config.skillsLabel}</SectionTitle>
+                <SkillList pills />
+              </section>
+              <section>
+                <SectionTitle>{config.educationLabel}</SectionTitle>
+                <EducationList />
+              </section>
+            </aside>
+          </div>
+        </div>
+      );
+    }
+
+    if (config.layout === 'timeline') {
+      return (
+        <div
+          data-testid={`live-preview-${templateId}`}
+          className="resume-page bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto shadow-2xl p-[21mm] text-slate-900 font-sans print:shadow-none"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          <header className="mb-8 pb-6 border-b" style={{ borderColor: config.soft }}>
+            <div className="flex justify-between gap-8">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] mb-3" style={{ color: config.accent }}>{config.label}</div>
+                <h1 className="text-4xl font-black uppercase leading-tight">{displayName}</h1>
+                <div className="mt-2 text-base font-semibold text-slate-600">{targetRole || 'Target Role'}</div>
+              </div>
+              <div className="text-right text-xs leading-relaxed text-slate-500">
+                {contactItems.map((item, i) => <div key={i}>{item}</div>)}
+              </div>
+            </div>
+          </header>
+
+          <section className="mb-7">
+            <SectionTitle>{config.summaryLabel}</SectionTitle>
+            <p className="text-sm leading-7 text-slate-700">{summaryText}</p>
+          </section>
+          <section className="mb-7">
+            <SectionTitle>{config.experienceLabel}</SectionTitle>
+            <ExperienceList timeline />
+          </section>
+          <div className="grid grid-cols-2 gap-8">
+            <section>
+              <SectionTitle>{config.skillsLabel}</SectionTitle>
+              <SkillList pills />
+            </section>
+            <section>
+              <SectionTitle>{config.educationLabel}</SectionTitle>
+              <EducationList />
+            </section>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        data-testid={`live-preview-${templateId}`}
+        className="resume-page bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto shadow-2xl p-[24mm] text-slate-900 font-serif print:shadow-none"
+        style={{ fontFamily: "'Merriweather', serif", borderTop: `6px solid ${config.accent}` }}
+      >
+        <header className="text-center pb-6 mb-7 border-b border-slate-200">
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] mb-3" style={{ color: config.accent }}>{config.label}</div>
+          <h1 className="text-3xl font-bold uppercase tracking-wide mb-2">{displayName}</h1>
+          <div className="text-sm font-semibold text-slate-700">{targetRole || 'Target Role'}</div>
+          <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-500">
+            {contactItems.map((item, i) => <span key={i}>{item}</span>)}
+          </div>
+        </header>
+        <section className="mb-6">
+          <SectionTitle>{config.summaryLabel}</SectionTitle>
+          <p className="text-sm leading-7 text-slate-700">{summaryText}</p>
+        </section>
+        <section className="mb-6">
+          <SectionTitle>{config.experienceLabel}</SectionTitle>
+          <ExperienceList />
+        </section>
+        <div className="grid grid-cols-2 gap-8">
+          <section>
+            <SectionTitle>{config.educationLabel}</SectionTitle>
+            <EducationList />
+          </section>
+          <section>
+            <SectionTitle>{config.skillsLabel}</SectionTitle>
+            <SkillList />
+          </section>
+        </div>
+      </div>
+    );
+  };
+
+  if (categoryTemplate) {
+    return renderCategoryResumeTemplate(categoryTemplate);
+  }
 
   // --- TEMPLATE: CREATIVE BOLD ---
   if (templateId === 'creative_bold') {
