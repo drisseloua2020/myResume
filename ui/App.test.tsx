@@ -217,6 +217,88 @@ describe('App import flow', () => {
     }));
   });
 
+  it('maps intelligent scan labels into the correct editor fields', async () => {
+    const user = userEvent.setup();
+    vi.mocked(generateResumeContent).mockResolvedValueOnce({
+      json: {
+        'Resume JSON': {
+          'Candidate Info': {
+            'Full Name': 'Avery Stone',
+            'Professional Title': 'Registered Nurse',
+            'Contact Details': {
+              'Email Address': 'avery@example.com',
+              'Cell Phone': '(555) 222-0100',
+            },
+            'Current Location': 'Tampa, FL 33602',
+          },
+          'Professional Summary': 'Clinical professional focused on patient-centered care.',
+          'Work Experience': {
+            'Job Title': 'Registered Nurse',
+            'Employer Name': 'BrightWorks Health',
+            'Date Range': 'Mar 2020 - Present',
+            Accomplishments: [
+              { Text: 'Coordinated care plans across a 24-bed unit.' },
+              { Text: 'Trained new staff on EHR documentation practices.' },
+            ],
+          },
+          'Education And Training': {
+            'Institution Name': 'University of South Florida',
+            Credential: 'BS Nursing',
+            'Date Range': '2015 - 2019',
+          },
+          'Technical Skills': [
+            {
+              Category: 'Clinical',
+              Items: ['Patient Care', 'EHR Documentation'],
+            },
+          ],
+        },
+      },
+    });
+
+    const { container } = render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await user.upload(fileInput, new File(['resume'], 'avery-resume.pdf', { type: 'application/pdf' }));
+    await screen.findByText('avery-resume.pdf');
+
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
+
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = vi.mocked(saveResume).mock.calls[0][0];
+    expect(payload.title).toBe('Avery Stone - Registered Nurse');
+    expect(payload.content.personalDetails).toEqual(expect.objectContaining({
+      firstName: 'Avery',
+      lastName: 'Stone',
+      email: 'avery@example.com',
+      phone: '(555) 222-0100',
+      city: 'Tampa',
+      state: 'FL',
+      postalCode: '33602',
+      summary: 'Clinical professional focused on patient-centered care.',
+    }));
+    expect(payload.content.experienceItems[0]).toEqual(expect.objectContaining({
+      role: 'Registered Nurse',
+      company: 'BrightWorks Health',
+      dates: 'Mar 2020 - Present',
+      description: '- Coordinated care plans across a 24-bed unit.\n- Trained new staff on EHR documentation practices.',
+    }));
+    expect(payload.content.educationItems[0]).toEqual(expect.objectContaining({
+      school: 'University of South Florida',
+      degree: 'BS Nursing',
+      dates: '2015 - 2019',
+    }));
+    expect(payload.content.skillItems[0]).toEqual(expect.objectContaining({
+      category: 'Clinical',
+      items: 'Patient Care, EHR Documentation',
+    }));
+  });
+
   it('keeps full street addresses and nested contact details in the right imported fields', async () => {
     const user = userEvent.setup();
     vi.mocked(generateResumeContent).mockResolvedValueOnce({

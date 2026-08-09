@@ -50,15 +50,52 @@ const firstImportedText = (...values: unknown[]): string => {
   return '';
 };
 
+const normalizeImportedKey = (key: string): string => (
+  key.replace(/[^A-Za-z0-9]/g, '').toLowerCase()
+);
+
 const importedField = (source: any, keys: string[]): unknown => {
-  if (!source || typeof source !== 'object') return undefined;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return undefined;
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(source, key)) {
       return source[key];
     }
   }
+  const normalizedKeys = new Set(keys.map(normalizeImportedKey));
+  for (const [key, value] of Object.entries(source)) {
+    if (normalizedKeys.has(normalizeImportedKey(key))) {
+      return value;
+    }
+  }
   return undefined;
 };
+
+const importedObjectField = (source: any, keys: string[]): Record<string, unknown> => {
+  const value = importedField(source, keys);
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+};
+
+const IMPORTED_RECORD_VALUE_KEYS = [
+  'role',
+  'title',
+  'position',
+  'jobTitle',
+  'job_title',
+  'company',
+  'employer',
+  'degree',
+  'qualification',
+  'credential',
+  'school',
+  'institution',
+  'category',
+  'items',
+  'bullet',
+  'text',
+  'description',
+  'achievement',
+  'responsibility',
+];
 
 const importedValues = (value: unknown): unknown[] => {
   if (Array.isArray(value)) return value;
@@ -68,18 +105,32 @@ const importedValues = (value: unknown): unknown[] => {
       .map((item) => item.trim())
       .filter(Boolean);
   }
-  if (value && typeof value === 'object') return Object.values(value);
+  if (value && typeof value === 'object') {
+    if (IMPORTED_RECORD_VALUE_KEYS.some((key) => importedField(value, [key]) !== undefined)) {
+      return [value];
+    }
+    return Object.values(value);
+  }
   return [];
 };
 
 const cleanImportedListItem = (value: unknown): string => {
   const source = value && typeof value === 'object'
     ? firstImportedText(
-      (value as any).bullet,
-      (value as any).description,
-      (value as any).text,
-      (value as any).achievement,
-      (value as any).responsibility,
+      importedField(value, [
+        'bullet',
+        'description',
+        'text',
+        'achievement',
+        'responsibility',
+        'duty',
+        'name',
+        'value',
+        'skill',
+        'item',
+        'label',
+        'items',
+      ]),
     )
     : cleanImportedText(value);
   return source.replace(/^[\s,;\-*\u2022\u00b7]+/, '').replace(/[\s,;]+$/, '').trim();
@@ -99,19 +150,14 @@ const importedBulletLines = (...sources: unknown[]): string => {
 };
 
 const importedDateRange = (value: any): string => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
   const explicit = firstImportedText(
-    value?.dates,
-    value?.dateRange,
-    value?.date_range,
-    value?.period,
-    value?.date,
-    value?.years,
-    value?.duration,
+    importedField(value, ['dates', 'dateRange', 'date_range', 'date range', 'period', 'date', 'years', 'duration', 'tenure'])
   );
   if (explicit) return explicit;
 
-  const start = firstImportedText(value?.start, value?.startDate, value?.start_date, value?.from);
-  const end = firstImportedText(value?.end, value?.endDate, value?.end_date, value?.to);
+  const start = firstImportedText(importedField(value, ['start', 'startDate', 'start_date', 'start date', 'from']));
+  const end = firstImportedText(importedField(value, ['end', 'endDate', 'end_date', 'end date', 'to', 'through']));
   return start && end ? `${start} - ${end}` : start || end;
 };
 
@@ -482,38 +528,93 @@ const App: React.FC = () => {
   const mapJsonToState = (json: any): Partial<UserInputData> => {
       if (!json) return {};
 
-      const resumeJson = json.RESUME_JSON || json.resume_json || json.resumeJson || json.resume || json;
-      const header = resumeJson.header || resumeJson.personalDetails || resumeJson.personal || {};
-      const contact = importedField(header, ['contact', 'contactInfo', 'contact_info'])
-        || importedField(resumeJson, ['contact', 'contactInfo', 'contact_info'])
-        || {};
+      const parsedResumeJson = importedField(json, ['RESUME_JSON', 'resume_json', 'resumeJson', 'resume json', 'parsedResumeJson', 'parsed_resume_json', 'resume']);
+      const resumeJson = parsedResumeJson && typeof parsedResumeJson === 'object' && !Array.isArray(parsedResumeJson)
+        ? parsedResumeJson as Record<string, unknown>
+        : json;
+      const header = importedObjectField(resumeJson, [
+        'header',
+        'personalDetails',
+        'personal_details',
+        'personal',
+        'candidate',
+        'candidateInfo',
+        'candidate_info',
+        'contactDetails',
+        'contact_details',
+      ]);
+      const headerContact = importedObjectField(header, ['contact', 'contactInfo', 'contact_info', 'contactDetails', 'contact_details']);
+      const rootContact = importedObjectField(resumeJson, ['contact', 'contactInfo', 'contact_info', 'contactDetails', 'contact_details']);
+      const contact = Object.keys(headerContact).length > 0 ? headerContact : rootContact;
       const experienceSource = importedValues(
-        resumeJson.experience
-        || resumeJson.experiences
-        || resumeJson.workExperience
-        || resumeJson.work_experience
-        || resumeJson.professionalExperience
-        || resumeJson.employment
+        importedField(resumeJson, [
+          'experience',
+          'experiences',
+          'workExperience',
+          'work_experience',
+          'work experience',
+          'professionalExperience',
+          'professional_experience',
+          'professional experience',
+          'employment',
+          'employmentHistory',
+          'employment_history',
+          'workHistory',
+          'work_history',
+          'careerHistory',
+          'career_history',
+          'positions',
+          'jobs',
+        ])
       );
       const educationSource = importedValues(
-        resumeJson.education
-        || resumeJson.educations
-        || resumeJson.academicBackground
-        || resumeJson.academic_background
+        importedField(resumeJson, [
+          'education',
+          'educations',
+          'academicBackground',
+          'academic_background',
+          'academic background',
+          'educationAndTraining',
+          'education_and_training',
+          'schools',
+          'training',
+        ])
       );
       
       const experiences: ExperienceItem[] = experienceSource
         .map((exp: any) => ({
             id: Math.random().toString(),
-            role: firstImportedText(importedField(exp, ['role', 'title', 'position', 'jobTitle', 'job_title'])),
-            company: firstImportedText(importedField(exp, ['company', 'employer', 'organization', 'organisation', 'companyName', 'company_name'])),
+            role: firstImportedText(importedField(exp, [
+              'role',
+              'title',
+              'position',
+              'positionTitle',
+              'position_title',
+              'jobTitle',
+              'job_title',
+              'job title',
+              'designation',
+            ])),
+            company: firstImportedText(importedField(exp, [
+              'company',
+              'employer',
+              'employerName',
+              'employer_name',
+              'organization',
+              'organisation',
+              'organizationName',
+              'organization_name',
+              'organisationName',
+              'companyName',
+              'company_name',
+              'workplace',
+              'client',
+            ])),
             dates: importedDateRange(exp),
             description: importedBulletLines(
-              exp?.highlights,
-              exp?.bullets,
-              exp?.achievements,
-              exp?.responsibilities,
-              exp?.description,
+              importedField(exp, ['highlights', 'bullets', 'bullet_points', 'achievements', 'accomplishments']),
+              importedField(exp, ['responsibilities', 'responsibility', 'duties']),
+              importedField(exp, ['description', 'details', 'summary']),
             ),
         }))
         .filter((exp) => exp.role || exp.company || exp.dates || exp.description);
@@ -521,14 +622,48 @@ const App: React.FC = () => {
       const educations: EducationItem[] = educationSource
         .map((edu: any) => ({
             id: Math.random().toString(),
-            degree: firstImportedText(importedField(edu, ['degree', 'program', 'qualification', 'title'])),
-            school: firstImportedText(importedField(edu, ['school', 'institution', 'university', 'college', 'organization', 'organisation'])),
+            degree: firstImportedText(importedField(edu, [
+              'degree',
+              'program',
+              'qualification',
+              'credential',
+              'certificate',
+              'course',
+              'fieldOfStudy',
+              'field_of_study',
+              'title',
+            ])),
+            school: firstImportedText(importedField(edu, [
+              'school',
+              'institution',
+              'institutionName',
+              'institution_name',
+              'university',
+              'college',
+              'organization',
+              'organisation',
+              'academy',
+            ])),
             dates: importedDateRange(edu)
         }))
         .filter((edu) => edu.degree || edu.school || edu.dates);
 
       const skills: SkillItem[] = [];
-      const skillSource = resumeJson.skills || resumeJson.skillItems || resumeJson.technicalSkills || resumeJson.technical_skills;
+      const skillSource = importedField(resumeJson, [
+        'skills',
+        'skillItems',
+        'skill_items',
+        'technicalSkills',
+        'technical_skills',
+        'technical skills',
+        'coreCompetencies',
+        'core_competencies',
+        'competencies',
+        'technologies',
+        'tools',
+        'toolsAndTechnologies',
+        'tools_and_technologies',
+      ]);
       const pushSkillGroup = (category: string, items: unknown) => {
         const cleanItems = splitImportedCommaList(importedValues(items));
         if (cleanItems.length === 0) return;
@@ -540,65 +675,73 @@ const App: React.FC = () => {
         });
       };
 
-      if (Array.isArray(skillSource) || typeof skillSource === 'string') {
+      if (Array.isArray(skillSource) && skillSource.some((item) => item && typeof item === 'object' && !Array.isArray(item) && importedField(item, ['items', 'skills', 'values', 'technologies']))) {
+        skillSource.forEach((item) => {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+          pushSkillGroup(
+            firstImportedText(importedField(item, ['category', 'name', 'label', 'title'])) || 'Core',
+            importedField(item, ['items', 'skills', 'values', 'technologies']),
+          );
+        });
+      } else if (Array.isArray(skillSource) || typeof skillSource === 'string') {
         pushSkillGroup('Core', skillSource);
       } else if (skillSource && typeof skillSource === 'object') {
-        Object.entries(skillSource).forEach(([category, items]) => pushSkillGroup(category, items));
+        const directSkillItems = importedField(skillSource, ['items', 'skills', 'values', 'technologies']);
+        if (directSkillItems !== undefined) {
+          pushSkillGroup(
+            firstImportedText(importedField(skillSource, ['category', 'name', 'label', 'title'])) || 'Core',
+            directSkillItems,
+          );
+        } else {
+          Object.entries(skillSource).forEach(([category, items]) => pushSkillGroup(category, items));
+        }
       }
 
       const location = mergeImportedAddressParts(
         parseImportedAddress(header),
         parseImportedAddress(resumeJson),
-        parseImportedAddress(importedField(header, ['location', 'currentLocation', 'current_location'])),
-        parseImportedAddress(importedField(resumeJson, ['location', 'currentLocation', 'current_location'])),
-        parseImportedAddress(importedField(header, ['address', 'mailingAddress', 'mailing_address'])),
-        parseImportedAddress(importedField(resumeJson, ['address', 'mailingAddress', 'mailing_address'])),
+        parseImportedAddress(importedField(header, ['location', 'currentLocation', 'current_location', 'current location'])),
+        parseImportedAddress(importedField(resumeJson, ['location', 'currentLocation', 'current_location', 'current location'])),
+        parseImportedAddress(importedField(header, ['address', 'mailingAddress', 'mailing_address', 'mailing address'])),
+        parseImportedAddress(importedField(resumeJson, ['address', 'mailingAddress', 'mailing_address', 'mailing address'])),
       );
 
       // Extract Name
       const fullName = firstImportedText(
-        header.name,
-        header.fullName,
-        header.full_name,
-        importedField(contact, ['name', 'fullName', 'full_name']),
-        resumeJson.name,
+        importedField(header, ['name', 'fullName', 'full_name', 'full name', 'candidateName', 'candidate_name']),
+        importedField(contact, ['name', 'fullName', 'full_name', 'full name', 'candidateName', 'candidate_name']),
+        importedField(resumeJson, ['name', 'fullName', 'full_name', 'full name', 'candidateName', 'candidate_name']),
       );
       const nameParts = fullName.split(' ').filter(Boolean);
       const firstName = firstImportedText(
-        header.firstName,
-        header.first_name,
-        importedField(contact, ['firstName', 'first_name']),
+        importedField(header, ['firstName', 'first_name', 'first name', 'givenName', 'given_name']),
+        importedField(contact, ['firstName', 'first_name', 'first name', 'givenName', 'given_name']),
       ) || nameParts[0] || '';
       const lastName = firstImportedText(
-        header.lastName,
-        header.last_name,
-        importedField(contact, ['lastName', 'last_name']),
+        importedField(header, ['lastName', 'last_name', 'last name', 'familyName', 'family_name', 'surname']),
+        importedField(contact, ['lastName', 'last_name', 'last name', 'familyName', 'family_name', 'surname']),
       ) || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
       const targetRole = firstImportedText(
-        header.title,
-        header.role,
-        resumeJson.targetRole,
-        resumeJson.target_role,
-        resumeJson.title,
+        importedField(header, ['title', 'role', 'headline', 'professionalTitle', 'professional_title', 'jobTitle', 'job_title']),
+        importedField(resumeJson, ['targetRole', 'target_role', 'target role', 'title', 'role', 'headline', 'professionalTitle', 'professional_title']),
         experiences[0]?.role,
       );
 
       const personalDetails: PersonalDetails = {
           firstName: firstName,
           lastName: lastName,
-          email: firstImportedText(header.email, importedField(contact, ['email']), resumeJson.email),
-          phone: firstImportedText(header.phone, importedField(contact, ['phone', 'telephone', 'mobile']), resumeJson.phone),
+          email: firstImportedText(importedField(header, ['email', 'emailAddress', 'email_address']), importedField(contact, ['email', 'emailAddress', 'email_address']), importedField(resumeJson, ['email', 'emailAddress', 'email_address'])),
+          phone: firstImportedText(importedField(header, ['phone', 'telephone', 'mobile', 'cell', 'cellPhone', 'cell_phone']), importedField(contact, ['phone', 'telephone', 'mobile', 'cell', 'cellPhone', 'cell_phone']), importedField(resumeJson, ['phone', 'telephone', 'mobile', 'cell', 'cellPhone', 'cell_phone'])),
           address: firstImportedText(
-            header.streetAddress,
-            header.street_address,
-            importedField(contact, ['streetAddress', 'street_address', 'addressLine1', 'address_line_1']),
+            importedField(header, ['streetAddress', 'street_address', 'street address', 'addressLine1', 'address_line_1', 'address 1']),
+            importedField(contact, ['streetAddress', 'street_address', 'street address', 'addressLine1', 'address_line_1', 'address 1']),
             location.address,
           ),
           city: location.city,
           state: location.state,
           country: location.country,
           postalCode: location.postalCode,
-          summary: firstImportedText(resumeJson.summary, resumeJson.profile, resumeJson.professionalSummary, resumeJson.professional_summary)
+          summary: firstImportedText(importedField(resumeJson, ['summary', 'profile', 'professionalSummary', 'professional_summary', 'professional summary', 'objective', 'about']))
       };
 
       return {

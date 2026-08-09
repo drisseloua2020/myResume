@@ -235,26 +235,40 @@ ROLE_KEYWORDS = {
     "analyst",
     "architect",
     "associate",
+    "assistant",
+    "cashier",
     "coach",
+    "clerk",
     "consultant",
     "coordinator",
     "devops",
     "developer",
     "designer",
     "director",
+    "driver",
+    "educator",
+    "electrician",
     "engineer",
     "executive",
+    "generalist",
+    "intern",
     "lead",
     "manager",
+    "mechanic",
+    "nurse",
     "officer",
     "operator",
     "owner",
+    "paralegal",
+    "pharmacist",
     "principal",
     "product",
     "program",
     "project",
     "qa",
     "recruiter",
+    "receptionist",
+    "representative",
     "scrum",
     "scientist",
     "security",
@@ -264,7 +278,9 @@ ROLE_KEYWORDS = {
     "supervisor",
     "support",
     "technician",
+    "teacher",
     "tester",
+    "therapist",
 }
 
 DEGREE_KEYWORDS = {
@@ -421,18 +437,29 @@ def _extract_header(lines: list[str]) -> dict[str, object]:
             phone = _extract_phone(line)
         if _looks_like_url(line):
             links.append({"label": "Link", "url": line})
-        if not location and "," in line and not _is_contact_line(line) and len(line) <= 90:
+        if not location and not _is_contact_line(line) and len(line) <= 90 and ("," in line or _looks_like_location_line(line)):
             location = line
 
-    for line in segments:
-        if _is_contact_line(line) or line == location:
-            continue
-        if not name:
-            name = line
-            continue
-        if not title and len(line) <= 100:
-            title = line
-            break
+    candidate_segments = [
+        line
+        for line in segments
+        if (
+            not _is_contact_line(line)
+            and line != location
+            and not _section_for_heading(line)
+            and not _looks_like_date_range(line)
+        )
+    ]
+
+    preferred_name = next((line for line in candidate_segments if not _looks_like_role_title(line)), "")
+    if preferred_name:
+        name = preferred_name
+    elif candidate_segments:
+        name = candidate_segments[0]
+
+    title = next((line for line in candidate_segments if line != name and _looks_like_role_title(line)), "")
+    if not title:
+        title = next((line for line in candidate_segments if line != name and len(line) <= 100), "")
 
     return {
         "name": name,
@@ -702,6 +729,10 @@ def _detail_segments(line: str) -> list[str]:
 
 def _role_company_segments(line: str) -> list[str]:
     segments = _detail_segments(line)
+    if len(segments) == 1:
+        dash_segments = [segment.strip(" ,;") for segment in re.split(r"\s+(?:-|\u2013|\u2014)\s+", line) if segment.strip(" ,;")]
+        if len(dash_segments) >= 2:
+            segments = dash_segments
     if len(segments) == 1 and "," in line:
         segments = [segment.strip(" ,;") for segment in re.split(r"\s*,\s*", line) if segment.strip(" ,;")]
     return [segment for segment in segments if segment and not _looks_like_date_range(segment)]
@@ -718,11 +749,21 @@ def _assign_role_company_from_segments(segments: list[str]) -> tuple[str, str, s
 
     if role_index >= 0:
         role = segments[role_index]
-        remaining = [segment for index, segment in enumerate(segments) if index != role_index]
-        if remaining:
-            company = remaining[0]
-        if len(remaining) > 1:
-            location = ", ".join(remaining[1:])
+        remaining = [(index, segment) for index, segment in enumerate(segments) if index != role_index]
+        location_segments = [segment for _, segment in remaining if _looks_like_location_line(segment)]
+        company = next(
+            (segment for index, segment in remaining if index < role_index and not _looks_like_location_line(segment)),
+            "",
+        )
+        if not company:
+            company = next(
+                (segment for index, segment in remaining if index > role_index and not _looks_like_location_line(segment)),
+                "",
+            )
+        if not company:
+            company = next((segment for _, segment in remaining if not _looks_like_location_line(segment)), "")
+        if location_segments:
+            location = ", ".join(location_segments)
     elif len(segments) >= 2:
         company = segments[0]
         if _looks_like_location_line(segments[1]):
