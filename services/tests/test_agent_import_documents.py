@@ -12,7 +12,7 @@ PDF_MIME = "application/pdf"
 
 class _FakeGeminiResponse:
     text = """RESUME_JSON:
-{"header":{"name":"Alex Resume","title":"Engineer","location":"","phone":"","email":"","links":[]},"summary":"","skills":{"core":[],"tools":[],"cloud":[],"data":[],"other":[]},"experience":[],"projects":[],"education":[],"certifications":[],"awards":[],"publications":[]}
+{"header":{"name":"Alex Resume","title":"Engineer","location":"","phone":"","email":"","links":[]},"summary":"","skills":{"Skills":[]},"experience":[],"education":[]}
 
 GAP_AND_FIX_LIST:
 N/A
@@ -212,7 +212,7 @@ def test_generate_resume_uses_understood_pdf_json_when_ai_json_is_weak(client, m
     assert resume_json["header"]["name"] == "Morgan Smart"
     assert resume_json["header"]["title"] == "Software Architect"
     assert resume_json["summary"] == "Architect focused on AI delivery and platform modernization."
-    assert resume_json["skills"]["core"] == ["Python", "AWS", "Architecture"]
+    assert resume_json["skills"]["Skills"] == ["Python", "AWS", "Architecture"]
     assert resume_json["experience"][0]["role"] == "Software Architect"
     assert resume_json["experience"][0]["company"] == "Slalom"
     assert resume_json["experience"][0]["start"] == "Jan 2022"
@@ -313,7 +313,7 @@ def test_generate_resume_falls_back_to_local_import_parser_when_ai_fails(client,
     assert resume_json["header"]["name"] == "Alex Resume"
     assert resume_json["header"]["title"] == "Senior Python Engineer"
     assert resume_json["header"]["email"] == "alex@example.com"
-    assert "Python" in resume_json["skills"]["core"]
+    assert "Python" in resume_json["skills"]["Skills"]
     assert resume_json["experience"] == []
 
 
@@ -366,7 +366,7 @@ def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(clie
     assert resume_json["header"]["phone"] == "(555) 010-0200"
     assert resume_json["header"]["location"] == "Austin, TX"
     assert resume_json["summary"] == "Backend engineer building reliable APIs."
-    assert resume_json["skills"]["core"] == ["Python", "FastAPI", "SQL"]
+    assert resume_json["skills"]["Skills"] == ["Python", "FastAPI", "SQL"]
     assert resume_json["experience"][0]["role"] == "Senior Python Engineer"
     assert resume_json["experience"][0]["company"] == "Acme Corp"
     assert resume_json["experience"][0]["start"] == "Jan 2020"
@@ -424,7 +424,7 @@ def test_generate_resume_parses_compact_pdf_rows_into_structured_fields(client, 
     assert resume_json["header"]["name"] == "Jordan Candidate"
     assert resume_json["header"]["title"] == "Software Architect"
     assert resume_json["summary"] == "Architect focused on AI-enabled delivery and cloud modernization."
-    assert resume_json["skills"]["core"] == ["Cloud Architecture", "AI Engineering", "Python", "AWS"]
+    assert resume_json["skills"]["Skills"] == ["Cloud Architecture", "AI Engineering", "Python", "AWS"]
     assert resume_json["experience"][0]["role"] == "Software Architect"
     assert resume_json["experience"][0]["company"] == "Slalom"
     assert resume_json["experience"][0]["location"] == "Seattle WA"
@@ -584,7 +584,7 @@ def test_generate_resume_filters_unaligned_pdf_noise_from_template_json(client, 
     assert "555-555-0100" not in serialized
 
     assert resume_json["summary"] == "Principal architect with experience modernizing cloud platforms."
-    assert resume_json["skills"]["core"] == ["Python", "AWS", "Cloud Architecture"]
+    assert resume_json["skills"]["Skills"] == ["Python", "AWS", "Cloud Architecture"]
     assert len(resume_json["experience"]) == 1
     assert resume_json["experience"][0]["company"] == "Contoso Ltd"
     assert resume_json["experience"][0]["role"] == "Principal Architect"
@@ -700,7 +700,7 @@ def test_generate_resume_recognizes_title_first_header_and_non_tech_roles(client
     assert resume_json["header"]["title"] == "Registered Nurse"
     assert resume_json["header"]["location"] == "Tampa FL 33602"
     assert resume_json["summary"] == "Clinical professional focused on patient-centered care."
-    assert resume_json["skills"]["core"] == ["Patient Care", "EHR Documentation", "Care Coordination"]
+    assert resume_json["skills"]["Skills"] == ["Patient Care", "EHR Documentation", "Care Coordination"]
 
     assert resume_json["experience"][0]["company"] == "BrightWorks Health"
     assert resume_json["experience"][0]["role"] == "Registered Nurse"
@@ -816,3 +816,64 @@ def test_generate_resume_keeps_hyphenated_detail_fragments_out_of_job_titles(cli
         "blue-team",
         "Improved alert triage coverage by 20%",
     ]
+
+
+def test_generate_resume_moves_non_experience_education_sections_into_skills(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Jordan Sections",
+            "Platform Engineer",
+            "jordan@example.com",
+            "SKILLS",
+            "Python, AWS, Terraform",
+            "EXPERIENCE",
+            "Platform Engineer",
+            "Contoso Cloud",
+            "2021 - Present",
+            "Automated cloud platform deployments.",
+            "PROJECTS",
+            "Resume Importer",
+            "Built a document parser that maps sections into editor fields.",
+            "CERTIFICATIONS",
+            "AWS Certified Solutions Architect",
+            "EDUCATION",
+            "State University",
+            "BS Computer Science",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "jordan-sections.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert set(resume_json.keys()) == {"header", "summary", "skills", "experience", "education"}
+    assert resume_json["skills"]["Skills"] == ["Python", "AWS", "Terraform"]
+    assert resume_json["skills"]["Projects"] == [
+        "Resume Importer",
+        "Built a document parser that maps sections into editor fields.",
+    ]
+    assert resume_json["skills"]["Certifications"] == ["AWS Certified Solutions Architect"]
+    assert resume_json["education"][0]["school"] == "State University"
+    assert resume_json["education"][0]["degree"] == "BS Computer Science"
+    assert resume_json["education"][0]["start"] == ""
+    assert resume_json["education"][0]["end"] == ""

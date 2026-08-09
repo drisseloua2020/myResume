@@ -1108,7 +1108,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       const prefix = `Education ${index + 1}`;
       if (!hasText(edu.school)) missing.push(`${prefix} school`);
       if (!hasText(edu.degree)) missing.push(`${prefix} degree`);
-      if (!hasText(withEducationDateText(edu).dates)) missing.push(`${prefix} dates`);
     });
 
     skills.forEach((skill, index) => {
@@ -1649,7 +1648,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                       value={edu.startMonth || ''}
                                       onChange={e => updateEducation(edu.id, 'startMonth', e.target.value)}
                                       className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
-                                      required
                                     >
                                       <option value="">Start month</option>
                                       {MONTH_OPTIONS.map(month => <option key={month} value={month}>{month}</option>)}
@@ -1658,7 +1656,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                       value={edu.startYear || ''}
                                       onChange={e => updateEducation(edu.id, 'startYear', e.target.value)}
                                       className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
-                                      required
                                     >
                                       <option value="">Start year</option>
                                       {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}
@@ -1667,7 +1664,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                       value={edu.endMonth || ''}
                                       onChange={e => updateEducation(edu.id, 'endMonth', e.target.value)}
                                       className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
-                                      required
                                     >
                                       <option value="">End month</option>
                                       {MONTH_OPTIONS.map(month => <option key={month} value={month}>{month}</option>)}
@@ -1676,7 +1672,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                       value={edu.endYear || ''}
                                       onChange={e => updateEducation(edu.id, 'endYear', e.target.value)}
                                       className="w-full bg-white p-2 border border-slate-300 rounded text-sm"
-                                      required
                                     >
                                       <option value="">End year</option>
                                       {YEAR_OPTIONS.map(year => <option key={year} value={year}>{year}</option>)}

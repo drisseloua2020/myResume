@@ -41,6 +41,10 @@ PDF_SECTION_HEADINGS = (
     "education",
     "certifications",
     "projects",
+    "awards",
+    "publications",
+    "languages",
+    "volunteer",
 )
 
 
@@ -225,6 +229,24 @@ SECTION_ALIASES: dict[str, set[str]] = {
     },
     "awards": {"awards", "honors", "achievements", "recognition"},
     "publications": {"publications"},
+    "languages": {"languages", "language skills"},
+    "volunteer": {"volunteer", "volunteering", "volunteer experience", "community involvement"},
+    "affiliations": {"affiliations", "professional affiliations", "memberships", "associations"},
+    "interests": {"interests", "hobbies", "activities"},
+    "coursework": {"coursework", "relevant coursework", "professional development", "training"},
+}
+
+SECTION_LABELS: dict[str, str] = {
+    "skills": "Skills",
+    "projects": "Projects",
+    "certifications": "Certifications",
+    "awards": "Awards",
+    "publications": "Publications",
+    "languages": "Languages",
+    "volunteer": "Volunteer",
+    "affiliations": "Affiliations",
+    "interests": "Interests",
+    "coursework": "Coursework",
 }
 
 ROLE_KEYWORDS = {
@@ -515,6 +537,18 @@ def _skill_values(lines: list[str]) -> list[str]:
             if _is_skill_value(value) and value not in values:
                 values.append(value)
     return values[:30]
+
+
+def _skill_groups_from_sections(sections: dict[str, list[str]]) -> dict[str, list[str]]:
+    groups: dict[str, list[str]] = {}
+
+    for section, label in SECTION_LABELS.items():
+        lines = sections.get(section, [])
+        values = _skill_values(lines) if section == "skills" else _clean_field_lines(lines)
+        if values:
+            groups[label] = values[:30]
+
+    return groups or {"Skills": []}
 
 
 def _highlight_items(lines: list[str]) -> list[dict[str, object]]:
@@ -1266,24 +1300,13 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
         if not _is_contact_line(line) and line != header_name
     ])
     education = _parse_education_entries([line for line in sections.get("education", []) if not _is_contact_line(line)])
-    projects = _parse_project_entries([line for line in sections.get("projects", []) if not _is_contact_line(line)])
 
     return {
         "header": header,
         "summary": summary,
-        "skills": {
-            "core": _skill_values(sections.get("skills", [])),
-            "tools": [],
-            "cloud": [],
-            "data": [],
-            "other": [],
-        },
+        "skills": _skill_groups_from_sections(sections),
         "experience": experience,
-        "projects": projects,
         "education": education,
-        "certifications": _clean_field_lines(sections.get("certifications", []))[:12],
-        "awards": _clean_field_lines(sections.get("awards", []))[:12],
-        "publications": _clean_field_lines(sections.get("publications", []))[:12],
     }
 
 
