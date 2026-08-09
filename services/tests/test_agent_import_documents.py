@@ -651,3 +651,68 @@ def test_generate_resume_collects_common_resume_date_formats_when_ai_fails(clien
     assert resume_json["education"][0]["degree"] == "BS Computer Science"
     assert resume_json["education"][0]["start"] == "May 2021"
     assert resume_json["education"][0]["end"] == ""
+
+
+def test_generate_resume_recognizes_title_first_header_and_non_tech_roles(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Registered Nurse",
+            "Avery Stone",
+            "avery@example.com | (555) 222-0100 | Tampa FL 33602",
+            "SUMMARY",
+            "Clinical professional focused on patient-centered care.",
+            "SKILLS",
+            "Patient Care, EHR Documentation, Care Coordination",
+            "WORK EXPERIENCE",
+            "BrightWorks Health - Registered Nurse - Tampa, FL - Mar 2020 - Present",
+            "Coordinated care plans across a 24-bed unit.",
+            "Trained new staff on EHR documentation practices.",
+            "EDUCATION",
+            "University of South Florida - BS Nursing - 2015 - 2019",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "avery-resume.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["header"]["name"] == "Avery Stone"
+    assert resume_json["header"]["title"] == "Registered Nurse"
+    assert resume_json["header"]["location"] == "Tampa FL 33602"
+    assert resume_json["summary"] == "Clinical professional focused on patient-centered care."
+    assert resume_json["skills"]["core"] == ["Patient Care", "EHR Documentation", "Care Coordination"]
+
+    assert resume_json["experience"][0]["company"] == "BrightWorks Health"
+    assert resume_json["experience"][0]["role"] == "Registered Nurse"
+    assert resume_json["experience"][0]["location"] == "Tampa, FL"
+    assert resume_json["experience"][0]["start"] == "Mar 2020"
+    assert resume_json["experience"][0]["end"] == "Present"
+    assert [item["bullet"] for item in resume_json["experience"][0]["highlights"]] == [
+        "Coordinated care plans across a 24-bed unit.",
+        "Trained new staff on EHR documentation practices.",
+    ]
+
+    assert resume_json["education"][0]["school"] == "University of South Florida"
+    assert resume_json["education"][0]["degree"] == "BS Nursing"
+    assert resume_json["education"][0]["start"] == "2015"
+    assert resume_json["education"][0]["end"] == "2019"
