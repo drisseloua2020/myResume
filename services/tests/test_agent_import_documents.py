@@ -766,3 +766,53 @@ def test_generate_resume_keeps_short_action_lines_as_job_description(client, mon
         "Managed software backlog",
         "Improved customer adoption by 18%",
     ]
+
+
+def test_generate_resume_keeps_hyphenated_detail_fragments_out_of_job_titles(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Riley Defender",
+            "Security Analyst",
+            "riley@example.com",
+            "EXPERIENCE",
+            "Security Analyst",
+            "Acme Security",
+            "Jan 2021 - Present",
+            "Security Engineer",
+            "blue-team",
+            "Improved alert triage coverage by 20%",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "riley-security.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert len(resume_json["experience"]) == 1
+    assert resume_json["experience"][0]["role"] == "Security Analyst"
+    assert resume_json["experience"][0]["company"] == "Acme Security"
+    assert [item["bullet"] for item in resume_json["experience"][0]["highlights"]] == [
+        "Security Engineer",
+        "blue-team",
+        "Improved alert triage coverage by 20%",
+    ]
