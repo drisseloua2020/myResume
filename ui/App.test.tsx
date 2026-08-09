@@ -184,6 +184,14 @@ describe('App import flow', () => {
               years: '2012 - 2016',
             },
           ],
+          projects: [
+            {
+              name: 'Resume Scanner',
+              description: 'Classified imported resume sections.',
+              bullets: ['Moved certifications into grouped editor skills.'],
+            },
+          ],
+          certifications: ['AWS Certified Solutions Architect'],
         },
       },
     });
@@ -230,6 +238,16 @@ describe('App import flow', () => {
       category: 'Core',
       items: 'Cloud Architecture, AI Engineering, Python',
     }));
+    expect(payload.content.skillItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: 'Projects',
+        items: 'Resume Scanner: Classified imported resume sections., Moved certifications into grouped editor skills.',
+      }),
+      expect.objectContaining({
+        category: 'Certifications',
+        items: 'AWS Certified Solutions Architect',
+      }),
+    ]));
   });
 
   it('maps intelligent scan labels into the correct editor fields', async () => {

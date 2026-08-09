@@ -176,6 +176,164 @@ const splitImportedCommaList = (items: unknown[]): string[] => {
   return values;
 };
 
+const formatImportedCategoryLabel = (value: string): string => {
+  const label = cleanImportedText(value).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!label) return 'Other';
+  return label
+    .split(' ')
+    .map((word) => word.length <= 3 && word === word.toUpperCase()
+      ? word
+      : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+const importedSectionDetailItems = (source: unknown): string[] => {
+  const details: string[] = [];
+  const addDetail = (value: unknown) => {
+    const text = cleanImportedListItem(value);
+    if (!text) return;
+    text
+      .split(/\n|;/)
+      .map((item) => cleanImportedListItem(item))
+      .filter(Boolean)
+      .forEach((item) => {
+        if (!details.includes(item)) details.push(item);
+      });
+  };
+
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (value && typeof value === 'object') {
+      const before = details.length;
+      const title = firstImportedText(importedField(value, ['name', 'title', 'label', 'category', 'credential', 'certificate']));
+      const primary = firstImportedText(importedField(value, ['description', 'summary', 'details', 'value', 'text']));
+      if (title && primary && title !== primary) {
+        addDetail(`${title}: ${primary}`);
+      } else {
+        addDetail(primary || title);
+      }
+
+      [
+        'items',
+        'skills',
+        'values',
+        'technologies',
+        'bullets',
+        'bullet_points',
+        'highlights',
+        'achievements',
+        'accomplishments',
+        'responsibilities',
+        'notes',
+      ].forEach((key) => {
+        const nested = importedField(value, [key]);
+        if (nested !== undefined) visit(nested);
+      });
+
+      if (details.length === before) {
+        Object.values(value).forEach(visit);
+      }
+      return;
+    }
+
+    addDetail(value);
+  };
+
+  visit(source);
+  return details;
+};
+
+const DEDICATED_IMPORTED_SECTION_KEYS = new Set([
+  'RESUME_JSON',
+  'resume_json',
+  'resumeJson',
+  'resume',
+  'header',
+  'personalDetails',
+  'personal_details',
+  'personal',
+  'candidate',
+  'candidateInfo',
+  'candidate_info',
+  'contact',
+  'contactInfo',
+  'contact_info',
+  'contactDetails',
+  'contact_details',
+  'name',
+  'fullName',
+  'full_name',
+  'firstName',
+  'first_name',
+  'lastName',
+  'last_name',
+  'email',
+  'phone',
+  'location',
+  'address',
+  'title',
+  'role',
+  'targetRole',
+  'target_role',
+  'summary',
+  'profile',
+  'professionalSummary',
+  'professional_summary',
+  'objective',
+  'experience',
+  'experiences',
+  'workExperience',
+  'work_experience',
+  'professionalExperience',
+  'professional_experience',
+  'employment',
+  'employmentHistory',
+  'employment_history',
+  'workHistory',
+  'work_history',
+  'careerHistory',
+  'career_history',
+  'positions',
+  'jobs',
+  'education',
+  'educations',
+  'academicBackground',
+  'academic_background',
+  'educationAndTraining',
+  'education_and_training',
+  'schools',
+  'training',
+  'skills',
+  'skillItems',
+  'skill_items',
+  'technicalSkills',
+  'technical_skills',
+  'coreCompetencies',
+  'core_competencies',
+  'competencies',
+  'technologies',
+  'tools',
+  'toolsAndTechnologies',
+  'tools_and_technologies',
+  'preferences',
+  'templateId',
+  'template_id',
+  'profileImageUrl',
+  'profile_image_url',
+  'profileImageName',
+  'profile_image_name',
+  'profileImageData',
+  'profile_image_data',
+  'fileData',
+  'file_data',
+  'currentResumeText',
+  'current_resume_text',
+].map(normalizeImportedKey));
+
 type ImportedAddressParts = Pick<PersonalDetails, 'address' | 'city' | 'state' | 'country' | 'postalCode'>;
 
 const EMPTY_IMPORTED_ADDRESS: ImportedAddressParts = {
@@ -692,14 +850,26 @@ const App: React.FC = () => {
         'toolsAndTechnologies',
         'tools_and_technologies',
       ]);
-      const pushSkillGroup = (category: string, items: unknown) => {
-        const cleanItems = splitImportedCommaList(importedValues(items));
+      const pushSkillGroup = (category: string, items: unknown, preserveDetails = false) => {
+        const cleanItems = preserveDetails
+          ? importedSectionDetailItems(items)
+          : splitImportedCommaList(importedValues(items));
         if (cleanItems.length === 0) return;
-        const label = cleanImportedText(category).replace(/_/g, ' ');
+        const categoryLabel = formatImportedCategoryLabel(category || 'Core');
+        const existing = skills.find((skill) => normalizeImportedKey(skill.category) === normalizeImportedKey(categoryLabel));
+        if (existing) {
+          const existingItems = splitImportedCommaList(importedValues(existing.items));
+          const mergedItems = [...existingItems];
+          cleanItems.forEach((item) => {
+            if (!mergedItems.includes(item)) mergedItems.push(item);
+          });
+          existing.items = mergedItems.join(', ');
+          return;
+        }
         skills.push({
-            id: Math.random().toString(),
-            category: label ? label.charAt(0).toUpperCase() + label.slice(1) : 'Core',
-            items: cleanItems.join(', ')
+          id: Math.random().toString(),
+          category: categoryLabel,
+          items: cleanItems.join(', '),
         });
       };
 
@@ -724,6 +894,11 @@ const App: React.FC = () => {
           Object.entries(skillSource).forEach(([category, items]) => pushSkillGroup(category, items));
         }
       }
+
+      Object.entries(resumeJson).forEach(([sectionKey, sectionValue]) => {
+        if (DEDICATED_IMPORTED_SECTION_KEYS.has(normalizeImportedKey(sectionKey))) return;
+        pushSkillGroup(sectionKey, sectionValue, true);
+      });
 
       const location = mergeImportedAddressParts(
         parseImportedAddress(header),

@@ -197,6 +197,72 @@ describe('ResumeInput', () => {
     });
   });
 
+  it('saves resumes when education dates are missing', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+        prefilledData={{
+          targetRole: 'Senior Developer',
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: false,
+          },
+          personalDetails: {
+            firstName: 'Resume',
+            lastName: 'User',
+            email: 'resume@example.com',
+            phone: '555-0100',
+            address: '100 Main St',
+            city: 'San Francisco',
+            state: 'California',
+            country: 'United States',
+            postalCode: '94105',
+            summary: 'Experienced developer.',
+          },
+          experienceItems: [
+            { id: 'exp_1', role: 'Senior Developer', company: 'Acme', dates: '2020 - Present', description: 'Built products.' },
+          ],
+          educationItems: [
+            { id: 'edu_1', degree: 'BS Computer Science', school: 'State University', dates: '' },
+          ],
+          skillItems: [
+            { id: 'skill_1', category: 'Technical', items: 'React, Python' },
+          ],
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /^save resume$/i }));
+
+    await waitFor(() => expect(saveResume).toHaveBeenCalled());
+    const savedContent = vi.mocked(saveResume).mock.calls.at(-1)?.[0].content;
+    expect(savedContent?.educationItems?.[0]).toEqual(expect.objectContaining({
+      school: 'State University',
+      degree: 'BS Computer Science',
+      dates: '',
+    }));
+  });
+
   it('saves uploaded profile photos with the protected app URL', async () => {
     const user = userEvent.setup();
 
