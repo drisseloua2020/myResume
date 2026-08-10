@@ -352,6 +352,73 @@ describe('ResumeInput', () => {
     expect(saved.content.skillItems).toEqual([]);
   });
 
+  it('switches editor workspace between split, viewer-only, and editor-only layouts', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+        prefilledData={{
+          targetRole: 'Security Analyst',
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: false,
+          },
+          personalDetails: {
+            firstName: 'Resume',
+            lastName: 'User',
+            email: 'resume@example.com',
+            phone: '',
+            address: '',
+            city: '',
+            state: '',
+            country: '',
+            postalCode: '',
+            summary: '',
+          },
+          experienceItems: [{
+            id: 'exp_1',
+            role: 'Security Analyst',
+            company: 'Blue Team Co',
+            dates: 'January 2020 - Present',
+            description: 'Monitored security events.',
+          }],
+          educationItems: [],
+          skillItems: [],
+        }}
+      />
+    );
+
+    expect(screen.getByPlaceholderText(/senior product designer/i)).toBeInTheDocument();
+    expect(screen.getByText('Live Preview')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^viewer$/i }));
+    expect(screen.queryByPlaceholderText(/senior product designer/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Live Preview')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^editor$/i }));
+    expect(screen.getByPlaceholderText(/senior product designer/i)).toBeInTheDocument();
+    expect(screen.queryByText('Live Preview')).not.toBeInTheDocument();
+  });
+
   it('saves uploaded profile photos with the protected app URL', async () => {
     const user = userEvent.setup();
 

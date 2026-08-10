@@ -58,7 +58,6 @@ export default function CoverLettersPage() {
   const [jobUrl, setJobUrl] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [title, setTitle] = useState('');
-  const [templateId, setTemplateId] = useState<string>(AVAILABLE_TEMPLATES[0]?.id || 'classic_pro');
   const [generating, setGenerating] = useState(false);
   const [generationNotice, setGenerationNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<CoverLetterRecord | null>(null);
@@ -127,7 +126,7 @@ export default function CoverLettersPage() {
         jobDescription: jobSourceMode === 'paste' ? jobDescription.trim() : undefined,
         jobUrl: jobSourceMode === 'url' ? jobUrl.trim() : undefined,
         title: title.trim() || undefined,
-        templateId,
+        templateId: draft?.templateId || AVAILABLE_TEMPLATES[0]?.id || 'classic_pro',
         resumeJson: draft?.content ?? null,
       });
       setSelected(record);
@@ -291,7 +290,7 @@ export default function CoverLettersPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
                   <div>
                     <label htmlFor="cover-letter-title" className="text-xs font-bold uppercase tracking-wide text-slate-500">Job Title</label>
                     <input
@@ -301,21 +300,6 @@ export default function CoverLettersPage() {
                       placeholder="Optional, inferred when possible"
                       className="mt-2 w-full rounded border border-slate-300 px-3 py-2 text-sm"
                     />
-                  </div>
-                  <div>
-                    <label htmlFor="cover-letter-template" className="text-xs font-bold uppercase tracking-wide text-slate-500">Template</label>
-                    <select
-                      id="cover-letter-template"
-                      value={templateId}
-                      onChange={(e) => setTemplateId(e.target.value)}
-                      className="mt-2 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                    >
-                      {AVAILABLE_TEMPLATES.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
               </div>

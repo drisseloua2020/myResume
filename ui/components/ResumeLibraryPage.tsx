@@ -214,7 +214,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(300px,0.62fr)_minmax(680px,1.38fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(240px,0.46fr)_minmax(760px,1.54fr)]">
         <div className="bg-white border border-slate-200 rounded overflow-hidden shadow-sm">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
             <div className="text-sm font-semibold text-slate-800">Saved Resumes</div>
@@ -232,7 +232,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
               {itemsWithTemplate.map((r) => (
                 <div key={r.id} className={`border-b border-slate-100 px-4 py-4 ${selectedResume?.id === r.id ? 'bg-blue-50/60' : ''}`}>
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">{r.title}</div>
+                    <div className="break-words text-sm font-semibold leading-snug text-slate-900">{r.title}</div>
                     <div className="mt-1 text-xs text-slate-500">{r.templateName} | {new Date(r.updatedAt || r.createdAt).toLocaleDateString()}</div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
