@@ -20,7 +20,7 @@ function safeFilename(value: string): string {
 
 type ResumeLibraryPageProps = {
   onLoadResume?: (resume: ResumeRecord) => void | Promise<void>;
-  onResumeDeleted?: (resumeId: string) => void | Promise<void>;
+  onResumeDeleted?: (resumeId: string, options?: { isLibraryEmpty: boolean }) => void | Promise<void>;
   user?: User;
 };
 
@@ -52,14 +52,16 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
     return items.map((i) => ({ ...i, templateName: templateName(i.templateId) }));
   }, [items]);
 
-  async function refresh() {
+  async function refresh(): Promise<ResumeListItem[]> {
     setLoading(true);
     setError(null);
     try {
       const res = await listResumes();
       setItems(res);
+      return res;
     } catch (e: any) {
       setError(e?.message || 'Failed to load resumes');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -151,8 +153,8 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
     try {
       await deleteResume(deletedResumeId);
       if (selectedResume?.id === deletedResumeId) setSelectedResume(null);
-      await onResumeDeleted?.(deletedResumeId);
-      await refresh();
+      const refreshedItems = await refresh();
+      await onResumeDeleted?.(deletedResumeId, { isLibraryEmpty: refreshedItems.length === 0 });
     } catch (e: any) {
       alert(e?.message || 'Delete failed');
     } finally {

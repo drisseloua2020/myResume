@@ -137,6 +137,43 @@ function withEducationDateText(item: EducationItem): EducationItem {
   return { ...item, dates };
 }
 
+function emptyPreferences(): NonNullable<UserInputData['preferences']> {
+  return {
+    pages: '1-page',
+    tone: 'modern',
+    region: 'US',
+    photo: false,
+  };
+}
+
+function emptyPersonalDetails(): PersonalDetails {
+  return {
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    country: '',
+    postalCode: '',
+    summary: '',
+  };
+}
+
+function personalDetailsFromUser(user: User): PersonalDetails {
+  const nameParts = user.name ? user.name.split(' ') : [''];
+  const initialFirst = nameParts[0] || '';
+  const initialLast = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+  return {
+    ...emptyPersonalDetails(),
+    firstName: initialFirst,
+    lastName: initialLast,
+    email: user.email || '',
+  };
+}
+
 const emptyExperience = (): ExperienceItem => ({
   id: Math.random().toString(),
   role: '',
@@ -160,6 +197,51 @@ const emptyEducation = (): EducationItem => ({
   endMonth: '',
   endYear: '',
 });
+
+const emptySkill = (): SkillItem => ({
+  id: Math.random().toString(),
+  category: '',
+  items: '',
+});
+
+const hasTextValue = (value?: string | null) => Boolean(value && value.trim().length > 0);
+
+const hasExperienceContent = (item: ExperienceItem): boolean => (
+  [
+    item.role,
+    item.company,
+    item.dates,
+    item.startMonth,
+    item.startYear,
+    item.endMonth,
+    item.endYear,
+    item.description,
+  ].some(hasTextValue) || Boolean(item.isPresent)
+);
+
+const hasEducationContent = (item: EducationItem): boolean => (
+  [
+    item.degree,
+    item.school,
+    item.dates,
+    item.startMonth,
+    item.startYear,
+    item.endMonth,
+    item.endYear,
+  ].some(hasTextValue)
+);
+
+const hasSkillContent = (item: SkillItem): boolean => (
+  [item.category, item.items].some(hasTextValue)
+);
+
+const EmptyResumePreview: React.FC = () => (
+  <div
+    data-testid="empty-live-preview"
+    aria-label="Empty resume preview"
+    className="resume-page bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto shadow-2xl print:shadow-none"
+  />
+);
 
 const IMPORT_DOCUMENT_TYPES: Record<string, string> = {
   'application/pdf': '.pdf',
@@ -612,75 +694,64 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     setSaveMsg(null);
   }, [loadedResumeId]);
 
-  // Personal Details State - Initialize with user data if available
+  // Personal Details State - Initialize with user data only when no explicit editor data was supplied.
   const [personalDetails, setPersonalDetails] = useState<PersonalDetails>(() => {
-    // Split user name into first/last as default
-    const nameParts = user.name ? user.name.split(' ') : [''];
-    const initialFirst = nameParts[0] || '';
-    const initialLast = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
-    
-    return {
-      firstName: initialFirst,
-      lastName: initialLast,
-      email: user.email || '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      country: '',
-      postalCode: '',
-      summary: ''
-    };
+    if (prefilledData) {
+      return {
+        ...emptyPersonalDetails(),
+        ...(prefilledData.personalDetails || {}),
+      };
+    }
+    return personalDetailsFromUser(user);
   });
 
   // Handle Prefilled Data (e.g. from Import)
   useEffect(() => {
     if (prefilledData) {
-      if ('targetRole' in prefilledData) setTargetRole(prefilledData.targetRole || '');
-      if (prefilledData.experienceItems) setExperiences(prefilledData.experienceItems.map(hydrateExperienceItem));
-      if (prefilledData.educationItems) setEducations(prefilledData.educationItems.map(hydrateEducationItem));
-      if (prefilledData.skillItems) setSkills(prefilledData.skillItems);
-      if (prefilledData.jobDescription) setJobDescription(prefilledData.jobDescription);
-      if (prefilledData.jobUrl) setJobUrl(prefilledData.jobUrl);
-      if (prefilledData.preferences) {
-        setPreferences(prev => ({
-          ...prev!,
-          ...prefilledData.preferences,
-        }));
-      }
-      if (prefilledData.personalDetails) {
-         setPersonalDetails(prev => ({
-             ...prev,
-             ...prefilledData.personalDetails
-         }));
-      }
-      if ('profileImageUrl' in prefilledData) setProfileImageUrl(prefilledData.profileImageUrl || undefined);
-      if ('profileImageName' in prefilledData) setProfilePhotoName(prefilledData.profileImageName || null);
-      if ('profileImageData' in prefilledData) setLegacyProfileImageData(prefilledData.profileImageData || undefined);
+      setTargetRole(prefilledData.targetRole || '');
+      setJobDescription(prefilledData.jobDescription || '');
+      setJobUrl(prefilledData.jobUrl || '');
+      setExperiences((prefilledData.experienceItems || []).map(hydrateExperienceItem));
+      setEducations((prefilledData.educationItems || []).map(hydrateEducationItem));
+      setSkills(prefilledData.skillItems || []);
+      setPreferences({
+        ...emptyPreferences(),
+        ...(prefilledData.preferences || {}),
+      });
+      setPersonalDetails({
+        ...emptyPersonalDetails(),
+        ...(prefilledData.personalDetails || {}),
+      });
+      setProfileImageUrl(prefilledData.profileImageUrl || undefined);
+      setProfilePhotoName(prefilledData.profileImageName || null);
+      setLegacyProfileImageData(prefilledData.profileImageData || undefined);
+      setProfilePhotoError(null);
+      setCurrentResumeText(prefilledData.currentResumeText || '');
+      setFileData(prefilledData.fileData);
+      setFileName(prefilledData.fileData?.name || null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [prefilledData]);
   
   // Common State
-  const [targetRole, setTargetRole] = useState('');
-  const [jobDescription, setJobDescription] = useState('');
-  const [jobUrl, setJobUrl] = useState('');
+  const [targetRole, setTargetRole] = useState(prefilledData?.targetRole || '');
+  const [jobDescription, setJobDescription] = useState(prefilledData?.jobDescription || '');
+  const [jobUrl, setJobUrl] = useState(prefilledData?.jobUrl || '');
   const [jobSourceMode, setJobSourceMode] = useState<JobSourceMode>('url');
   const [preferences, setPreferences] = useState<UserInputData['preferences']>({
-    pages: '1-page',
-    tone: 'modern',
-    region: 'US',
-    photo: false,
+    ...emptyPreferences(),
+    ...(prefilledData?.preferences || {}),
   });
 
   // Mode A State (Upload)
-  const [currentResumeText, setCurrentResumeText] = useState('');
-  const [fileData, setFileData] = useState<UserInputData['fileData'] | undefined>(undefined);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [currentResumeText, setCurrentResumeText] = useState(prefilledData?.currentResumeText || '');
+  const [fileData, setFileData] = useState<UserInputData['fileData'] | undefined>(prefilledData?.fileData);
+  const [fileName, setFileName] = useState<string | null>(prefilledData?.fileData?.name || null);
 
   // Profile Photo State
-  const [profileImageUrl, setProfileImageUrl] = useState<string | undefined>(undefined);
-  const [legacyProfileImageData, setLegacyProfileImageData] = useState<{ mimeType: string, data: string } | undefined>(undefined);
-  const [profilePhotoName, setProfilePhotoName] = useState<string | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | undefined>(prefilledData?.profileImageUrl);
+  const [legacyProfileImageData, setLegacyProfileImageData] = useState<{ mimeType: string, data: string } | undefined>(prefilledData?.profileImageData);
+  const [profilePhotoName, setProfilePhotoName] = useState<string | null>(prefilledData?.profileImageName || null);
   const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
   const [profilePhotoError, setProfilePhotoError] = useState<string | null>(null);
 
@@ -709,15 +780,21 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   }, [profileImageUrl, legacyProfileImageData]);
 
   // Mode B State (Structured)
-  const [experiences, setExperiences] = useState<ExperienceItem[]>([
-    { ...emptyExperience(), id: '1' }
-  ]);
-  const [educations, setEducations] = useState<EducationItem[]>([
-    { ...emptyEducation(), id: '1' }
-  ]);
-  const [skills, setSkills] = useState<SkillItem[]>([
-    { id: '1', category: '', items: '' }
-  ]);
+  const [experiences, setExperiences] = useState<ExperienceItem[]>(() => (
+    prefilledData
+      ? (prefilledData.experienceItems || []).map(hydrateExperienceItem)
+      : [{ ...emptyExperience(), id: '1' }]
+  ));
+  const [educations, setEducations] = useState<EducationItem[]>(() => (
+    prefilledData
+      ? (prefilledData.educationItems || []).map(hydrateEducationItem)
+      : [{ ...emptyEducation(), id: '1' }]
+  ));
+  const [skills, setSkills] = useState<SkillItem[]>(() => (
+    prefilledData
+      ? (prefilledData.skillItems || [])
+      : [{ ...emptySkill(), id: '1' }]
+  ));
 
   const activeTemplate = AVAILABLE_TEMPLATES.find(t => t.id === selectedTemplateId);
 
@@ -993,25 +1070,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     // Reset ALL fields to a blank state (start from scratch with the selected template)
     setTargetRole('');
     setJobDescription('');
-    setPreferences({
-      pages: '1-page',
-      tone: 'modern',
-      region: 'US',
-      photo: false,
-    });
+    setJobUrl('');
+    setPreferences(emptyPreferences());
 
-    setPersonalDetails({
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      country: '',
-      postalCode: '',
-      summary: '',
-    });
+    setPersonalDetails(emptyPersonalDetails());
 
     // Clear profile photo
     setProfileImageUrl(undefined);
@@ -1232,6 +1294,27 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     skillItems: skills
   };
   const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData);
+  const isResumeViewerEmpty = ![
+    targetRole,
+    jobDescription,
+    jobUrl,
+    profileImageUrl,
+    profilePhotoName || '',
+    personalDetails.firstName,
+    personalDetails.lastName,
+    personalDetails.email,
+    personalDetails.phone,
+    personalDetails.address,
+    personalDetails.city,
+    personalDetails.state,
+    personalDetails.country,
+    personalDetails.postalCode,
+    personalDetails.summary,
+  ].some(hasTextValue)
+    && !legacyProfileImageData
+    && !experiences.some(hasExperienceContent)
+    && !educations.some(hasEducationContent)
+    && !skills.some(hasSkillContent);
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
@@ -1834,7 +1917,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
             {/* The Resume Document Component - Wrapped in its own scroll viewport */}
             <div className="w-full flex-1 min-h-0 overflow-auto pb-4 flex justify-center custom-scrollbar">
                 <div className="transform origin-top transition-transform duration-200 scale-[0.55] sm:scale-[0.7] md:scale-[0.85] xl:scale-100">
-                    <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
+                    {isResumeViewerEmpty ? (
+                      <EmptyResumePreview />
+                    ) : (
+                      <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
+                    )}
                 </div>
             </div>
 
@@ -1850,7 +1937,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
             className="absolute top-0 bg-white pointer-events-none overflow-visible"
             style={{ left: '-10000px', width: '210mm', minHeight: '297mm', height: 'auto', overflow: 'visible' }}
          >
-            <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
+            {isResumeViewerEmpty ? (
+              <EmptyResumePreview />
+            ) : (
+              <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
+            )}
          </div>
       </div>
     {showNewResumeConfirm && (
