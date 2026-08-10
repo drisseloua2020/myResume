@@ -68,6 +68,7 @@ describe('CoverLettersPage', () => {
     render(<CoverLettersPage />);
 
     expect(await screen.findByText(/latest resume automatically linked/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^template$/i)).not.toBeInTheDocument();
     await user.type(screen.getByLabelText(/job posting url/i), 'https://jobs.example.com/platform-engineer');
     await user.click(screen.getByRole('button', { name: /generate linked letter/i }));
 
@@ -75,6 +76,7 @@ describe('CoverLettersPage', () => {
       expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({
         jobUrl: 'https://jobs.example.com/platform-engineer',
         jobDescription: undefined,
+        templateId: 'classic_pro',
         resumeJson: expect.objectContaining({ targetRole: 'Platform Engineer' }),
       }));
     });

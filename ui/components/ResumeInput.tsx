@@ -26,6 +26,7 @@ interface ResumeInputProps {
 }
 
 type TabType = 'upload' | 'create' | 'cover_letter';
+type WorkspaceViewMode = 'split' | 'viewer' | 'editor';
 type JobSourceMode = 'url' | 'paste';
 
 const MONTH_OPTIONS = [
@@ -674,6 +675,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   loadedResumeId = null,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  const [workspaceViewMode, setWorkspaceViewMode] = useState<WorkspaceViewMode>('split');
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showNewResumeConfirm, setShowNewResumeConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -1357,11 +1359,39 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     additionalSections
   ]);
 
+  const showEditorColumn = workspaceViewMode !== 'viewer';
+  const showPreviewColumn = workspaceViewMode !== 'editor';
+
   return (
-    <div className="flex flex-col lg:flex-row gap-6 relative items-start">
+    <div className="relative space-y-4">
+      <div className="no-print flex justify-center lg:justify-end">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+          {[
+            { key: 'split', label: 'Current Page' },
+            { key: 'viewer', label: 'Viewer' },
+            { key: 'editor', label: 'Editor' },
+          ].map((mode) => (
+            <button
+              key={mode.key}
+              type="button"
+              onClick={() => setWorkspaceViewMode(mode.key as WorkspaceViewMode)}
+              className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${
+                workspaceViewMode === mode.key
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={`flex flex-col gap-6 relative items-start ${workspaceViewMode === 'split' ? 'lg:flex-row' : ''}`}>
       
       {/* --- LEFT COLUMN: EDITOR FORM --- */}
-      <div className="w-full lg:w-[44%] xl:w-[500px] 2xl:w-[560px] flex-shrink-0 no-print">
+      {showEditorColumn && (
+      <div className={`${workspaceViewMode === 'editor' ? 'w-full max-w-4xl mx-auto' : 'w-full lg:w-[44%] xl:w-[500px] 2xl:w-[560px]'} flex-shrink-0 no-print`}>
         <div className="w-full max-w-full min-w-0 flex flex-col sm:flex-row sm:flex-wrap xl:flex-nowrap sm:justify-between sm:items-stretch gap-3 mb-10 relative">
           <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 flex overflow-x-auto w-full min-w-0 sm:flex-[1_1_34rem] xl:min-w-[34rem]">
              <button
@@ -1935,9 +1965,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
         </form>
       </div>
+      )}
 
       {/* --- RIGHT COLUMN: LIVE PREVIEW --- */}
-      <div className="flex-1 mt-[1in] lg:sticky lg:top-[calc(6rem+1in)] self-start">
+      {showPreviewColumn && (
+      <div className={`${workspaceViewMode === 'viewer' ? 'w-full max-w-[82rem] mx-auto mt-0' : 'flex-1 mt-[1in] lg:sticky lg:top-[calc(6rem+1in)]'} self-start`}>
          <div className="bg-slate-200/50 rounded-xl border-2 border-slate-200 p-3 lg:p-5 flex flex-col items-center h-[82vh] lg:h-[calc(100vh-6rem)] min-h-[620px] max-h-[980px] no-print relative">
             <div className="w-full flex justify-between items-center mb-6 max-w-[210mm] flex-shrink-0">
                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
@@ -1985,6 +2017,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
             )}
          </div>
       </div>
+      )}
     {showNewResumeConfirm && (
       <ConfirmNewResumeModal
         onCancel={() => setShowNewResumeConfirm(false)}
@@ -1995,6 +2028,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       />
     )}
 
+      </div>
     </div>
   );
 };
