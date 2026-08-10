@@ -930,3 +930,61 @@ def test_generate_resume_groups_labeled_skill_lines_under_skills(client, monkeyp
     assert resume_json["skills"]["AI & Security"] == ["Agentic AI", "OpenAI APIs"]
     assert resume_json["skills"]["Cloud & Engineering"] == ["AWS", "Azure"]
     assert resume_json["skills"]["Boot"] == ["AngularJS"]
+
+
+def test_generate_resume_moves_skill_lines_out_of_education_section(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Taylor Mixed",
+            "Solutions Architect",
+            "taylor@example.com",
+            "EDUCATION",
+            "Architecture: Distributed Systems",
+            "Microservices",
+            "Cloud &amp; Engineering: AWS",
+            "Azure",
+            "State University",
+            "BS Computer Science",
+            "2012 - 2016",
+            "EXPERIENCE",
+            "Solutions Architect",
+            "Example Cloud",
+            "2022 - Present",
+            "Designed distributed cloud services.",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "taylor-mixed.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["skills"]["Architecture"] == ["Distributed Systems", "Microservices"]
+    assert resume_json["skills"]["Cloud & Engineering"] == ["AWS", "Azure"]
+    assert resume_json["education"] == [{
+        "school": "State University",
+        "degree": "BS Computer Science",
+        "location": "",
+        "start": "2012",
+        "end": "2016",
+        "notes": [],
+    }]

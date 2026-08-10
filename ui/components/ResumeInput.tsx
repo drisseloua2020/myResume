@@ -1138,11 +1138,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       ['lastName', 'Last name'],
       ['email', 'Email'],
       ['phone', 'Phone'],
-      ['address', 'Street address'],
-      ['country', 'Country'],
-      ['state', 'State / region'],
-      ['city', 'City'],
-      ['postalCode', 'Zip / postal code'],
       ['summary', 'Professional summary'],
     ];
 
@@ -1521,7 +1516,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                              <label className="text-[10px] font-bold text-slate-500 uppercase">Street Address</label>
-                             <input value={personalDetails.address} onChange={e => updatePersonalDetails('address', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. 123 Main St" autoComplete="street-address" required />
+                             <input value={personalDetails.address} onChange={e => updatePersonalDetails('address', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="e.g. 123 Main St" autoComplete="street-address" />
                           </div>
                           <div>
                              <label className="text-[10px] font-bold text-slate-500 uppercase">Country</label>
@@ -1532,7 +1527,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
                                placeholder={loadingCountries ? 'Loading countries...' : 'e.g. United States'}
                                autoComplete="country-name"
-                               required
                              />
                              <datalist id="country-options">
                                {countries.map(country => (
@@ -1558,7 +1552,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
                                placeholder={loadingStates ? 'Loading states...' : 'e.g. CA'}
                                autoComplete="address-level1"
-                               required
                              />
                              <datalist id="state-options">
                                {states.map(state => (
@@ -1575,7 +1568,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                               className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
                               placeholder={loadingCities ? 'Loading cities...' : 'e.g. San Francisco'}
                               autoComplete="address-level2"
-                              required
                             />
                             <datalist id="city-options">
                               {cities.map(city => (
@@ -1595,7 +1587,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                maxLength={5}
                                pattern="\d{5}"
                                title="Enter a 5-digit zip code"
-                               required
                              />
                          </div>
                       </div>

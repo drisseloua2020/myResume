@@ -197,7 +197,7 @@ describe('ResumeInput', () => {
     });
   });
 
-  it('saves resumes when education dates are missing', async () => {
+  it('saves resumes when education dates and address are missing', async () => {
     const user = userEvent.setup();
 
     render(
@@ -232,11 +232,11 @@ describe('ResumeInput', () => {
             lastName: 'User',
             email: 'resume@example.com',
             phone: '555-0100',
-            address: '100 Main St',
-            city: 'San Francisco',
-            state: 'California',
-            country: 'United States',
-            postalCode: '94105',
+            address: '',
+            city: '',
+            state: '',
+            country: '',
+            postalCode: '',
             summary: 'Experienced developer.',
           },
           experienceItems: [
@@ -260,6 +260,13 @@ describe('ResumeInput', () => {
       school: 'State University',
       degree: 'BS Computer Science',
       dates: '',
+    }));
+    expect(savedContent?.personalDetails).toEqual(expect.objectContaining({
+      address: '',
+      city: '',
+      state: '',
+      country: '',
+      postalCode: '',
     }));
   });
 

@@ -326,30 +326,46 @@ COMPANY_KEYWORD_RE = re.compile(
     flags=re.I,
 )
 
-DEGREE_KEYWORDS = {
-    "bachelor",
-    "master",
-    "mba",
-    "phd",
-    "degree",
-    "diploma",
-    "certificate",
-    "university",
+EDUCATION_INSTITUTION_KEYWORDS = {
+    "academy",
     "college",
+    "conservatory",
+    "ecole",
+    "escuela",
+    "fachhochschule",
+    "hochschule",
+    "institute",
+    "institut",
+    "instituto",
+    "lycee",
+    "polytechnic",
     "school",
+    "seminary",
+    "universidad",
+    "universidade",
+    "universite",
+    "university",
 }
 
-DEGREE_ONLY_KEYWORDS = {
+DEGREE_KEYWORDS = {
+    "aa",
     "ba",
     "bachelor",
+    "bba",
+    "beng",
+    "bsc",
     "bs",
     "certificate",
+    "certification",
     "degree",
     "diploma",
+    "doctorate",
     "ma",
     "master",
     "mba",
+    "meng",
     "ms",
+    "msc",
     "phd",
 }
 
@@ -837,6 +853,8 @@ def _is_skill_value(value: str) -> bool:
     clean = value.strip(" .")
     if not clean or len(clean) > 60:
         return False
+    if _looks_like_education_institution(clean) or _looks_like_degree(clean):
+        return False
     if _is_template_noise_line(clean, allow_role=True, allow_company=True, allow_location=True):
         return False
     words = re.findall(r"[A-Za-z0-9+#.-]+", clean)
@@ -940,13 +958,33 @@ def _split_company_location(value: str) -> tuple[str, str]:
 
 
 def _looks_like_degree_or_school(line: str) -> bool:
-    words = set(re.findall(r"[A-Za-z]+", line.lower()))
-    return bool(words & DEGREE_KEYWORDS)
+    return _looks_like_degree(line) or _looks_like_education_institution(line)
 
 
 def _looks_like_degree(line: str) -> bool:
     words = set(re.findall(r"[A-Za-z]+", line.lower()))
-    return bool(words & DEGREE_ONLY_KEYWORDS)
+    return bool(words & DEGREE_KEYWORDS)
+
+
+def _looks_like_education_institution(line: str) -> bool:
+    normalized = (
+        line.lower()
+        .replace("&", " ")
+        .replace("\u00e9", "e")
+        .replace("\u00e8", "e")
+        .replace("\u00e1", "a")
+        .replace("\u00ed", "i")
+        .replace("\u00f3", "o")
+        .replace("\u00fa", "u")
+    )
+    words = set(re.findall(r"[A-Za-z]+", normalized))
+    if words & EDUCATION_INSTITUTION_KEYWORDS:
+        return True
+    return bool(re.search(
+        r"\b(?:ucla|uc\s+berkeley|nyu|mit|caltech|stanford|harvard|oxford|cambridge)\b",
+        normalized,
+        flags=re.I,
+    ))
 
 
 def _detail_segments(line: str) -> list[str]:
@@ -1285,16 +1323,33 @@ def _parse_education_line(line: str) -> dict[str, object] | None:
 
     if degree_index >= 0:
         degree = segments[degree_index]
-        school = next((segment for index, segment in enumerate(segments) if index != degree_index), "")
+        school = next(
+            (
+                segment for index, segment in enumerate(segments)
+                if index != degree_index and _looks_like_education_institution(segment)
+            ),
+            "",
+        )
         notes = [segment for index, segment in enumerate(segments) if index not in {degree_index} and segment != school]
     elif len(segments) >= 2:
-        school, degree = segments[0], segments[1]
-        notes = segments[2:]
+        school_index = next(
+            (index for index, segment in enumerate(segments) if _looks_like_education_institution(segment)),
+            -1,
+        )
+        if school_index >= 0:
+            school = segments[school_index]
+            degree = next(
+                (segment for index, segment in enumerate(segments) if index != school_index and _looks_like_degree(segment)),
+                "",
+            )
+            notes = [segment for index, segment in enumerate(segments) if segment not in {school, degree}]
+        else:
+            notes = segments
     else:
         if _looks_like_degree_or_school(segments[0]):
             if _looks_like_degree(segments[0]):
                 degree = segments[0]
-            else:
+            elif _looks_like_education_institution(segments[0]):
                 school = segments[0]
         else:
             notes = [segments[0]]
@@ -1303,7 +1358,7 @@ def _parse_education_line(line: str) -> dict[str, object] | None:
         location = next((segment for segment in notes if "," in segment), "")
         notes = [segment for segment in notes if segment != location]
 
-    if not any([school, degree, start, end]):
+    if not school or not _looks_like_education_institution(school):
         return None
 
     return {
@@ -1321,10 +1376,13 @@ def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
     if not clean_lines:
         return []
 
+    if not any(_looks_like_education_institution(_strip_date_range(line)) for line in clean_lines):
+        return []
+
     compact_entries: list[dict[str, object]] = []
     for line in clean_lines:
         parsed = _parse_education_line(line)
-        if parsed and (parsed["school"] or parsed["degree"]) and (
+        if parsed and parsed["school"] and (
             len(_role_company_segments(_strip_date_range(line))) >= 2 or _looks_like_date_range(line)
         ):
             compact_entries.append(parsed)
@@ -1340,24 +1398,27 @@ def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
         _strip_date_range(line) if _looks_like_date_range(line) else line
         for line in clean_lines
     ]
-    content_lines = [line for line in content_lines if line]
+    content_lines = [
+        line for line in content_lines
+        if line and (_looks_like_education_institution(line) or _looks_like_degree(line) or not _skill_values_from_text(line))
+    ]
     if not content_lines:
-        return [{"school": "", "degree": "", "location": "", "start": start, "end": end, "notes": []}]
+        return []
 
+    school_index = next((index for index, line in enumerate(content_lines) if _looks_like_education_institution(line)), -1)
+    if school_index < 0:
+        return []
+
+    school = content_lines[school_index]
     degree_index = next(
-        (index for index, line in enumerate(content_lines) if _looks_like_degree(line)),
-        next((index for index, line in enumerate(content_lines) if _looks_like_degree_or_school(line)), 0),
+        (index for index, line in enumerate(content_lines) if index != school_index and _looks_like_degree(line)),
+        -1,
     )
-    degree = content_lines[degree_index]
-    school = ""
-    if degree_index > 0:
-        school = content_lines[degree_index - 1]
-    elif len(content_lines) > 1:
-        school = content_lines[1]
+    degree = content_lines[degree_index] if degree_index >= 0 else ""
 
     notes = [
         line for index, line in enumerate(content_lines)
-        if index not in {degree_index, max(0, degree_index - 1)}
+        if index not in {school_index, degree_index}
     ]
     return [{
         "school": school,
@@ -1367,6 +1428,19 @@ def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
         "end": end,
         "notes": notes[:8],
     }]
+
+
+def _education_section_skill_lines(lines: list[str]) -> list[str]:
+    skill_lines: list[str] = []
+    for line in lines:
+        clean = _strip_date_range(line) if _looks_like_date_range(line) else line
+        if not clean or _is_contact_line(clean):
+            continue
+        if _looks_like_education_institution(clean) or _looks_like_degree(clean):
+            continue
+        if _parse_skill_category_line(clean) or _skill_values_from_text(clean):
+            skill_lines.append(clean)
+    return skill_lines
 
 
 def _parse_project_entries(lines: list[str]) -> list[dict[str, object]]:
@@ -1401,12 +1475,16 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
         line for line in sections.get("experience", [])
         if not _is_contact_line(line) and line != header_name
     ])
-    education = _parse_education_entries([line for line in sections.get("education", []) if not _is_contact_line(line)])
+    education_lines = [line for line in sections.get("education", []) if not _is_contact_line(line)]
+    education = _parse_education_entries(education_lines)
+    skill_groups = _skill_groups_from_sections(sections)
+    for category, values in _skill_groups_from_skill_lines(_education_section_skill_lines(education_lines)).items():
+        _add_skill_group_values(skill_groups, category, values)
 
     return {
         "header": header,
         "summary": summary,
-        "skills": _skill_groups_from_sections(sections),
+        "skills": skill_groups,
         "experience": experience,
         "education": education,
     }
