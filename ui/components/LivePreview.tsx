@@ -165,7 +165,7 @@ const CATEGORY_RESUME_TEMPLATES: Record<string, CategoryResumeTemplate> = {
 };
 
 const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'classic_pro' }) => {
-  const { experienceItems, educationItems, skillItems, targetRole, preferences, personalDetails } = data;
+  const { experienceItems, educationItems, skillItems, additionalSections, targetRole, preferences, personalDetails } = data;
 
   // Helper to format full address
   const fullAddress = [
@@ -190,9 +190,15 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
     : apiAssetUrl(data.profileImageUrl);
 
   const categoryTemplate = CATEGORY_RESUME_TEMPLATES[templateId];
-  const contactItems = [displayEmail, phoneNumber, fullAddress || preferences?.region].filter(Boolean);
+  const linkItems = (personalDetails?.links || '')
+    .split(/\n|,|\|/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const contactItems = [displayEmail, phoneNumber, ...linkItems, fullAddress || preferences?.region].filter(Boolean);
   const skillTokens = (skillItems || [])
     .flatMap((skill) => skill.items.split(',').map((item) => item.trim()).filter(Boolean));
+  const visibleAdditionalSections = (additionalSections || [])
+    .filter((section) => section.title?.trim() || section.items?.trim());
 
   const SectionTitle: React.FC<{ children: React.ReactNode; subtle?: boolean }> = ({ children, subtle }) => (
     <h3
@@ -269,6 +275,36 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
     );
   };
 
+  const AdditionalSectionsList: React.FC<{ subtle?: boolean; compact?: boolean }> = ({ subtle = false, compact = false }) => {
+    if (visibleAdditionalSections.length === 0) return null;
+
+    return (
+      <div className={compact ? 'space-y-3' : 'space-y-5'}>
+        {visibleAdditionalSections.map((section, i) => {
+          const lines = (section.items || '')
+            .split(/\n|;/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+          return (
+            <section key={`${section.title}-${i}`} data-pdf-block>
+              <div className={`${compact ? 'text-xs' : 'text-sm'} font-bold uppercase tracking-wide mb-2 ${subtle ? 'text-white/80' : 'text-slate-700'}`}>
+                {section.title || 'Additional Section'}
+              </div>
+              <div className={`space-y-1 ${compact ? 'text-xs' : 'text-sm'} leading-relaxed ${subtle ? 'text-white/70' : 'text-slate-700'}`}>
+                {lines.length > 0 ? lines.map((line, idx) => (
+                  <div key={idx}>{line}</div>
+                )) : (
+                  <div>{section.items}</div>
+                )}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderCategoryResumeTemplate = (config: CategoryResumeTemplate) => {
     if (config.layout === 'sidebar') {
       return (
@@ -309,6 +345,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
               <SectionTitle>{config.experienceLabel}</SectionTitle>
               <ExperienceList />
             </section>
+            {visibleAdditionalSections.length > 0 && (
+              <section>
+                <SectionTitle>Additional Sections</SectionTitle>
+                <AdditionalSectionsList />
+              </section>
+            )}
           </main>
         </div>
       );
@@ -352,6 +394,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                 <SectionTitle>{config.educationLabel}</SectionTitle>
                 <EducationList />
               </section>
+              {visibleAdditionalSections.length > 0 && (
+                <section>
+                  <SectionTitle>Additional Sections</SectionTitle>
+                  <AdditionalSectionsList compact />
+                </section>
+              )}
             </aside>
           </div>
         </div>
@@ -396,6 +444,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
               <EducationList />
             </section>
           </div>
+          {visibleAdditionalSections.length > 0 && (
+            <section className="mt-7">
+              <SectionTitle>Additional Sections</SectionTitle>
+              <AdditionalSectionsList compact />
+            </section>
+          )}
         </div>
       );
     }
@@ -432,6 +486,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
             <SkillList />
           </section>
         </div>
+        {visibleAdditionalSections.length > 0 && (
+          <section className="mt-7">
+            <SectionTitle>Additional Sections</SectionTitle>
+            <AdditionalSectionsList compact />
+          </section>
+        )}
       </div>
     );
   };
@@ -456,6 +516,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                     <div className="text-sm text-purple-100 flex flex-wrap gap-x-6 gap-y-2 opacity-90">
                         {displayEmail && <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>{displayEmail}</span>}
                         {phoneNumber && <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>{phoneNumber}</span>}
+                        {linkItems.map((link, i) => <span key={i} className="break-words">{link}</span>)}
                         {fullAddress && <span className="flex items-center gap-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>{fullAddress}</span>}
                     </div>
                 </div>
@@ -503,6 +564,14 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                             ) : <div className="text-slate-300 italic">No experience added.</div>}
                         </div>
                      </section>
+                     {visibleAdditionalSections.length > 0 && (
+                        <section>
+                           <h3 className="text-lg font-bold text-purple-700 uppercase mb-4 flex items-center gap-2">
+                              <span className="w-8 h-1 bg-purple-700"></span> Additional
+                           </h3>
+                           <AdditionalSectionsList compact />
+                        </section>
+                     )}
                 </div>
 
                 {/* Right Column (Sidebar) */}
@@ -559,6 +628,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                 <div className="text-right text-sm text-slate-600 leading-relaxed">
                     <div>{displayEmail}</div>
                     {phoneNumber && <div>{phoneNumber}</div>}
+                    {linkItems.map((link, i) => <div key={i}>{link}</div>)}
                     {fullAddress && <div>{fullAddress}</div>}
                 </div>
              </header>
@@ -605,6 +675,13 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                 </div>
              </section>
 
+             {visibleAdditionalSections.length > 0 && (
+                <section className="mb-8">
+                   <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest border-b border-slate-300 mb-4 pb-1">Additional Sections</h3>
+                   <AdditionalSectionsList compact />
+                </section>
+             )}
+
              {/* Education */}
              <section>
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest border-b border-slate-300 mb-4 pb-1">Education</h3>
@@ -645,6 +722,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
             <div className="text-sm space-y-2 font-light">
               <div className="break-words font-medium">{displayEmail}</div>
               {phoneNumber && <div>{phoneNumber}</div>}
+              {linkItems.map((link, i) => <div key={i} className="break-words">{link}</div>)}
               {fullAddress && <div className="leading-tight opacity-80">{fullAddress}</div>}
             </div>
           </div>
@@ -715,6 +793,14 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
               )}
             </div>
           </section>
+          {visibleAdditionalSections.length > 0 && (
+            <section className="mt-8">
+              <h3 className="text-lg font-bold uppercase tracking-wider text-slate-900 border-b border-slate-200 pb-2 mb-4 flex items-center gap-2">
+                <span className="w-2 h-2 bg-blue-600 rounded-full"></span> Additional
+              </h3>
+              <AdditionalSectionsList compact />
+            </section>
+          )}
         </div>
       </div>
     );
@@ -735,6 +821,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
            <div className="flex justify-center flex-wrap gap-4 text-xs text-slate-400 font-medium">
               {displayEmail && <span>{displayEmail}</span>}
               {phoneNumber && <span>| {phoneNumber}</span>}
+              {linkItems.map((link, i) => <span key={i}>| {link}</span>)}
               {fullAddress && <span>| {fullAddress}</span>}
               {preferences?.region && !fullAddress && <span>| {preferences.region}</span>}
            </div>
@@ -794,6 +881,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                </div>
             </section>
         </div>
+        {visibleAdditionalSections.length > 0 && (
+          <section className="mt-8">
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Additional Sections</div>
+            <AdditionalSectionsList compact />
+          </section>
+        )}
       </div>
     );
   }
@@ -814,6 +907,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
             <div className="text-right text-xs font-medium text-slate-600 space-y-0.5">
                <div>{displayEmail}</div>
                <div>{phoneNumber}</div>
+               {linkItems.map((link, i) => <div key={i}>{link}</div>)}
                <div>{fullAddress}</div>
             </div>
         </header>
@@ -845,6 +939,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                        ))}
                    </div>
                </section>
+               {visibleAdditionalSections.length > 0 && (
+                  <section>
+                    <h3 className="text-sm font-black text-orange-600 uppercase mb-3">Additional</h3>
+                    <AdditionalSectionsList compact />
+                  </section>
+               )}
             </div>
 
             {/* Sidebar (1 col) */}
@@ -896,6 +996,9 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
         <h1 className="text-3xl font-bold uppercase tracking-wide mb-2">{displayName}</h1>
         <div className="text-sm text-slate-600 flex justify-center gap-4 separator flex-wrap">
           <span>{displayEmail}</span>
+          {linkItems.map((link, i) => (
+             <React.Fragment key={i}><span>|</span><span>{link}</span></React.Fragment>
+          ))}
           {phoneNumber && (
              <><span>•</span><span>{phoneNumber}</span></>
           )}
@@ -967,6 +1070,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
            ))}
         </div>
       </section>
+      {visibleAdditionalSections.length > 0 && (
+        <section className="mt-6">
+          <h3 className="text-sm font-bold uppercase border-b border-slate-300 mb-3 pb-1 tracking-wider">Additional Sections</h3>
+          <AdditionalSectionsList compact />
+        </section>
+      )}
     </div>
   );
 };

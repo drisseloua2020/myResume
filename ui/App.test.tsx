@@ -161,6 +161,7 @@ describe('App import flow', () => {
             email: 'jordan@example.com',
             phone: '555-555-0100',
             location: 'Seattle, WA 98101',
+            links: [{ label: 'LinkedIn', url: 'linkedin.com/in/jordan' }],
           },
           professional_summary: 'Architect focused on AI-enabled delivery.',
           technical_skills: {
@@ -187,6 +188,7 @@ describe('App import flow', () => {
           projects: [
             {
               name: 'Resume Scanner',
+              link: 'https://example.com/project',
               description: 'Classified imported resume sections.',
               bullets: ['Moved certifications into grouped editor skills.'],
             },
@@ -218,6 +220,7 @@ describe('App import flow', () => {
       lastName: 'Candidate',
       email: 'jordan@example.com',
       phone: '555-555-0100',
+      links: 'LinkedIn: linkedin.com/in/jordan',
       city: 'Seattle',
       state: 'WA',
       postalCode: '98101',
@@ -238,13 +241,13 @@ describe('App import flow', () => {
       category: 'Core',
       items: 'Cloud Architecture, AI Engineering, Python',
     }));
-    expect(payload.content.skillItems).toEqual(expect.arrayContaining([
+    expect(payload.content.additionalSections).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        category: 'Projects',
-        items: 'Resume Scanner: Classified imported resume sections., Moved certifications into grouped editor skills.',
+        title: 'Projects',
+        items: 'Resume Scanner: Classified imported resume sections.\nMoved certifications into grouped editor skills.\nhttps://example.com/project',
       }),
       expect.objectContaining({
-        category: 'Certifications',
+        title: 'Certifications',
         items: 'AWS Certified Solutions Architect',
       }),
     ]));

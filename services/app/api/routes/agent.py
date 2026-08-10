@@ -722,17 +722,42 @@ def _skill_groups_from_skill_lines(lines: list[str]) -> dict[str, list[str]]:
 
 def _skill_groups_from_sections(sections: dict[str, list[str]]) -> dict[str, list[str]]:
     groups: dict[str, list[str]] = {}
-
-    for section, label in SECTION_LABELS.items():
-        lines = sections.get(section, [])
-        if section == "skills":
-            groups.update(_skill_groups_from_skill_lines(lines))
-            continue
-        values = _clean_field_lines(lines)
-        if values:
-            groups[label] = values[:30]
+    groups.update(_skill_groups_from_skill_lines(sections.get("skills", [])))
 
     return groups or {"Skills": []}
+
+
+def _clean_additional_section_lines(lines: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for line in lines:
+        value = _clean_resume_line(line)
+        if (
+            not value
+            or _section_for_heading(value)
+            or _is_date_only_line(value)
+            or _looks_like_email(value)
+            or _looks_like_phone(value)
+        ):
+            continue
+        if value not in cleaned:
+            cleaned.append(value)
+    return cleaned
+
+
+def _additional_sections_from_sections(sections: dict[str, list[str]]) -> list[dict[str, object]]:
+    additional_sections: list[dict[str, object]] = []
+
+    for section, label in SECTION_LABELS.items():
+        if section == "skills":
+            continue
+        values = _clean_additional_section_lines(sections.get(section, []))
+        if values:
+            additional_sections.append({
+                "title": label,
+                "items": values[:40],
+            })
+
+    return additional_sections
 
 
 def _highlight_items(lines: list[str]) -> list[dict[str, object]]:
@@ -1546,6 +1571,7 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
     skill_groups = _skill_groups_from_sections(sections)
     for category, values in _skill_groups_from_skill_lines(_education_section_skill_lines(education_lines)).items():
         _add_skill_group_values(skill_groups, category, values)
+    additional_sections = _additional_sections_from_sections(sections)
 
     return {
         "header": header,
@@ -1553,6 +1579,7 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
         "skills": skill_groups,
         "experience": experience,
         "education": education,
+        "additionalSections": additional_sections,
     }
 
 
