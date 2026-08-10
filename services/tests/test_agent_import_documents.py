@@ -877,3 +877,56 @@ def test_generate_resume_moves_non_experience_education_sections_into_skills(cli
     assert resume_json["education"][0]["degree"] == "BS Computer Science"
     assert resume_json["education"][0]["start"] == ""
     assert resume_json["education"][0]["end"] == ""
+
+
+def test_generate_resume_groups_labeled_skill_lines_under_skills(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Taylor Skills",
+            "Solutions Architect",
+            "taylor@example.com",
+            "SKILLS",
+            "Architecture: Distributed Systems",
+            "Microservices",
+            "AI &amp; Security: Agentic AI",
+            "OpenAI APIs",
+            "Cloud &amp; Engineering: AWS",
+            "Azure",
+            "Boot",
+            "AngularJS",
+            "EXPERIENCE",
+            "Solutions Architect",
+            "Example Cloud",
+            "2022 - Present",
+            "Designed distributed cloud services.",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "taylor-skills.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["skills"]["Architecture"] == ["Distributed Systems", "Microservices"]
+    assert resume_json["skills"]["AI & Security"] == ["Agentic AI", "OpenAI APIs"]
+    assert resume_json["skills"]["Cloud & Engineering"] == ["AWS", "Azure"]
+    assert resume_json["skills"]["Boot"] == ["AngularJS"]

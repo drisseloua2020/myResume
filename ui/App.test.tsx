@@ -332,6 +332,67 @@ describe('App import flow', () => {
     }));
   });
 
+  it('maps labeled skill lines into separate skills categories', async () => {
+    const user = userEvent.setup();
+    vi.mocked(generateResumeContent).mockResolvedValueOnce({
+      json: {
+        RESUME_JSON: {
+          header: {
+            name: 'Taylor Skills',
+            title: 'Solutions Architect',
+            email: 'taylor@example.com',
+          },
+          skills: [
+            'Architecture: Distributed Systems',
+            'Microservices',
+            'AI & Security: Agentic AI',
+            'OpenAI APIs',
+            'Cloud & Engineering: AWS',
+            'Azure',
+            'Boot',
+            'AngularJS',
+          ],
+          experience: [],
+          education: [],
+        },
+      },
+    });
+
+    const { container } = render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await user.upload(fileInput, new File(['resume'], 'taylor-skills.pdf', { type: 'application/pdf' }));
+    await screen.findByText('taylor-skills.pdf');
+
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
+
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = vi.mocked(saveResume).mock.calls[0][0];
+    expect(payload.content.skillItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: 'Architecture',
+        items: 'Distributed Systems, Microservices',
+      }),
+      expect.objectContaining({
+        category: 'AI & Security',
+        items: 'Agentic AI, OpenAI APIs',
+      }),
+      expect.objectContaining({
+        category: 'Cloud & Engineering',
+        items: 'AWS, Azure',
+      }),
+      expect.objectContaining({
+        category: 'Boot',
+        items: 'AngularJS',
+      }),
+    ]));
+  });
+
   it('folds undated imported job fragments into the previous dated job description', async () => {
     const user = userEvent.setup();
     vi.mocked(generateResumeContent).mockResolvedValueOnce({
@@ -611,6 +672,52 @@ describe('App import flow', () => {
       expect(screen.queryByDisplayValue('Tech Co')).not.toBeInTheDocument();
       expect(screen.queryByDisplayValue('Software Architect')).not.toBeInTheDocument();
     });
-    expect(screen.getByDisplayValue('resume@example.com')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('First Name')).toHaveValue('');
+    expect(screen.getByPlaceholderText('email@example.com')).toHaveValue('');
+    expect(await screen.findAllByTestId('empty-live-preview')).not.toHaveLength(0);
+  });
+
+  it('keeps the editor and preview empty when there are no saved resumes', async () => {
+    vi.mocked(getLatestResume).mockResolvedValue(null);
+    vi.mocked(getLatestDraft).mockResolvedValue({
+      templateId: 'classic_pro',
+      content: {
+        targetRole: 'Stale Architect',
+        personalDetails: {
+          firstName: 'Stale',
+          lastName: 'Draft',
+          email: 'stale@example.com',
+          phone: '',
+          address: '',
+          city: '',
+          state: '',
+          country: '',
+          postalCode: '',
+          summary: '',
+        },
+        experienceItems: [
+          {
+            id: 'exp_stale',
+            role: 'Stale Architect',
+            company: 'Stale Co',
+            dates: '2020 - 2021',
+            description: 'Old draft content.',
+          },
+        ],
+      },
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(getLatestResume).toHaveBeenCalled();
+    });
+
+    expect(getLatestDraft).not.toHaveBeenCalled();
+    expect(screen.queryByDisplayValue('Stale Co')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Stale Architect')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('First Name')).toHaveValue('');
+    expect(screen.getByPlaceholderText('email@example.com')).toHaveValue('');
+    expect(await screen.findAllByTestId('empty-live-preview')).not.toHaveLength(0);
   });
 });

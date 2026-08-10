@@ -64,7 +64,34 @@ describe('ResumeLibraryPage', () => {
 
     await waitFor(() => {
       expect(deleteResume).toHaveBeenCalledWith('res_123');
-      expect(onResumeDeleted).toHaveBeenCalledWith('res_123');
+      expect(onResumeDeleted).toHaveBeenCalledWith('res_123', { isLibraryEmpty: false });
+    });
+  });
+
+  it('reports when deleting leaves the resume library empty', async () => {
+    const user = userEvent.setup();
+    const onResumeDeleted = vi.fn();
+    vi.mocked(listResumes)
+      .mockResolvedValueOnce([
+        {
+          id: 'res_123',
+          templateId: 'classic_pro',
+          title: 'Senior Developer Resume',
+          createdAt: '2026-05-01T12:00:00Z',
+          updatedAt: '2026-05-20T12:00:00Z',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    render(<ResumeLibraryPage onResumeDeleted={onResumeDeleted} />);
+
+    expect(await screen.findByText('Senior Developer Resume')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /delete/i }));
+    await user.click(screen.getByRole('button', { name: /yes/i }));
+
+    await waitFor(() => {
+      expect(onResumeDeleted).toHaveBeenCalledWith('res_123', { isLibraryEmpty: true });
     });
   });
 });

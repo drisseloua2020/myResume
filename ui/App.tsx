@@ -25,7 +25,7 @@ import { authService } from './services/authService';
 import { setSession, clearSession, SESSION_EXPIRED_EVENT } from './services/apiClient';
 import { getOAuthBackendCallbackRedirect, isOAuthCallbackPath } from './services/oauthRedirect';
 import { agentService } from './services/agentService';
-import { saveDraft, getLatestDraft, getLatestResume, saveResume } from './services/resumeService';
+import { saveDraft, getLatestResume, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
 import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, PersonalDetails } from './types';
 
@@ -176,6 +176,25 @@ const splitImportedCommaList = (items: unknown[]): string[] => {
   return values;
 };
 
+const IMPORTED_STANDALONE_SKILL_CATEGORY_KEYS = new Set([
+  'ai',
+  'ai security',
+  'architecture',
+  'backend',
+  'boot',
+  'cloud',
+  'cloud engineering',
+  'data',
+  'databases',
+  'engineering',
+  'frameworks',
+  'frontend',
+  'languages',
+  'platforms',
+  'security',
+  'tools',
+]);
+
 const formatImportedCategoryLabel = (value: string): string => {
   const label = cleanImportedText(value).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!label) return 'Other';
@@ -185,6 +204,77 @@ const formatImportedCategoryLabel = (value: string): string => {
       ? word
       : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
+};
+
+const normalizeImportedSkillCategoryKey = (value: string): string => (
+  cleanImportedText(value)
+    .replace(/&/g, ' ')
+    .replace(/[^A-Za-z0-9+#. ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+);
+
+const importedSkillLines = (items: unknown): string[] => (
+  importedValues(items)
+    .flatMap((item) => cleanImportedListItem(item).split(/\n|;/))
+    .map(cleanImportedListItem)
+    .filter(Boolean)
+);
+
+const parseImportedSkillCategoryLine = (line: string): { category: string; items: string[] } | null => {
+  if (!line.includes(':')) return null;
+  const [rawCategory, ...valueParts] = line.split(':');
+  const category = cleanImportedListItem(rawCategory);
+  const value = cleanImportedListItem(valueParts.join(':'));
+  if (!category || !value || category.length > 50) return null;
+  const items = splitImportedCommaList([value]);
+  return items.length > 0 ? { category, items } : null;
+};
+
+const isStandaloneImportedSkillCategory = (line: string, nextLine: string): boolean => {
+  if (!nextLine || line.includes(':') || /[,|/;]/.test(line)) return false;
+  if (parseImportedSkillCategoryLine(nextLine)) return false;
+  if (splitImportedCommaList([nextLine]).length === 0) return false;
+  return IMPORTED_STANDALONE_SKILL_CATEGORY_KEYS.has(normalizeImportedSkillCategoryKey(line));
+};
+
+const groupedImportedSkillItems = (items: unknown, fallbackCategory: string): Array<{ category: string; items: string[] }> => {
+  const groups: Array<{ category: string; items: string[] }> = [];
+  let currentCategory = cleanImportedText(fallbackCategory) || 'Core';
+
+  const addItems = (category: string, values: string[]) => {
+    if (values.length === 0) return;
+    const label = formatImportedCategoryLabel(category || 'Core');
+    let group = groups.find((item) => normalizeImportedKey(item.category) === normalizeImportedKey(label));
+    if (!group) {
+      group = { category: label, items: [] };
+      groups.push(group);
+    }
+    values.forEach((value) => {
+      if (!group.items.includes(value)) group.items.push(value);
+    });
+  };
+
+  const lines = importedSkillLines(items);
+  lines.forEach((line, index) => {
+    const categoryLine = parseImportedSkillCategoryLine(line);
+    if (categoryLine) {
+      currentCategory = categoryLine.category;
+      addItems(currentCategory, categoryLine.items);
+      return;
+    }
+
+    const nextLine = lines[index + 1] || '';
+    if (isStandaloneImportedSkillCategory(line, nextLine)) {
+      currentCategory = line;
+      return;
+    }
+
+    addItems(currentCategory, splitImportedCommaList([line]));
+  });
+
+  return groups;
 };
 
 const importedSectionDetailItems = (source: unknown): string[] => {
@@ -425,6 +515,34 @@ const parseImportedAddress = (value: unknown): ImportedAddressParts => (
 
 const DEFAULT_IMPORTED_TEMPLATE_ID = 'classic_pro';
 
+const emptyEditorData = (templateId?: string): Partial<UserInputData> => ({
+  targetRole: '',
+  jobDescription: '',
+  jobUrl: '',
+  templateId,
+  preferences: {
+    pages: '1-page',
+    tone: 'modern',
+    region: 'US',
+    photo: false,
+  },
+  personalDetails: {
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    country: '',
+    postalCode: '',
+    summary: '',
+  },
+  experienceItems: [],
+  educationItems: [],
+  skillItems: [],
+});
+
 const computeImportedResumeTitle = (content: Partial<UserInputData>): string => {
   const firstName = cleanImportedText(content.personalDetails?.firstName);
   const lastName = cleanImportedText(content.personalDetails?.lastName);
@@ -456,6 +574,8 @@ const App: React.FC = () => {
   const [loadedResumeId, setLoadedResumeId] = useState<string | null>(null);
   const [loadedResumeTitle, setLoadedResumeTitle] = useState<string | null>(null);
   const initialResumeLoadUserRef = useRef<string | null>(null);
+  const emptyVisibleEditorDataRef = useRef<Partial<UserInputData>>(emptyEditorData());
+  const visibleEditorData = editorData ?? emptyVisibleEditorDataRef.current;
 
 
   // Global handler: if API returns 401, disconnect user and return to home page.
@@ -525,12 +645,12 @@ const App: React.FC = () => {
     setWorkspaceResetKey((k) => k + 1);
   };
 
-  const resetEditorForDeletedResume = (deletedResumeId: string) => {
-    if (loadedResumeId !== deletedResumeId) return;
+  const resetEditorForDeletedResume = (deletedResumeId: string, options?: { isLibraryEmpty?: boolean }) => {
+    if (loadedResumeId !== deletedResumeId && !options?.isLibraryEmpty) return;
 
     setResults(null);
     setError(null);
-    setEditorData(null);
+    setEditorData(emptyEditorData());
     setLoadedResumeId(null);
     setLoadedResumeTitle(null);
     setSelectedTemplateId(undefined);
@@ -540,7 +660,7 @@ const App: React.FC = () => {
   };
 
   // Load the newest saved resume when a user lands in the editor.
-  // If the user has no saved resume yet, fall back to the last autosaved draft.
+  // If the user has no saved resume, keep the workspace intentionally empty.
   useEffect(() => {
     if (!currentUser || currentUser.role === 'admin') return;
     if (activeTab !== 'workspace') return;
@@ -560,20 +680,8 @@ const App: React.FC = () => {
           return;
         }
 
-        const draft = await getLatestDraft(selectedTemplateId);
-        if (cancelled) return;
-
-        if (draft?.content) {
-          const draftContent = draft.content && typeof draft.content === 'object' && !Array.isArray(draft.content)
-            ? draft.content as Partial<UserInputData>
-            : {};
-          const templateId = draft.templateId || selectedTemplateId;
-          setSelectedTemplateId(templateId);
-          setEditorData({ ...draftContent, templateId });
-          setLoadedResumeId(null);
-          setLoadedResumeTitle(null);
-          setWorkspaceResetKey((k) => k + 1);
-        }
+        setLoadedResumeId(null);
+        setLoadedResumeTitle(null);
       } catch {
         // Workspace can still start empty if the saved-resume lookup fails.
         initialResumeLoadUserRef.current = null;
@@ -851,25 +959,28 @@ const App: React.FC = () => {
         'tools_and_technologies',
       ]);
       const pushSkillGroup = (category: string, items: unknown, preserveDetails = false) => {
-        const cleanItems = preserveDetails
-          ? importedSectionDetailItems(items)
-          : splitImportedCommaList(importedValues(items));
-        if (cleanItems.length === 0) return;
-        const categoryLabel = formatImportedCategoryLabel(category || 'Core');
-        const existing = skills.find((skill) => normalizeImportedKey(skill.category) === normalizeImportedKey(categoryLabel));
-        if (existing) {
-          const existingItems = splitImportedCommaList(importedValues(existing.items));
-          const mergedItems = [...existingItems];
-          cleanItems.forEach((item) => {
-            if (!mergedItems.includes(item)) mergedItems.push(item);
+        const groups = preserveDetails
+          ? [{ category: category || 'Core', items: importedSectionDetailItems(items) }]
+          : groupedImportedSkillItems(items, category || 'Core');
+
+        groups.forEach((group) => {
+          if (group.items.length === 0) return;
+          const categoryLabel = formatImportedCategoryLabel(group.category || 'Core');
+          const existing = skills.find((skill) => normalizeImportedKey(skill.category) === normalizeImportedKey(categoryLabel));
+          if (existing) {
+            const existingItems = splitImportedCommaList(importedValues(existing.items));
+            const mergedItems = [...existingItems];
+            group.items.forEach((item) => {
+              if (!mergedItems.includes(item)) mergedItems.push(item);
+            });
+            existing.items = mergedItems.join(', ');
+            return;
+          }
+          skills.push({
+            id: Math.random().toString(),
+            category: categoryLabel,
+            items: group.items.join(', '),
           });
-          existing.items = mergedItems.join(', ');
-          return;
-        }
-        skills.push({
-          id: Math.random().toString(),
-          category: categoryLabel,
-          items: cleanItems.join(', '),
         });
       };
 
@@ -1163,7 +1274,7 @@ const App: React.FC = () => {
             // Persist workspace edits as the user types
             await saveDraft({ templateId: draft.templateId ?? selectedTemplateId, content: draft });
           }}
-          prefilledData={editorData}
+          prefilledData={visibleEditorData}
           isLoading={isLoading} 
           role={currentUser.role}
           userPlan={currentUser.plan}

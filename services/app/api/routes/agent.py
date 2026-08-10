@@ -539,12 +539,114 @@ def _skill_values(lines: list[str]) -> list[str]:
     return values[:30]
 
 
+STANDALONE_SKILL_CATEGORY_KEYS = {
+    "ai",
+    "ai security",
+    "architecture",
+    "backend",
+    "boot",
+    "cloud",
+    "cloud engineering",
+    "data",
+    "databases",
+    "engineering",
+    "frameworks",
+    "frontend",
+    "languages",
+    "platforms",
+    "security",
+    "tools",
+}
+
+
+def _normalize_skill_category_key(value: str) -> str:
+    clean = value.replace("&", " ")
+    clean = re.sub(r"[^A-Za-z0-9+#. ]+", " ", clean)
+    return re.sub(r"\s+", " ", clean).strip().lower()
+
+
+def _add_skill_group_values(groups: dict[str, list[str]], category: str, values: list[str]) -> None:
+    label = category.strip(" :") or "Skills"
+    if label not in groups:
+        groups[label] = []
+    for value in values:
+        clean = _clean_resume_line(value).strip(" .")
+        if _is_skill_value(clean) and clean not in groups[label]:
+            groups[label].append(clean)
+
+
+def _skill_values_from_text(value: str) -> list[str]:
+    values: list[str] = []
+    for item in re.split(r"[,;|/]", value):
+        clean = _clean_resume_line(item).strip(" .")
+        if _is_skill_value(clean) and clean not in values:
+            values.append(clean)
+    return values
+
+
+def _parse_skill_category_line(line: str) -> tuple[str, list[str]] | None:
+    if ":" not in line:
+        return None
+
+    category, value = [part.strip(" .") for part in line.split(":", 1)]
+    if not category or not value or len(category) > 50:
+        return None
+    if _is_template_noise_line(category, allow_role=True, allow_company=True, allow_location=True):
+        return None
+
+    values = _skill_values_from_text(value)
+    return (category, values) if values else None
+
+
+def _is_standalone_skill_category(line: str, next_line: str) -> bool:
+    if not next_line or ":" in line or any(delimiter in line for delimiter in [",", "|", ";", "/"]):
+        return False
+    if _parse_skill_category_line(next_line):
+        return False
+
+    clean = line.strip(" .")
+    if _is_template_noise_line(clean, allow_role=True, allow_company=True, allow_location=True):
+        return False
+    if not _skill_values_from_text(next_line):
+        return False
+    return _normalize_skill_category_key(clean) in STANDALONE_SKILL_CATEGORY_KEYS
+
+
+def _skill_groups_from_skill_lines(lines: list[str]) -> dict[str, list[str]]:
+    groups: dict[str, list[str]] = {}
+    current_category = "Skills"
+
+    for index, line in enumerate(lines):
+        if _is_template_noise_line(line, allow_role=True, allow_company=True, allow_location=True):
+            continue
+
+        category_line = _parse_skill_category_line(line)
+        if category_line:
+            category, values = category_line
+            current_category = category
+            _add_skill_group_values(groups, current_category, values)
+            continue
+
+        next_line = lines[index + 1] if index + 1 < len(lines) else ""
+        if _is_standalone_skill_category(line, next_line):
+            current_category = line.strip(" .")
+            groups.setdefault(current_category, [])
+            continue
+
+        _add_skill_group_values(groups, current_category, _skill_values_from_text(line))
+
+    return {category: values[:30] for category, values in groups.items() if values}
+
+
 def _skill_groups_from_sections(sections: dict[str, list[str]]) -> dict[str, list[str]]:
     groups: dict[str, list[str]] = {}
 
     for section, label in SECTION_LABELS.items():
         lines = sections.get(section, [])
-        values = _skill_values(lines) if section == "skills" else _clean_field_lines(lines)
+        if section == "skills":
+            groups.update(_skill_groups_from_skill_lines(lines))
+            continue
+        values = _clean_field_lines(lines)
         if values:
             groups[label] = values[:30]
 
