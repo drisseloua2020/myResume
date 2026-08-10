@@ -393,6 +393,67 @@ describe('App import flow', () => {
     ]));
   });
 
+  it('moves skill-looking education lines into skills while keeping only schools in education', async () => {
+    const user = userEvent.setup();
+    vi.mocked(generateResumeContent).mockResolvedValueOnce({
+      json: {
+        RESUME_JSON: {
+          header: {
+            name: 'Taylor Mixed',
+            title: 'Solutions Architect',
+            email: 'taylor@example.com',
+          },
+          education: [
+            'Architecture: Distributed Systems',
+            'Microservices',
+            'Cloud & Engineering: AWS',
+            'Azure',
+            {
+              institution: 'State University',
+              qualification: 'BS Computer Science',
+              years: '2012 - 2016',
+            },
+          ],
+          skills: [],
+          experience: [],
+        },
+      },
+    });
+
+    const { container } = render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /import file/i }));
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    await user.upload(fileInput, new File(['resume'], 'taylor-mixed.pdf', { type: 'application/pdf' }));
+    await screen.findByText('taylor-mixed.pdf');
+
+    await user.click(screen.getByRole('button', { name: /import to editor/i }));
+
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = vi.mocked(saveResume).mock.calls[0][0];
+    expect(payload.content.educationItems).toEqual([
+      expect.objectContaining({
+        school: 'State University',
+        degree: 'BS Computer Science',
+        dates: '2012 - 2016',
+      }),
+    ]);
+    expect(payload.content.skillItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: 'Architecture',
+        items: 'Distributed Systems, Microservices',
+      }),
+      expect.objectContaining({
+        category: 'Cloud & Engineering',
+        items: 'AWS, Azure',
+      }),
+    ]));
+  });
+
   it('folds undated imported job fragments into the previous dated job description', async () => {
     const user = userEvent.setup();
     vi.mocked(generateResumeContent).mockResolvedValueOnce({

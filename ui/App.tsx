@@ -277,6 +277,34 @@ const groupedImportedSkillItems = (items: unknown, fallbackCategory: string): Ar
   return groups;
 };
 
+const IMPORTED_EDUCATION_INSTITUTION_RE = /\b(?:academy|college|conservatory|ecole|escuela|fachhochschule|hochschule|institute|institut|instituto|lycee|polytechnic|school|seminary|universidad|universidade|universite|university|ucla|uc\s+berkeley|nyu|mit|caltech|stanford|harvard|oxford|cambridge)\b/i;
+const IMPORTED_DEGREE_RE = /\b(?:a\.?a\.?|b\.?a\.?|bachelor|bba|beng|b\.?s\.?|bsc|certificate|certification|degree|diploma|doctorate|m\.?a\.?|master|mba|meng|m\.?s\.?|msc|ph\.?d\.?)\b/i;
+
+const normalizeImportedEducationText = (value: string): string => (
+  cleanImportedText(value)
+    .replace(/[\u00e9\u00e8]/gi, 'e')
+    .replace(/[\u00e1\u00e0]/gi, 'a')
+    .replace(/[\u00ed\u00ec]/gi, 'i')
+    .replace(/[\u00f3\u00f2]/gi, 'o')
+    .replace(/[\u00fa\u00f9]/gi, 'u')
+);
+
+const looksLikeImportedEducationInstitution = (value: string): boolean => (
+  IMPORTED_EDUCATION_INSTITUTION_RE.test(normalizeImportedEducationText(value))
+);
+
+const looksLikeImportedDegree = (value: string): boolean => (
+  IMPORTED_DEGREE_RE.test(normalizeImportedEducationText(value))
+);
+
+const importedEducationSkillItems = (source: unknown): string[] => (
+  importedSkillLines(source).filter((line) => (
+    !looksLikeImportedEducationInstitution(line)
+    && !looksLikeImportedDegree(line)
+    && (parseImportedSkillCategoryLine(line) || splitImportedCommaList([line]).length > 0)
+  ))
+);
+
 const importedSectionDetailItems = (source: unknown): string[] => {
   const details: string[] = [];
   const addDetail = (value: unknown) => {
@@ -913,34 +941,47 @@ const App: React.FC = () => {
           return items;
         }, []);
 
+      const misplacedEducationSkillItems: unknown[] = [];
       const educations: EducationItem[] = educationSource
-        .map((edu: any) => ({
-            id: Math.random().toString(),
-            degree: firstImportedText(importedField(edu, [
-              'degree',
-              'program',
-              'qualification',
-              'credential',
-              'certificate',
-              'course',
-              'fieldOfStudy',
-              'field_of_study',
-              'title',
-            ])),
-            school: firstImportedText(importedField(edu, [
-              'school',
-              'institution',
-              'institutionName',
-              'institution_name',
-              'university',
-              'college',
-              'organization',
-              'organisation',
-              'academy',
-            ])),
-            dates: importedDateRange(edu)
-        }))
-        .filter((edu) => edu.degree || edu.school || edu.dates);
+        .reduce<EducationItem[]>((items, source: any) => {
+          const edu = {
+              id: Math.random().toString(),
+              degree: firstImportedText(importedField(source, [
+                'degree',
+                'program',
+                'qualification',
+                'credential',
+                'certificate',
+                'course',
+                'fieldOfStudy',
+                'field_of_study',
+                'title',
+              ])),
+              school: firstImportedText(importedField(source, [
+                'school',
+                'institution',
+                'institutionName',
+                'institution_name',
+                'university',
+                'college',
+                'organization',
+                'organisation',
+                'academy',
+              ])),
+              dates: importedDateRange(source),
+          };
+
+          if (looksLikeImportedEducationInstitution(edu.school)) {
+            items.push(edu);
+            return items;
+          }
+
+          const educationSkillItems = importedEducationSkillItems(source);
+          if (educationSkillItems.length > 0) {
+            misplacedEducationSkillItems.push(...educationSkillItems);
+          }
+          return items;
+        }, []);
 
       const skills: SkillItem[] = [];
       const skillSource = importedField(resumeJson, [
@@ -1004,6 +1045,10 @@ const App: React.FC = () => {
         } else {
           Object.entries(skillSource).forEach(([category, items]) => pushSkillGroup(category, items));
         }
+      }
+
+      if (misplacedEducationSkillItems.length > 0) {
+        pushSkillGroup('Skills', misplacedEducationSkillItems);
       }
 
       Object.entries(resumeJson).forEach(([sectionKey, sectionValue]) => {
