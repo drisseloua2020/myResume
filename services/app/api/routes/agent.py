@@ -1446,8 +1446,9 @@ def _parse_education_line(line: str) -> dict[str, object] | None:
             notes = [segments[0]]
 
     if notes:
-        location = next((segment for segment in notes if "," in segment), "")
-        notes = [segment for segment in notes if segment != location]
+        location_source = next((segment for segment in notes if _looks_like_location_line(segment) or "," in segment), "")
+        location = location_source.strip(" |,;")
+        notes = [segment for segment in notes if segment != location_source]
 
     if not school or not _looks_like_education_institution(school):
         return None
@@ -1491,7 +1492,12 @@ def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
     ]
     content_lines = [
         line for line in content_lines
-        if line and (_looks_like_education_institution(line) or _looks_like_degree(line) or not _skill_values_from_text(line))
+        if line and (
+            _looks_like_education_institution(line)
+            or _looks_like_degree(line)
+            or _looks_like_location_line(line)
+            or not _skill_values_from_text(line)
+        )
     ]
     if not content_lines:
         return []
@@ -1511,10 +1517,12 @@ def _parse_education_entries(lines: list[str]) -> list[dict[str, object]]:
         line for index, line in enumerate(content_lines)
         if index not in {school_index, degree_index}
     ]
+    location = next((line for line in notes if _looks_like_location_line(line)), "")
+    notes = [line for line in notes if line != location]
     return [{
         "school": school,
         "degree": degree,
-        "location": "",
+        "location": location,
         "start": start,
         "end": end,
         "notes": notes[:8],
@@ -1526,6 +1534,8 @@ def _education_section_skill_lines(lines: list[str]) -> list[str]:
     for line in lines:
         clean = _strip_date_range(line) if _looks_like_date_range(line) else line
         if not clean or _is_contact_line(clean):
+            continue
+        if _looks_like_location_line(clean):
             continue
         if _looks_like_education_institution(clean) or _looks_like_degree(clean):
             continue

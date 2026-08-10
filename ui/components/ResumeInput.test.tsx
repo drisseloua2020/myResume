@@ -243,7 +243,7 @@ describe('ResumeInput', () => {
             { id: 'exp_1', role: 'Senior Developer', company: 'Acme', dates: '2020 - Present', description: 'Built products.' },
           ],
           educationItems: [
-            { id: 'edu_1', degree: 'BS Computer Science', school: 'State University', dates: '' },
+            { id: 'edu_1', degree: 'BS Computer Science', school: 'State University', location: 'Richardson, TX', dates: '' },
           ],
           skillItems: [
             { id: 'skill_1', category: 'Technical', items: 'React, Python' },
@@ -259,6 +259,7 @@ describe('ResumeInput', () => {
     expect(savedContent?.educationItems?.[0]).toEqual(expect.objectContaining({
       school: 'State University',
       degree: 'BS Computer Science',
+      location: 'Richardson, TX',
       dates: '',
     }));
     expect(savedContent?.personalDetails).toEqual(expect.objectContaining({
@@ -268,6 +269,87 @@ describe('ResumeInput', () => {
       country: '',
       postalCode: '',
     }));
+  });
+
+  it('saves when optional resume fields are blank and only work experience is complete', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+        prefilledData={{
+          targetRole: '',
+          preferences: {
+            pages: '1-page',
+            tone: 'modern',
+            region: 'US',
+            photo: false,
+          },
+          personalDetails: {
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            address: '',
+            city: '',
+            state: '',
+            country: '',
+            postalCode: '',
+            summary: '',
+          },
+          experienceItems: [{
+            id: 'exp_1',
+            role: 'Security Analyst',
+            company: 'Blue Team Co',
+            dates: 'January 2020 - Present',
+            startMonth: 'January',
+            startYear: '2020',
+            endMonth: '',
+            endYear: '',
+            isPresent: true,
+            description: 'Monitored security events and documented incidents.',
+          }],
+          educationItems: [
+            { id: 'edu_empty', degree: '', school: '', location: '', dates: '' },
+          ],
+          skillItems: [
+            { id: 'skill_empty', category: '', items: '' },
+          ],
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /^save resume$/i }));
+
+    await waitFor(() => expect(saveResume).toHaveBeenCalledTimes(1));
+    const saved = vi.mocked(saveResume).mock.calls[0][0];
+    expect(saved.title).toBe('Resume');
+    expect(saved.content.targetRole).toBe('');
+    expect(saved.content.personalDetails?.summary).toBe('');
+    expect(saved.content.experienceItems?.[0]).toEqual(expect.objectContaining({
+      role: 'Security Analyst',
+      company: 'Blue Team Co',
+      dates: 'January 2020 - Present',
+      description: 'Monitored security events and documented incidents.',
+    }));
+    expect(saved.content.educationItems).toEqual([]);
+    expect(saved.content.skillItems).toEqual([]);
   });
 
   it('saves uploaded profile photos with the protected app URL', async () => {

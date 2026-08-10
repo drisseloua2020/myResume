@@ -41,6 +41,7 @@ const previewData: UserInputData = {
   educationItems: [{
     id: 'edu_1',
     school: 'State University',
+    location: 'Austin, TX',
     degree: 'BS Business',
     dates: '2015 - 2019',
   }],
@@ -77,6 +78,26 @@ describe('LivePreview category templates', () => {
       expect(screen.getByTestId(`live-preview-${templateId}`)).toBeInTheDocument();
       expect(screen.getByText('Jordan Preview')).toBeInTheDocument();
       expect(screen.getAllByText('Product Manager').length).toBeGreaterThan(0);
+      expect(screen.getByText('State University - Austin, TX')).toBeInTheDocument();
     },
   );
+
+  it('does not show fallback professional summary text when the editor summary is blank', () => {
+    render(
+      <LivePreview
+        data={{
+          ...previewData,
+          personalDetails: {
+            ...previewData.personalDetails!,
+            summary: '',
+          },
+        }}
+        user={previewUser}
+        templateId="classic_pro"
+      />,
+    );
+
+    expect(screen.queryByText(/Experienced professional with a proven track record/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Product leader focused on measurable customer outcomes.')).not.toBeInTheDocument();
+  });
 });

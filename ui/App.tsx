@@ -88,6 +88,10 @@ const IMPORTED_RECORD_VALUE_KEYS = [
   'credential',
   'school',
   'institution',
+  'location',
+  'city',
+  'state',
+  'country',
   'category',
   'items',
   'bullet',
@@ -618,6 +622,25 @@ const parseImportedAddress = (value: unknown): ImportedAddressParts => (
   mergeImportedAddressParts(parseImportedAddressObject(value), parseImportedAddressText(value))
 );
 
+const formatImportedLocation = (parts: ImportedAddressParts): string => (
+  [parts.city, parts.state, parts.country].filter(Boolean).join(', ')
+);
+
+const importedEducationLocation = (source: unknown): string => {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return '';
+  const explicitLocation = firstImportedText(importedField(source, [
+    'location',
+    'schoolLocation',
+    'school_location',
+    'institutionLocation',
+    'institution_location',
+    'campus',
+    'campusLocation',
+    'campus_location',
+  ]));
+  return explicitLocation || formatImportedLocation(parseImportedAddress(source));
+};
+
 const DEFAULT_IMPORTED_TEMPLATE_ID = 'classic_pro';
 
 const emptyEditorData = (templateId?: string): Partial<UserInputData> => ({
@@ -1047,6 +1070,7 @@ const App: React.FC = () => {
                 'organisation',
                 'academy',
               ])),
+              location: importedEducationLocation(source),
               dates: importedDateRange(source),
           };
 
