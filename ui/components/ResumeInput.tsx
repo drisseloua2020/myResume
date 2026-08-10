@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AppMode, UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, SkillItem, User, PersonalDetails } from '../types';
+import { AppMode, UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, User, PersonalDetails } from '../types';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
@@ -152,6 +152,7 @@ function emptyPersonalDetails(): PersonalDetails {
     lastName: '',
     email: '',
     phone: '',
+    links: '',
     address: '',
     city: '',
     state: '',
@@ -204,6 +205,12 @@ const emptySkill = (): SkillItem => ({
   items: '',
 });
 
+const emptyAdditionalSection = (): AdditionalSectionItem => ({
+  id: Math.random().toString(),
+  title: '',
+  items: '',
+});
+
 const hasTextValue = (value?: string | null) => Boolean(value && value.trim().length > 0);
 
 const hasExperienceContent = (item: ExperienceItem): boolean => (
@@ -233,6 +240,10 @@ const hasEducationContent = (item: EducationItem): boolean => (
 
 const hasSkillContent = (item: SkillItem): boolean => (
   [item.category, item.items].some(hasTextValue)
+);
+
+const hasAdditionalSectionContent = (item: AdditionalSectionItem): boolean => (
+  [item.title, item.items].some(hasTextValue)
 );
 
 const EmptyResumePreview: React.FC = () => (
@@ -714,6 +725,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       setExperiences((prefilledData.experienceItems || []).map(hydrateExperienceItem));
       setEducations((prefilledData.educationItems || []).map(hydrateEducationItem));
       setSkills(prefilledData.skillItems || []);
+      setAdditionalSections(prefilledData.additionalSections || []);
       setPreferences({
         ...emptyPreferences(),
         ...(prefilledData.preferences || {}),
@@ -794,6 +806,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     prefilledData
       ? (prefilledData.skillItems || [])
       : [{ ...emptySkill(), id: '1' }]
+  ));
+  const [additionalSections, setAdditionalSections] = useState<AdditionalSectionItem[]>(() => (
+    prefilledData
+      ? (prefilledData.additionalSections || [])
+      : []
   ));
 
   const activeTemplate = AVAILABLE_TEMPLATES.find(t => t.id === selectedTemplateId);
@@ -960,6 +977,12 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const removeSkill = (id: string) => setSkills(skills.filter(i => i.id !== id));
   const updateSkill = (id: string, field: keyof SkillItem, value: string) => setSkills(skills.map(i => i.id === id ? { ...i, [field]: value } : i));
 
+  const addAdditionalSection = () => setAdditionalSections([...additionalSections, emptyAdditionalSection()]);
+  const removeAdditionalSection = (id: string) => setAdditionalSections(additionalSections.filter(i => i.id !== id));
+  const updateAdditionalSection = (id: string, field: keyof AdditionalSectionItem, value: string) => {
+    setAdditionalSections(additionalSections.map(i => i.id === id ? { ...i, [field]: value } : i));
+  };
+
   const updatePersonalDetails = (field: keyof PersonalDetails, value: string) => {
     setPersonalDetails(prev => {
       if (field === 'country') {
@@ -1087,6 +1110,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     setExperiences([{ ...emptyExperience(), id: '1' }]);
     setEducations([{ ...emptyEducation(), id: '1' }]);
     setSkills([{ id: '1', category: '', items: '' }]);
+    setAdditionalSections([]);
 
     // Clear import state (if any)
     setCurrentResumeText('');
@@ -1227,6 +1251,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     payload.experienceItems = experiences.map(withExperienceDateText);
     payload.educationItems = educations.map(withEducationDateText);
     payload.skillItems = skills;
+    payload.additionalSections = additionalSections.filter(hasAdditionalSectionContent);
 
     if (activeTab === 'cover_letter') {
       setIsSavingResume(true);
@@ -1287,7 +1312,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     personalDetails,
     experienceItems: experiences.map(withExperienceDateText),
     educationItems: educations.map(withEducationDateText),
-    skillItems: skills
+    skillItems: skills,
+    additionalSections: additionalSections.filter(hasAdditionalSectionContent)
   };
   const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData);
   const isResumeViewerEmpty = ![
@@ -1300,6 +1326,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     personalDetails.lastName,
     personalDetails.email,
     personalDetails.phone,
+    personalDetails.links || '',
     personalDetails.address,
     personalDetails.city,
     personalDetails.state,
@@ -1310,7 +1337,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     && !legacyProfileImageData
     && !experiences.some(hasExperienceContent)
     && !educations.some(hasEducationContent)
-    && !skills.some(hasSkillContent);
+    && !skills.some(hasSkillContent)
+    && !additionalSections.some(hasAdditionalSectionContent);
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
@@ -1345,7 +1373,8 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     personalDetails,
     experiences,
     educations,
-    skills
+    skills,
+    additionalSections
   ]);
 
   return (
@@ -1512,6 +1541,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                             <label className="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
                             <input value={personalDetails.phone} onChange={e => updatePersonalDetails('phone', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="+1 (555) 000-0000" autoComplete="tel" required />
                          </div>
+                      </div>
+
+                      <div>
+                         <label className="text-[10px] font-bold text-slate-500 uppercase">Links</label>
+                         <input value={personalDetails.links || ''} onChange={e => updatePersonalDetails('links', e.target.value)} className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="LinkedIn, GitHub, portfolio, or personal website" autoComplete="url" />
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1776,6 +1810,34 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                      ))}
                      <button type="button" onClick={addSkill} className="text-[#1a91f0] font-semibold text-sm flex items-center gap-2 hover:bg-blue-50 px-4 py-2 rounded transition-colors w-full justify-center">
                         + Add Skill
+                     </button>
+                  </div>
+               </div>
+
+               {/* Additional ATS Sections */}
+               <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
+                  <div className="mb-4">
+                      <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Additional ATS Sections</h2>
+                      <p className="mt-1 text-xs text-slate-500">Projects, certifications, awards, publications, languages, volunteer work, and other standard resume sections imported from your file.</p>
+                  </div>
+                  <div className="space-y-4">
+                     {additionalSections.map((section) => (
+                        <div key={section.id} className="bg-[#f7f9fa] p-4 rounded border border-slate-200">
+                           <div className="mb-3">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Section Title</label>
+                              <input value={section.title} onChange={e => updateAdditionalSection(section.id, 'title', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm font-medium" placeholder="e.g. Projects, Certifications, Languages" />
+                           </div>
+                           <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Details</label>
+                              <textarea value={section.items} onChange={e => updateAdditionalSection(section.id, 'items', e.target.value)} className="w-full h-24 bg-white p-2 border border-slate-300 rounded mt-1 text-sm" placeholder="One item per line or short grouped details..." />
+                           </div>
+                           <button type="button" onClick={() => removeAdditionalSection(section.id)} className="text-red-400 text-xs mt-2 hover:text-red-600">
+                              Remove
+                           </button>
+                        </div>
+                     ))}
+                     <button type="button" onClick={addAdditionalSection} className="text-[#1a91f0] font-semibold text-sm flex items-center gap-2 hover:bg-blue-50 px-4 py-2 rounded transition-colors w-full justify-center">
+                        + Add ATS Section
                      </button>
                   </div>
                </div>

@@ -950,17 +950,96 @@ def test_generate_resume_moves_non_experience_education_sections_into_skills(cli
     json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
     resume_json = json.loads(json_blob)
 
-    assert set(resume_json.keys()) == {"header", "summary", "skills", "experience", "education"}
+    assert set(resume_json.keys()) == {"header", "summary", "skills", "experience", "education", "additionalSections"}
     assert resume_json["skills"]["Skills"] == ["Python", "AWS", "Terraform"]
-    assert resume_json["skills"]["Projects"] == [
-        "Resume Importer",
-        "Built a document parser that maps sections into editor fields.",
+    assert resume_json["additionalSections"] == [
+        {
+            "title": "Projects",
+            "items": [
+                "Resume Importer",
+                "Built a document parser that maps sections into editor fields.",
+            ],
+        },
+        {
+            "title": "Certifications",
+            "items": ["AWS Certified Solutions Architect"],
+        },
     ]
-    assert resume_json["skills"]["Certifications"] == ["AWS Certified Solutions Architect"]
     assert resume_json["education"][0]["school"] == "State University"
     assert resume_json["education"][0]["degree"] == "BS Computer Science"
     assert resume_json["education"][0]["start"] == ""
     assert resume_json["education"][0]["end"] == ""
+
+
+def test_generate_resume_preserves_standard_ats_sections_as_additional_sections(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FailingGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Morgan Complete",
+            "Program Manager",
+            "morgan@example.com | linkedin.com/in/morgan",
+            "SUMMARY",
+            "Program manager with delivery experience.",
+            "SKILLS",
+            "Roadmapping, Stakeholder Management, Jira",
+            "EXPERIENCE",
+            "Program Manager",
+            "Example Co",
+            "2021 - Present",
+            "Delivered cross-functional launch programs.",
+            "PROJECTS",
+            "Launch Dashboard",
+            "Created KPI reporting for executive stakeholders.",
+            "CERTIFICATIONS",
+            "PMP",
+            "AWARDS",
+            "President's Award",
+            "PUBLICATIONS",
+            "Delivery Playbook",
+            "LANGUAGES",
+            "English",
+            "Spanish",
+            "VOLUNTEER",
+            "Mentor, Local STEM Program",
+            "AFFILIATIONS",
+            "Project Management Institute",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "importFormat": "ats",
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "morgan-complete.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    assert resume_json["header"]["links"] == [{"label": "Link", "url": "linkedin.com/in/morgan"}]
+    assert resume_json["skills"]["Skills"] == ["Roadmapping", "Stakeholder Management", "Jira"]
+    additional = {section["title"]: section["items"] for section in resume_json["additionalSections"]}
+    assert additional["Projects"] == ["Launch Dashboard", "Created KPI reporting for executive stakeholders."]
+    assert additional["Certifications"] == ["PMP"]
+    assert additional["Awards"] == ["President's Award"]
+    assert additional["Publications"] == ["Delivery Playbook"]
+    assert additional["Languages"] == ["English", "Spanish"]
+    assert additional["Volunteer"] == ["Mentor, Local STEM Program"]
+    assert additional["Affiliations"] == ["Project Management Institute"]
 
 
 def test_generate_resume_groups_labeled_skill_lines_under_skills(client, monkeypatch):

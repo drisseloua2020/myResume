@@ -27,7 +27,7 @@ import { getOAuthBackendCallbackRedirect, isOAuthCallbackPath } from './services
 import { agentService } from './services/agentService';
 import { saveDraft, getLatestResume, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
-import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, PersonalDetails } from './types';
+import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
 
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
@@ -347,6 +347,9 @@ const importedSectionDetailItems = (source: unknown): string[] => {
         'accomplishments',
         'responsibilities',
         'notes',
+        'link',
+        'url',
+        'website',
       ].forEach((key) => {
         const nested = importedField(value, [key]);
         if (nested !== undefined) visit(nested);
@@ -364,6 +367,34 @@ const importedSectionDetailItems = (source: unknown): string[] => {
   visit(source);
   return details;
 };
+
+const importedLinkItems = (source: unknown): string[] => {
+  const links: string[] = [];
+  importedValues(source).forEach((item) => {
+    let text = '';
+    if (item && typeof item === 'object') {
+      const label = firstImportedText(importedField(item, ['label', 'name', 'title', 'type']));
+      const url = firstImportedText(importedField(item, ['url', 'href', 'link', 'website', 'value']));
+      text = label && url ? `${label}: ${url}` : url || label;
+    } else {
+      text = cleanImportedText(item);
+    }
+    if (text && !links.includes(text)) links.push(text);
+  });
+  return links;
+};
+
+const STANDARD_IMPORTED_ADDITIONAL_SECTIONS: Array<{ label: string; keys: string[] }> = [
+  { label: 'Projects', keys: ['projects', 'projectExperience', 'project_experience', 'selectedProjects', 'selected_projects'] },
+  { label: 'Certifications', keys: ['certifications', 'certification', 'licenses', 'licensesAndCertifications', 'licenses_and_certifications', 'certificates'] },
+  { label: 'Awards', keys: ['awards', 'honors', 'achievements', 'recognition'] },
+  { label: 'Publications', keys: ['publications', 'papers', 'research', 'researchPublications', 'research_publications'] },
+  { label: 'Languages', keys: ['languages', 'languageSkills', 'language_skills'] },
+  { label: 'Volunteer', keys: ['volunteer', 'volunteering', 'volunteerExperience', 'volunteer_experience', 'communityInvolvement', 'community_involvement'] },
+  { label: 'Affiliations', keys: ['affiliations', 'professionalAffiliations', 'professional_affiliations', 'memberships', 'associations'] },
+  { label: 'Interests', keys: ['interests', 'hobbies', 'activities'] },
+  { label: 'Coursework', keys: ['coursework', 'relevantCoursework', 'relevant_coursework', 'professionalDevelopment', 'professional_development'] },
+];
 
 const DEDICATED_IMPORTED_SECTION_KEYS = new Set([
   'RESUME_JSON',
@@ -437,6 +468,52 @@ const DEDICATED_IMPORTED_SECTION_KEYS = new Set([
   'tools',
   'toolsAndTechnologies',
   'tools_and_technologies',
+  'projects',
+  'projectExperience',
+  'project_experience',
+  'selectedProjects',
+  'selected_projects',
+  'certifications',
+  'certification',
+  'licenses',
+  'licensesAndCertifications',
+  'licenses_and_certifications',
+  'certificates',
+  'awards',
+  'honors',
+  'achievements',
+  'recognition',
+  'publications',
+  'papers',
+  'research',
+  'researchPublications',
+  'research_publications',
+  'languages',
+  'languageSkills',
+  'language_skills',
+  'volunteer',
+  'volunteering',
+  'volunteerExperience',
+  'volunteer_experience',
+  'communityInvolvement',
+  'community_involvement',
+  'affiliations',
+  'professionalAffiliations',
+  'professional_affiliations',
+  'memberships',
+  'associations',
+  'interests',
+  'hobbies',
+  'activities',
+  'coursework',
+  'relevantCoursework',
+  'relevant_coursework',
+  'professionalDevelopment',
+  'professional_development',
+  'additionalSections',
+  'additional_sections',
+  'extraSections',
+  'extra_sections',
   'preferences',
   'templateId',
   'template_id',
@@ -559,6 +636,7 @@ const emptyEditorData = (templateId?: string): Partial<UserInputData> => ({
     lastName: '',
     email: '',
     phone: '',
+    links: '',
     address: '',
     city: '',
     state: '',
@@ -569,6 +647,7 @@ const emptyEditorData = (templateId?: string): Partial<UserInputData> => ({
   experienceItems: [],
   educationItems: [],
   skillItems: [],
+  additionalSections: [],
 });
 
 const computeImportedResumeTitle = (content: Partial<UserInputData>): string => {
@@ -1051,9 +1130,48 @@ const App: React.FC = () => {
         pushSkillGroup('Skills', misplacedEducationSkillItems);
       }
 
+      const additionalSections: AdditionalSectionItem[] = [];
+      const pushAdditionalSection = (title: string, source: unknown) => {
+        const normalizedTitle = formatImportedCategoryLabel(title || 'Additional');
+        const details = importedSectionDetailItems(source);
+        if (details.length === 0) return;
+
+        const existing = additionalSections.find((item) => normalizeImportedKey(item.title) === normalizeImportedKey(normalizedTitle));
+        if (existing) {
+          const existingDetails = existing.items.split(/\n|;/).map(cleanImportedListItem).filter(Boolean);
+          const merged = [...existingDetails];
+          details.forEach((detail) => {
+            if (!merged.includes(detail)) merged.push(detail);
+          });
+          existing.items = merged.join('\n');
+          return;
+        }
+
+        additionalSections.push({
+          id: Math.random().toString(),
+          title: normalizedTitle,
+          items: details.join('\n'),
+        });
+      };
+
+      STANDARD_IMPORTED_ADDITIONAL_SECTIONS.forEach(({ label, keys }) => {
+        const sectionValue = importedField(resumeJson, keys);
+        if (sectionValue !== undefined) pushAdditionalSection(label, sectionValue);
+      });
+
+      importedValues(importedField(resumeJson, ['additionalSections', 'additional_sections', 'extraSections', 'extra_sections'])).forEach((section) => {
+        if (!section || typeof section !== 'object' || Array.isArray(section)) {
+          pushAdditionalSection('Additional', section);
+          return;
+        }
+        const sectionTitle = firstImportedText(importedField(section, ['title', 'name', 'label', 'category', 'section']));
+        const sectionItems = importedField(section, ['items', 'details', 'values', 'bullets', 'entries', 'content', 'text']) ?? section;
+        pushAdditionalSection(sectionTitle || 'Additional', sectionItems);
+      });
+
       Object.entries(resumeJson).forEach(([sectionKey, sectionValue]) => {
         if (DEDICATED_IMPORTED_SECTION_KEYS.has(normalizeImportedKey(sectionKey))) return;
-        pushSkillGroup(sectionKey, sectionValue, true);
+        pushAdditionalSection(sectionKey, sectionValue);
       });
 
       const location = mergeImportedAddressParts(
@@ -1091,6 +1209,13 @@ const App: React.FC = () => {
           lastName: lastName,
           email: firstImportedText(importedField(header, ['email', 'emailAddress', 'email_address']), importedField(contact, ['email', 'emailAddress', 'email_address']), importedField(resumeJson, ['email', 'emailAddress', 'email_address'])),
           phone: firstImportedText(importedField(header, ['phone', 'telephone', 'mobile', 'cell', 'cellPhone', 'cell_phone']), importedField(contact, ['phone', 'telephone', 'mobile', 'cell', 'cellPhone', 'cell_phone']), importedField(resumeJson, ['phone', 'telephone', 'mobile', 'cell', 'cellPhone', 'cell_phone'])),
+          links: importedLinkItems(
+            importedField(header, ['links', 'profiles', 'websites', 'urls']),
+          ).concat(importedLinkItems(
+            importedField(contact, ['links', 'profiles', 'websites', 'urls']),
+          )).concat(importedLinkItems(
+            importedField(resumeJson, ['links', 'profiles', 'websites', 'urls', 'portfolio', 'linkedin', 'github']),
+          )).filter((item, index, all) => item && all.indexOf(item) === index).join(', '),
           address: firstImportedText(
             importedField(header, ['streetAddress', 'street_address', 'street address', 'addressLine1', 'address_line_1', 'address 1']),
             importedField(contact, ['streetAddress', 'street_address', 'street address', 'addressLine1', 'address_line_1', 'address 1']),
@@ -1118,6 +1243,7 @@ const App: React.FC = () => {
           experienceItems: experiences,
           educationItems: educations,
           skillItems: skills,
+          additionalSections,
       };
   };
 

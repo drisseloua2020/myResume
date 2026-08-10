@@ -75,11 +75,18 @@ export interface SkillItem {
   items: string;
 }
 
+export interface AdditionalSectionItem {
+  id: string;
+  title: string;
+  items: string;
+}
+
 export interface PersonalDetails {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  links?: string;
   address: string;
   city: string;
   state: string;
@@ -117,6 +124,7 @@ export interface UserInputData {
   experienceItems?: ExperienceItem[];
   educationItems?: EducationItem[];
   skillItems?: SkillItem[];
+  additionalSections?: AdditionalSectionItem[];
 
   preferences?: {
     pages: '1-page' | '2-page';

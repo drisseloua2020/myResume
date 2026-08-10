@@ -602,6 +602,95 @@ describe('ResumeInput', () => {
     });
   });
 
+  it('shows imported additional ATS sections as editable inputs and saves edits', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+        prefilledData={{
+          targetRole: 'Software Engineer',
+          personalDetails: {
+            firstName: 'Jordan',
+            lastName: 'Carter',
+            email: 'jordan@example.com',
+            phone: '555-0100',
+            links: 'LinkedIn: linkedin.com/in/jordan',
+            address: '',
+            city: 'Austin',
+            state: 'TX',
+            country: 'United States',
+            postalCode: '73301',
+            summary: 'Engineer building reliable applications.',
+          },
+          experienceItems: [{
+            id: 'exp_1',
+            role: 'Software Engineer',
+            company: 'Example Co',
+            dates: 'January 2021 - Present',
+            startMonth: 'January',
+            startYear: '2021',
+            endMonth: '',
+            endYear: '',
+            isPresent: true,
+            description: 'Built secure APIs.',
+          }],
+          educationItems: [{
+            id: 'edu_1',
+            school: 'State University',
+            degree: 'BS Computer Science',
+            dates: '',
+          }],
+          skillItems: [{
+            id: 'skill_1',
+            category: 'Core',
+            items: 'Python, AWS',
+          }],
+          additionalSections: [{
+            id: 'section_1',
+            title: 'Certifications',
+            items: 'AWS Certified Developer',
+          }],
+        }}
+      />
+    );
+
+    expect(screen.getByDisplayValue('LinkedIn: linkedin.com/in/jordan')).toBeInTheDocument();
+    expect(screen.getByText('Additional ATS Sections')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Certifications')).toBeInTheDocument();
+
+    const details = screen.getByDisplayValue('AWS Certified Developer');
+    fireEvent.change(details, { target: { value: 'AWS Certified Developer\nSecurity+' } });
+
+    await user.click(screen.getByRole('button', { name: /save resume/i }));
+
+    await waitFor(() => expect(saveResume).toHaveBeenCalledTimes(1));
+    const savedContent = vi.mocked(saveResume).mock.calls[0][0].content;
+    expect(savedContent.additionalSections).toEqual([
+      expect.objectContaining({
+        title: 'Certifications',
+        items: 'AWS Certified Developer\nSecurity+',
+      }),
+    ]);
+    expect(savedContent.personalDetails?.links).toBe('LinkedIn: linkedin.com/in/jordan');
+  });
+
   it('downloads the live resume as a generated PDF without using browser print', async () => {
     const user = userEvent.setup();
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
