@@ -6,6 +6,13 @@ export type CoverLetterListItem = {
   title: string;
   jobDescription: string;
   jobUrl?: string | null;
+  content?: {
+    coverLetterFull?: string;
+    coverLetterShort?: string;
+    coldEmail?: string;
+    resumeReference?: string | null;
+    generationSource?: string | null;
+  } | null;
   createdAt: string;
 };
 
@@ -14,6 +21,8 @@ export type CoverLetterRecord = CoverLetterListItem & {
     coverLetterFull: string;
     coverLetterShort: string;
     coldEmail: string;
+    resumeReference?: string | null;
+    generationSource?: string | null;
   };
 };
 

@@ -26,6 +26,8 @@ class GeneratedCoverLetterContent(StrictModel):
     coverLetterFull: str
     coverLetterShort: str
     coldEmail: str
+    resumeReference: str | None = None
+    generationSource: str | None = None
 
 
 class CoverLetterOut(StrictModel):

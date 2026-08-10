@@ -1387,7 +1387,7 @@ const App: React.FC = () => {
 
     if (activeTab === 'cover_letters') {
       return (
-        <div className="max-w-6xl mx-auto py-8 px-6">
+        <div className="mx-auto w-full max-w-[96rem] py-8 px-4 lg:px-6">
           <CoverLettersPage />
         </div>
       );
@@ -1395,7 +1395,7 @@ const App: React.FC = () => {
 
     if (activeTab === 'resumes') {
       return (
-        <div className="max-w-6xl mx-auto py-8 px-6">
+        <div className="mx-auto w-full max-w-[100rem] py-8 px-4 lg:px-6">
           <ResumeLibraryPage
             onLoadResume={openResumeInWorkspace}
             onResumeDeleted={resetEditorForDeletedResume}

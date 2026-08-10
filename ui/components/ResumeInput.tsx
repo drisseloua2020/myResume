@@ -1361,7 +1361,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     <div className="flex flex-col lg:flex-row gap-6 relative items-start">
       
       {/* --- LEFT COLUMN: EDITOR FORM --- */}
-      <div className="w-full lg:w-[52%] xl:w-[560px] 2xl:w-[640px] flex-shrink-0 no-print">
+      <div className="w-full lg:w-[44%] xl:w-[500px] 2xl:w-[560px] flex-shrink-0 no-print">
         <div className="w-full max-w-full min-w-0 flex flex-col sm:flex-row sm:flex-wrap xl:flex-nowrap sm:justify-between sm:items-stretch gap-3 mb-10 relative">
           <div className="bg-white p-1 rounded-full shadow-sm border border-slate-200 flex overflow-x-auto w-full min-w-0 sm:flex-[1_1_34rem] xl:min-w-[34rem]">
              <button
@@ -1938,7 +1938,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
       {/* --- RIGHT COLUMN: LIVE PREVIEW --- */}
       <div className="flex-1 mt-[1in] lg:sticky lg:top-[calc(6rem+1in)] self-start">
-         <div className="bg-slate-200/50 rounded-xl border-2 border-slate-200 p-4 lg:p-8 flex flex-col items-center h-[78vh] lg:h-[calc(100vh-7rem)] min-h-[560px] max-h-[920px] no-print relative">
+         <div className="bg-slate-200/50 rounded-xl border-2 border-slate-200 p-3 lg:p-5 flex flex-col items-center h-[82vh] lg:h-[calc(100vh-6rem)] min-h-[620px] max-h-[980px] no-print relative">
             <div className="w-full flex justify-between items-center mb-6 max-w-[210mm] flex-shrink-0">
                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -1957,7 +1957,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
             
             {/* The Resume Document Component - Wrapped in its own scroll viewport */}
             <div className="w-full flex-1 min-h-0 overflow-auto pb-4 flex justify-center custom-scrollbar">
-                <div className="transform origin-top transition-transform duration-200 scale-[0.55] sm:scale-[0.7] md:scale-[0.85] xl:scale-100">
+                <div className="transform origin-top transition-transform duration-200 scale-[0.6] sm:scale-[0.76] md:scale-[0.92] xl:scale-100 2xl:scale-[1.06]">
                     {isResumeViewerEmpty ? (
                       <EmptyResumePreview />
                     ) : (

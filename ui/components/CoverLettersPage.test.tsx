@@ -34,6 +34,7 @@ const savedLetter = {
     coverLetterFull: 'Dear hiring team...',
     coverLetterShort: 'Short letter',
     coldEmail: 'Hello',
+    resumeReference: 'Jordan Candidate - Platform Engineer (Classic Professional)',
   },
 };
 
@@ -43,7 +44,13 @@ describe('CoverLettersPage', () => {
     vi.mocked(getLatestDraft).mockResolvedValue({
       id: 'draft_1',
       templateId: 'classic_pro',
-      content: { targetRole: 'Platform Engineer' },
+      content: {
+        targetRole: 'Platform Engineer',
+        personalDetails: {
+          firstName: 'Jordan',
+          lastName: 'Candidate',
+        },
+      },
       createdAt: '2026-05-25T00:00:00Z',
       updatedAt: '2026-05-25T00:00:00Z',
     });
@@ -60,29 +67,34 @@ describe('CoverLettersPage', () => {
 
     render(<CoverLettersPage />);
 
-    expect(await screen.findByText(/using your latest resume draft/i)).toBeInTheDocument();
+    expect(await screen.findByText(/latest resume automatically linked/i)).toBeInTheDocument();
     await user.type(screen.getByLabelText(/job posting url/i), 'https://jobs.example.com/platform-engineer');
-    await user.click(screen.getByRole('button', { name: /generate & save/i }));
+    await user.click(screen.getByRole('button', { name: /generate linked letter/i }));
 
     await waitFor(() => {
       expect(generateCoverLetter).toHaveBeenCalledWith(expect.objectContaining({
         jobUrl: 'https://jobs.example.com/platform-engineer',
         jobDescription: undefined,
-        resumeJson: { targetRole: 'Platform Engineer' },
+        resumeJson: expect.objectContaining({ targetRole: 'Platform Engineer' }),
       }));
     });
+    expect(await screen.findByText(/Created "Platform Engineer" using Jordan Candidate/i)).toBeInTheDocument();
   });
 
-  it('lists saved letters with job link, PDF download, view, and delete actions', async () => {
+  it('lists saved letters in a table and opens a selected letter in the viewer tab', async () => {
     const user = userEvent.setup();
 
     render(<CoverLettersPage />);
 
     expect(await screen.findByText('Platform Engineer')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /job link/i })).toHaveAttribute('href', 'https://jobs.example.com/platform-engineer');
+    expect(screen.getByRole('columnheader', { name: /job description/i })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /used resume/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open job url/i })).toHaveAttribute('href', 'https://jobs.example.com/platform-engineer');
+    expect(screen.getAllByText('Jordan Candidate - Platform Engineer (Classic Professional)').length).toBeGreaterThan(1);
 
-    await user.click(screen.getByRole('button', { name: /^view$/i }));
+    await user.click(screen.getByRole('button', { name: /read cover letter/i }));
     expect(await screen.findByText('Dear hiring team...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /viewer/i })).toHaveClass('bg-slate-900');
 
     await user.click(screen.getAllByRole('button', { name: /download pdf/i })[0]);
     expect(downloadCoverLetterPdf).toHaveBeenCalledWith('cl_1', 'Platform Engineer');

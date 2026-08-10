@@ -453,6 +453,34 @@ def _resume_highlights(resume_context) -> list[str]:
     return [_clean_text(value)[:500] for value in highlights if _clean_text(value)][:6]
 
 
+def _resume_reference(resume_context, template_id: str | None) -> str:
+    if not isinstance(resume_context, dict):
+        return "Latest resume draft"
+
+    personal = resume_context.get("personalDetails")
+    name = ""
+    if isinstance(personal, dict):
+        name = " ".join(
+            part.strip()
+            for part in (
+                str(personal.get("firstName") or ""),
+                str(personal.get("lastName") or ""),
+            )
+            if part.strip()
+        )
+
+    role = str(resume_context.get("targetRole") or "").strip()
+    if not role:
+        for item in resume_context.get("experienceItems") or []:
+            if isinstance(item, dict) and item.get("role"):
+                role = str(item.get("role") or "").strip()
+                break
+
+    parts = [part for part in (name, role) if part]
+    label = " - ".join(parts) if parts else "Latest resume draft"
+    return f"{label} ({template_id})" if template_id else label
+
+
 def _job_priorities(job_description: str) -> list[str]:
     priorities: list[str] = []
     keywords = (
@@ -544,6 +572,7 @@ def generate(payload: GenerateCoverLetterIn, current_user: User = Depends(get_cu
         noisy_title_variants,
     )
     resume_context = _sanitize_resume_context(payload.resumeJson)
+    resume_reference = _resume_reference(resume_context, payload.templateId)
     user_prompt = f"""You are generating ONLY cover letter outputs.
 Use JOB_TITLE_FROM_DESCRIPTION as the position the candidate is applying to.
 Use only JOB_TITLE_FROM_DESCRIPTION in the cover letter body.
@@ -595,6 +624,7 @@ USER_CONTEXT_JSON:
             "coverLetterFull": cover_letter_full,
             "coverLetterShort": cover_letter_short,
             "coldEmail": cold_email,
+            "resumeReference": resume_reference,
             "raw": raw,
             "jobUrl": job_url,
             "generationSource": generation_source,

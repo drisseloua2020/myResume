@@ -41,7 +41,7 @@ describe('ResumeLibraryPage', () => {
 
     expect(await screen.findByText('Senior Developer Resume')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /load in editor/i }));
+    await user.click(screen.getByRole('button', { name: /load resume into editor/i }));
 
     await waitFor(() => {
       expect(onLoadResume).toHaveBeenCalledWith(expect.objectContaining({
@@ -59,7 +59,7 @@ describe('ResumeLibraryPage', () => {
 
     expect(await screen.findByText('Senior Developer Resume')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /delete/i }));
+    await user.click(screen.getByRole('button', { name: /delete resume/i }));
     await user.click(screen.getByRole('button', { name: /yes/i }));
 
     await waitFor(() => {
@@ -87,7 +87,7 @@ describe('ResumeLibraryPage', () => {
 
     expect(await screen.findByText('Senior Developer Resume')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /delete/i }));
+    await user.click(screen.getByRole('button', { name: /delete resume/i }));
     await user.click(screen.getByRole('button', { name: /yes/i }));
 
     await waitFor(() => {
