@@ -182,6 +182,7 @@ describe('App import flow', () => {
             {
               institution: 'State University',
               qualification: 'BS Computer Science',
+              location: 'Richardson, TX',
               years: '2012 - 2016',
             },
           ],
@@ -235,6 +236,7 @@ describe('App import flow', () => {
     expect(payload.content.educationItems[0]).toEqual(expect.objectContaining({
       school: 'State University',
       degree: 'BS Computer Science',
+      location: 'Richardson, TX',
       dates: '2012 - 2016',
     }));
     expect(payload.content.skillItems[0]).toEqual(expect.objectContaining({
@@ -280,6 +282,7 @@ describe('App import flow', () => {
           'Education And Training': {
             'Institution Name': 'University of South Florida',
             Credential: 'BS Nursing',
+            Location: 'Tampa, FL',
             'Date Range': '2015 - 2019',
           },
           'Technical Skills': [
@@ -327,6 +330,7 @@ describe('App import flow', () => {
     expect(payload.content.educationItems[0]).toEqual(expect.objectContaining({
       school: 'University of South Florida',
       degree: 'BS Nursing',
+      location: 'Tampa, FL',
       dates: '2015 - 2019',
     }));
     expect(payload.content.skillItems[0]).toEqual(expect.objectContaining({
@@ -414,6 +418,7 @@ describe('App import flow', () => {
             {
               institution: 'State University',
               qualification: 'BS Computer Science',
+              location: 'Richardson, TX',
               years: '2012 - 2016',
             },
           ],
@@ -442,6 +447,7 @@ describe('App import flow', () => {
       expect.objectContaining({
         school: 'State University',
         degree: 'BS Computer Science',
+        location: 'Richardson, TX',
         dates: '2012 - 2016',
       }),
     ]);

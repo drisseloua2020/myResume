@@ -62,6 +62,7 @@ export interface EducationItem {
   id: string;
   degree: string;
   school: string;
+  location?: string;
   dates: string;
   startMonth?: string;
   startYear?: string;

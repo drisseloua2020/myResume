@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserInputData, User } from '../types';
+import { UserInputData, User, EducationItem } from '../types';
 import { apiAssetUrl } from '../services/apiClient';
 
 interface LivePreviewProps {
@@ -184,7 +184,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
   const displayEmail = personalDetails?.email || user.email;
 
   const phoneNumber = personalDetails?.phone || '';
-  const summaryText = personalDetails?.summary || data.jobDescription || "Experienced professional with a proven track record of success in delivering high-quality results. Skilled in adapting to new challenges and utilizing industry best practices to drive efficiency and growth.";
+  const summaryText = personalDetails?.summary || '';
   const profileImageSrc = data.profileImageData
     ? `data:${data.profileImageData.mimeType};base64,${data.profileImageData.data}`
     : apiAssetUrl(data.profileImageUrl);
@@ -199,6 +199,9 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
     .flatMap((skill) => skill.items.split(',').map((item) => item.trim()).filter(Boolean));
   const visibleAdditionalSections = (additionalSections || [])
     .filter((section) => section.title?.trim() || section.items?.trim());
+  const educationSchoolLine = (edu: EducationItem): string => (
+    [edu.school, edu.location].filter(Boolean).join(' - ')
+  );
 
   const SectionTitle: React.FC<{ children: React.ReactNode; subtle?: boolean }> = ({ children, subtle }) => (
     <h3
@@ -243,7 +246,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
       {educationItems && educationItems.map((edu, i) => (
         <div key={i} data-pdf-block>
           <div className={`text-sm font-bold ${subtle ? 'text-white' : 'text-slate-900'}`}>{edu.degree}</div>
-          <div className={`text-xs ${subtle ? 'text-white/75' : 'text-slate-600'}`}>{edu.school}</div>
+          <div className={`text-xs ${subtle ? 'text-white/75' : 'text-slate-600'}`}>{educationSchoolLine(edu)}</div>
           <div className={`text-xs ${subtle ? 'text-white/55' : 'text-slate-400'}`}>{edu.dates}</div>
         </div>
       ))}
@@ -583,7 +586,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                             {educationItems && educationItems.map((edu, i) => (
                                 <div key={i} data-pdf-block>
                                     <div className="font-bold text-slate-800 text-sm">{edu.degree}</div>
-                                    <div className="text-xs text-slate-500 mb-1">{edu.school}</div>
+                                    <div className="text-xs text-slate-500 mb-1">{educationSchoolLine(edu)}</div>
                                     <div className="text-xs text-purple-500 font-medium">{edu.dates}</div>
                                 </div>
                             ))}
@@ -689,7 +692,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                     {educationItems && educationItems.map((edu, i) => (
                         <div key={i} className="flex justify-between text-sm">
                             <div>
-                                <span className="font-bold text-slate-900">{edu.school}</span>, <span className="italic text-slate-700">{edu.degree}</span>
+                                <span className="font-bold text-slate-900">{educationSchoolLine(edu)}</span>, <span className="italic text-slate-700">{edu.degree}</span>
                             </div>
                             <div className="font-medium text-slate-600">{edu.dates}</div>
                         </div>
@@ -735,7 +738,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                 {educationItems.map((edu, i) => (
                   <div key={i} data-pdf-block>
                     <div className="font-bold text-sm">{edu.degree}</div>
-                    <div className="text-xs text-slate-400">{edu.school}</div>
+                    <div className="text-xs text-slate-400">{educationSchoolLine(edu)}</div>
                     <div className="text-xs text-slate-500 italic">{edu.dates}</div>
                   </div>
                 ))}
@@ -861,7 +864,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                <div className="space-y-4">
                    {educationItems && educationItems.map((edu, i) => (
                        <div key={i}>
-                           <div className="text-sm font-bold text-slate-800">{edu.school}</div>
+                           <div className="text-sm font-bold text-slate-800">{educationSchoolLine(edu)}</div>
                            <div className="text-xs text-slate-600">{edu.degree}</div>
                            <div className="text-xs text-slate-400 mt-0.5">{edu.dates}</div>
                        </div>
@@ -973,7 +976,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                        {educationItems && educationItems.map((edu, i) => (
                            <div key={i} className="bg-slate-50 p-2 rounded">
                                <div className="text-xs font-bold text-slate-800 leading-tight">{edu.degree}</div>
-                               <div className="text-[10px] text-slate-600 mt-1">{edu.school}</div>
+                               <div className="text-[10px] text-slate-600 mt-1">{educationSchoolLine(edu)}</div>
                                <div className="text-[10px] text-slate-400 italic">{edu.dates}</div>
                            </div>
                        ))}
@@ -1049,7 +1052,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
           {educationItems && educationItems.map((edu, i) => (
             <div key={i} className="flex justify-between">
               <div>
-                <div className="font-bold text-sm">{edu.school}</div>
+                <div className="font-bold text-sm">{educationSchoolLine(edu)}</div>
                 <div className="text-sm text-slate-700">{edu.degree}</div>
               </div>
               <div className="text-sm italic text-slate-600">{edu.dates}</div>

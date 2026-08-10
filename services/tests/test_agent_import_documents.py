@@ -482,7 +482,7 @@ def test_generate_resume_parses_compact_pdf_rows_into_structured_fields(client, 
         "Senior Engineer at Acme Corp | 2018 - 2021",
         "Built resilient API platforms for customer-facing products.",
         "EDUCATION",
-        "State University | BS Computer Science | 2012 - 2016",
+        "State University | BS Computer Science | 2012 - 2016 | Richardson, TX",
     ])
 
     response = client.post(
@@ -520,6 +520,7 @@ def test_generate_resume_parses_compact_pdf_rows_into_structured_fields(client, 
     assert resume_json["experience"][1]["end"] == "2021"
     assert resume_json["education"][0]["school"] == "State University"
     assert resume_json["education"][0]["degree"] == "BS Computer Science"
+    assert resume_json["education"][0]["location"] == "Richardson, TX"
     assert resume_json["education"][0]["start"] == "2012"
     assert resume_json["education"][0]["end"] == "2016"
 
@@ -1112,6 +1113,7 @@ def test_generate_resume_moves_skill_lines_out_of_education_section(client, monk
             "Azure",
             "State University",
             "BS Computer Science",
+            "Richardson, TX",
             "2012 - 2016",
             "EXPERIENCE",
             "Solutions Architect",
@@ -1146,7 +1148,7 @@ def test_generate_resume_moves_skill_lines_out_of_education_section(client, monk
     assert resume_json["education"] == [{
         "school": "State University",
         "degree": "BS Computer Science",
-        "location": "",
+        "location": "Richardson, TX",
         "start": "2012",
         "end": "2016",
         "notes": [],
