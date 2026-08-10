@@ -173,6 +173,72 @@ def _document_kind(mime: str, name: str = "") -> str | None:
     return None
 
 
+ATS_IMPORT_FORMATS = {"ats", "ats_resume", "ats-resume", "ats_resume_upload", "ats-resume-upload"}
+ATS_CORE_SECTIONS = {"summary", "skills", "experience"}
+ATS_RECOGNIZED_SECTIONS = {
+    "summary",
+    "skills",
+    "experience",
+    "projects",
+    "education",
+    "certifications",
+    "awards",
+    "publications",
+    "languages",
+}
+ATS_RECOMMENDED_SECTIONS = ("summary", "skills", "experience", "education")
+
+
+def _requested_ats_import(input_data: dict) -> bool:
+    raw = input_data.get("importFormat", input_data.get("import_format", ""))
+    return str(raw).strip().lower() in ATS_IMPORT_FORMATS
+
+
+def _ats_resume_report(text: str) -> dict[str, object]:
+    lines = _resume_lines(text)
+    sections: list[str] = []
+    for line in lines:
+        section = _section_for_heading(line)
+        if section and section in ATS_RECOGNIZED_SECTIONS and section not in sections:
+            sections.append(section)
+
+    detected = set(sections)
+    has_standard_workflow = "experience" in detected and bool(detected & {"summary", "skills"})
+    has_entry_level_workflow = "skills" in detected and bool(detected & {"education", "projects", "certifications"})
+    is_ats_like = (
+        len(text.strip()) >= 80
+        and len(detected & ATS_RECOGNIZED_SECTIONS) >= 2
+        and (has_standard_workflow or has_entry_level_workflow)
+    )
+
+    return {
+        "validated": is_ats_like,
+        "sectionsDetected": sections,
+        "missingRecommendedSections": [
+            section for section in ATS_RECOMMENDED_SECTIONS if section not in detected
+        ],
+        "hasContactLine": any(_is_contact_line(line) for line in lines[:20]),
+        "guidance": (
+            "ATS import expects a readable, single-column PDF/DOC/DOCX with standard "
+            "headings such as SUMMARY, SKILLS, EXPERIENCE, and EDUCATION."
+        ),
+    }
+
+
+def _raise_non_ats_import(report: dict[str, object]) -> None:
+    sections = report.get("sectionsDetected") or []
+    detected = ", ".join(str(section).upper() for section in sections) if sections else "none"
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=(
+            "This file was readable, but it does not look like an ATS resume. "
+            "Please upload a text-based, single-column PDF or Word resume with standard "
+            "headings such as SUMMARY, SKILLS, EXPERIENCE, and EDUCATION. "
+            f"Detected sections: {detected}."
+        ),
+    )
+
+
 SECTION_ALIASES: dict[str, set[str]] = {
     "summary": {
         "summary",
@@ -1678,6 +1744,16 @@ def generate_resume(
                 _raise_unreadable_import("Word document")
 
     resume_text_for_understanding = _limit_resume_text(str(input_data.get("currentResumeText") or ""))
+    if payload.mode == "MODE_A" and _requested_ats_import(input_data):
+        if not resume_text_for_understanding:
+            _raise_unreadable_import("ATS resume")
+        ats_report = _ats_resume_report(resume_text_for_understanding)
+        if not ats_report["validated"]:
+            _raise_non_ats_import(ats_report)
+        input_data["importFormat"] = "ats"
+        input_data["atsImport"] = ats_report
+        parts.append(f"ATS_IMPORT_VALIDATION:\n{json.dumps(ats_report, indent=2)}")
+
     if payload.mode == "MODE_A" and resume_text_for_understanding:
         understood_resume_json = _local_resume_json_from_text(resume_text_for_understanding)
         input_data["parsedResumeJson"] = understood_resume_json

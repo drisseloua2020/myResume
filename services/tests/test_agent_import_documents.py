@@ -222,6 +222,90 @@ def test_generate_resume_uses_understood_pdf_json_when_ai_json_is_weak(client, m
     ]
 
 
+def test_generate_resume_accepts_ats_pdf_and_word_imports(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FakeGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    ats_lines = [
+        "Jordan Carter",
+        "Software Engineer",
+        "jordan@example.com | Austin, TX",
+        "SUMMARY",
+        "Software engineer building APIs and cloud services for business users.",
+        "SKILLS",
+        "Python, React, AWS",
+        "EXPERIENCE",
+        "Software Engineer - BrightLayer Analytics - Jan 2021 - Present",
+        "Built secure APIs for resume import workflows.",
+        "EDUCATION",
+        "State University",
+        "BS Computer Science",
+    ]
+    cases = [
+        (PDF_MIME, "jordan-ats.pdf", _pdf_bytes(ats_lines), "EXTRACTED_RESUME_TEXT_FROM_PDF"),
+        (DOCX_MIME, "jordan-ats.docx", _docx_bytes("\n".join(ats_lines)), "EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT"),
+    ]
+
+    for mime_type, name, resume_bytes, extract_marker in cases:
+        response = client.post(
+            "/agent/generate-resume",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "mode": "MODE_A",
+                "input": {
+                    "importFormat": "ats",
+                    "fileData": {
+                        "mimeType": mime_type,
+                        "name": name,
+                        "data": base64.b64encode(resume_bytes).decode("ascii"),
+                    },
+                },
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        contents = fake_client.models.calls[-1]["contents"]
+        joined = "\n".join(part for part in contents if isinstance(part, str))
+        assert extract_marker in joined
+        assert "ATS_IMPORT_VALIDATION" in joined
+        assert '"validated": true' in joined
+        assert '"importFormat": "ats"' in joined
+        assert "UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS" in joined
+
+
+def test_generate_resume_rejects_readable_non_ats_import_before_ai_parse(client, monkeypatch):
+    token = _signup(client)
+    fake_client = _FakeGeminiClient()
+    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
+
+    resume_bytes = _docx_bytes(
+        "Jordan Carter\n"
+        "This is a readable document, but it is written as a paragraph without standard resume sections. "
+        "It has enough text to extract, but it does not include summary, skills, experience, or education headings."
+    )
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "importFormat": "ats",
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "not-ats.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert "does not look like an ATS resume" in response.json()["detail"]
+    assert "Detected sections: none." in response.json()["detail"]
+    assert fake_client.models.calls == []
+
+
 def test_generate_resume_rejects_unsupported_import_file_type(client):
     token = _signup(client)
     response = client.post(
