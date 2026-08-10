@@ -886,7 +886,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     if (file) {
       const mimeType = getImportDocumentMimeType(file);
       if (!mimeType) {
-        alert("Supported formats: PDF, DOC, DOCX.");
+        alert("Supported ATS resume formats: PDF, DOC, DOCX.");
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
@@ -1115,7 +1115,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
     if (activeTab === 'upload') {
       if (!fileData) {
-        missing.push('Resume PDF or Word document');
+        missing.push('ATS resume PDF or Word document');
       }
       return missing;
     }
@@ -1203,6 +1203,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     const payload: UserInputData = {
       role,
       plan: userPlan,
+      importFormat: activeTab === 'upload' ? 'ats' : undefined,
       targetRole: activeTab === 'upload' ? '' : targetRole,
       jobDescription,
       jobUrl: jobUrl.trim() || undefined,
@@ -1440,13 +1441,13 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                     <p className="font-semibold text-slate-800">{fileName}</p>
                   ) : (
                     <>
-                      <p className="font-semibold text-slate-700">Upload Resume (PDF, DOC, DOCX)</p>
-                      <p className="text-sm text-slate-400 mt-1">Only PDF and Word documents are accepted</p>
+                      <p className="font-semibold text-slate-700">Upload ATS Resume (PDF, DOC, DOCX)</p>
+                      <p className="text-sm text-slate-400 mt-1">Use a text-based, single-column resume with standard ATS headings</p>
                     </>
                   )}
                </div>
                <div className="mt-6 text-left rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                 The uploaded document is parsed securely, then mapped into the live editor fields for review and editing.
+                 PDF and Word resumes are parsed securely, checked for ATS-style structure, then mapped into the live editor fields for review and editing.
                </div>
              </div>
           )}
@@ -1877,7 +1878,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              )}
 
              <p className="text-xs text-center text-slate-400 mt-2">
-               {activeTab === 'upload' ? 'Parses a PDF or Word resume and fills the editor so you can verify and customize.' :
+               {activeTab === 'upload' ? 'Parses an ATS PDF or Word resume and fills the editor so you can verify and customize.' :
                  activeTab === 'cover_letter' ? 'Create a tailored cover letter and cold email based on your resume.' :
                  'Saves your resume JSON to your library. Click Save again to update the same record.'}
              </p>

@@ -500,7 +500,7 @@ describe('ResumeInput', () => {
     const rejectedImage = new File(['not a resume'], 'resume.png', { type: 'image/png' });
     fireEvent.change(fileInput, { target: { files: [rejectedImage] } });
 
-    expect(alertSpy).toHaveBeenCalledWith('Supported formats: PDF, DOC, DOCX.');
+    expect(alertSpy).toHaveBeenCalledWith('Supported ATS resume formats: PDF, DOC, DOCX.');
     expect(screen.queryByText('resume.png')).not.toBeInTheDocument();
     expect(onImport).not.toHaveBeenCalled();
 
@@ -585,6 +585,7 @@ describe('ResumeInput', () => {
     await waitFor(() => {
       expect(onImport).toHaveBeenCalledWith(expect.objectContaining({
         targetRole: '',
+        importFormat: 'ats',
         profileImageUrl: undefined,
         profileImageName: undefined,
         profileImageData: undefined,

@@ -92,6 +92,7 @@ export interface UserInputData {
   role: UserRole;
   plan: SubscriptionPlan;
   templateId?: string; // Added template selection
+  importFormat?: 'ats';
   currentResumeText?: string;
   fileData?: {
     mimeType: string;
