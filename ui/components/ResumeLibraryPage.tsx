@@ -36,6 +36,38 @@ const fallbackUser: User = {
   authProvider: 'email',
 };
 
+type IconActionButtonProps = {
+  label: string;
+  tone: 'blue' | 'emerald' | 'red';
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+};
+
+const iconToneClasses: Record<IconActionButtonProps['tone'], string> = {
+  blue: 'border-blue-100 bg-blue-50 text-blue-700 hover:border-blue-200 hover:bg-blue-600 hover:text-white shadow-blue-100/70',
+  emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:bg-emerald-600 hover:text-white shadow-emerald-100/70',
+  red: 'border-red-100 bg-red-50 text-red-700 hover:border-red-200 hover:bg-red-600 hover:text-white shadow-red-100/70',
+};
+
+function IconActionButton({ label, tone, disabled, onClick, children }: IconActionButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className={`group relative inline-flex h-10 w-10 items-center justify-center rounded-lg border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 ${iconToneClasses[tone]}`}
+    >
+      {children}
+      <span className="pointer-events-none absolute -top-10 left-1/2 z-20 w-max -translate-x-1/2 rounded bg-slate-950 px-2.5 py-1.5 text-[11px] font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100">
+        {label}
+      </span>
+    </button>
+  );
+}
+
 export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user = fallbackUser }: ResumeLibraryPageProps) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<ResumeListItem[]>([]);
@@ -164,7 +196,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-[96rem] space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-3xl font-bold text-slate-900">View Resume</h2>
@@ -182,7 +214,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(320px,0.82fr)_minmax(520px,1.18fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(300px,0.62fr)_minmax(680px,1.38fr)]">
         <div className="bg-white border border-slate-200 rounded overflow-hidden shadow-sm">
           <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
             <div className="text-sm font-semibold text-slate-800">Saved Resumes</div>
@@ -204,26 +236,36 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
                     <div className="mt-1 text-xs text-slate-500">{r.templateName} | {new Date(r.updatedAt || r.createdAt).toLocaleDateString()}</div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button
+                    <IconActionButton
+                      label={loadingResumeId === r.id ? 'Opening resume' : 'View resume'}
+                      tone="blue"
                       onClick={() => handleView(r.id)}
                       disabled={loadingResumeId === r.id}
-                      className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-60 text-sm font-semibold"
                     >
-                      {loadingResumeId === r.id ? 'Opening...' : 'View'}
-                    </button>
-                    <button
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </IconActionButton>
+                    <IconActionButton
+                      label="Load resume into editor"
+                      tone="emerald"
                       onClick={() => handleLoad(r.id)}
                       disabled={loadingResumeId === r.id}
-                      className="px-3 py-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-60 text-sm font-semibold"
                     >
-                      Load in Editor
-                    </button>
-                    <button
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 12h11.25m0 0l-4.5-4.5m4.5 4.5l-4.5 4.5M19.5 4.5v15" />
+                      </svg>
+                    </IconActionButton>
+                    <IconActionButton
+                      label="Delete resume"
+                      tone="red"
                       onClick={() => handleDelete(r.id)}
-                      className="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold"
                     >
-                      Delete
-                    </button>
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.75 7.5h10.5M9 7.5V6a1.5 1.5 0 011.5-1.5h3A1.5 1.5 0 0115 6v1.5m-6.75 0l.75 12h6l.75-12M10.5 10.5v6M13.5 10.5v6" />
+                      </svg>
+                    </IconActionButton>
                   </div>
                 </div>
               ))}
@@ -231,7 +273,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
           )}
         </div>
 
-        <div className="bg-slate-200/50 rounded border border-slate-200 p-4 lg:p-6 min-h-[640px] shadow-sm">
+        <div className="bg-slate-200/50 rounded border border-slate-200 p-3 lg:p-5 min-h-[720px] shadow-sm">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Resume Preview</h3>
@@ -248,8 +290,8 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
 
           {selectedResume ? (
             <>
-              <div className="h-[720px] overflow-auto rounded bg-slate-100 p-4 flex justify-center">
-                <div className="origin-top scale-[0.62] sm:scale-[0.72] xl:scale-[0.82]">
+              <div className="h-[78vh] min-h-[720px] overflow-auto rounded bg-slate-100 p-3 lg:p-5 flex justify-center">
+                <div className="origin-top scale-[0.68] sm:scale-[0.78] xl:scale-[0.9] 2xl:scale-100">
                   <LivePreview data={selectedResume.content} user={user} templateId={selectedResume.templateId} />
                 </div>
               </div>

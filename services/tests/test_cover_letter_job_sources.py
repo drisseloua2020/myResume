@@ -61,6 +61,7 @@ def test_generate_cover_letter_from_job_url_fetches_description(client, monkeypa
     assert payload["title"] == "Platform Engineer"
     assert payload["jobUrl"] == "https://jobs.example.com/platform-engineer"
     assert "Build internal developer platforms" in payload["jobDescription"]
+    assert payload["content"]["resumeReference"] == "Platform Engineer (classic_pro)"
 
     contents = fake_client.models.calls[0]["contents"][0]
     assert "https://jobs.example.com/platform-engineer" in contents

@@ -37,7 +37,13 @@ def to_cover_letter_out(cover_letter) -> CoverLetterOut:
     content = cover_letter.content
     job_url = content.get("jobUrl") if isinstance(content, dict) else None
     if isinstance(content, dict) and {"coverLetterFull", "coverLetterShort", "coldEmail"}.issubset(content.keys()):
-        typed = GeneratedCoverLetterContent(coverLetterFull=str(content.get("coverLetterFull", "")), coverLetterShort=str(content.get("coverLetterShort", "")), coldEmail=str(content.get("coldEmail", "")))
+        typed = GeneratedCoverLetterContent(
+            coverLetterFull=str(content.get("coverLetterFull", "")),
+            coverLetterShort=str(content.get("coverLetterShort", "")),
+            coldEmail=str(content.get("coldEmail", "")),
+            resumeReference=str(content.get("resumeReference") or "") or None,
+            generationSource=str(content.get("generationSource") or "") or None,
+        )
     else:
         typed = content
     return CoverLetterOut(id=cover_letter.id, templateId=cover_letter.template_id, title=cover_letter.title, jobDescription=cover_letter.job_description, jobUrl=job_url, content=typed, createdAt=cover_letter.created_at)
