@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "41a1eb8c-c474-4981-94e5-24ea848c19b1",
     "name": "ResumeForge Original API - Full Endpoint Tests",
-    "description": "Postman collection generated from the original Express/TypeScript codebase. It exercises every declared endpoint in the original services project, including admin routes. AI and mailer-dependent requests are included but skipped by default via environment flags.",
+    "description": "Postman collection generated from the original Express/TypeScript codebase. It exercises every declared endpoint in the original services project, including admin routes. Mailer-dependent requests are included but skipped by default via environment flags.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -944,7 +944,7 @@
           ]
         },
         {
-          "name": "POST /agent/generate-resume",
+          "name": "POST /resumes/parse-upload",
           "request": {
             "method": "POST",
             "header": [
@@ -960,19 +960,19 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/agent/generate-resume",
+              "raw": "{{baseUrl}}/resumes/parse-upload",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "agent",
-                "generate-resume"
+                "resumes",
+                "parse-upload"
               ]
             },
-            "description": "Skipped unless runAiTests=true in the environment.",
+            "description": "Deterministic ATS resume parser. Provide atsResumeBase64 in the environment.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"mode\": \"MODE_A\",\n  \"input\": {\n    \"targetRole\": \"Software Engineer\",\n    \"summary\": \"Use a concise and professional tone.\"\n  }\n}",
+              "raw": "{\n  \"importFormat\": \"ats\",\n  \"fileData\": {\n    \"mimeType\": \"application/vnd.openxmlformats-officedocument.wordprocessingml.document\",\n    \"name\": \"ats-resume.docx\",\n    \"data\": \"{{atsResumeBase64}}\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -987,8 +987,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.environment.get('runAiTests') !== 'true') {",
-                  "  console.log('Skipping AI-dependent request because runAiTests=false');",
+                  "if (!pm.environment.get('atsResumeBase64')) {",
+                  "  console.log('Skipping ATS parser request because atsResumeBase64 is not set');",
                   "  pm.execution.skipRequest();",
                   "}"
                 ]
@@ -999,12 +999,13 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('AI resume generation returns 200', function () {",
+                  "pm.test('ATS resume parse returns 200', function () {",
                   "  pm.response.to.have.status(200);",
                   "});",
                   "const json = pm.response.json();",
-                  "pm.test('AI resume generation returns text', function () {",
-                  "  pm.expect(json.text).to.be.a('string');",
+                  "pm.test('ATS resume parse returns structured data', function () {",
+                  "  pm.expect(json.resume).to.be.an('object');",
+                  "  pm.expect(json.atsReport).to.be.an('object');",
                   "});"
                 ]
               }
@@ -1054,18 +1055,6 @@
           },
           "response": [],
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.environment.get('runAiTests') !== 'true') {",
-                  "  console.log('Skipping AI-dependent request because runAiTests=false');",
-                  "  pm.execution.skipRequest();",
-                  "}"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {

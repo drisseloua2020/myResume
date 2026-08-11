@@ -11,9 +11,6 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     jwt_expires_in: str = "15m"
     port: int = 3000
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-3-flash-preview"
-    gemini_temperature: float = 0.4
     cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000,https://myresume-rrcy.onrender.com,https://www.myresumes.net,https://myresumes.net")
     smtp_host: str = ""
     smtp_port: int | None = None

@@ -12,8 +12,8 @@ It includes requests for every original endpoint:
 - `GET /health`
 - Auth: signup, login, provider login, me, me/plan, logout, activity, contact
 - Admin-in-auth: users, logs, user plan update
-- Agent: sources, toggle, check, updates, generate-resume
-- Resumes: create, list, save draft, latest draft, update, get, delete
+- Agent: sources, toggle, check, updates
+- Resumes: create, list, parse upload, save draft, latest draft, update, get, delete
 - Cover letters: generate, list, get, delete
 - Profile: sources, connect, sync, updates
 - Admin: users, activity-logs, templates, profile-sources, contact-messages, reply, resumes, agent-updates
@@ -29,13 +29,12 @@ The collection generates a fresh normal user automatically on every run.
 ## Flags
 Two requests are included but skipped by default:
 
-- `runAiTests=false`
-  - skips `POST /agent/generate-resume`
-  - skips `POST /cover-letters/generate`
+- `atsResumeBase64`
+  - optional base64 DOCX/PDF payload for `POST /resumes/parse-upload`
 - `runMailerTests=false`
   - skips `POST /admin/contact-messages/:id/reply`
 
-Set either flag to `true` in the Postman environment if your app is configured with live Gemini / SMTP credentials.
+Set the mailer flag to `true` in the Postman environment if your app is configured with live SMTP credentials.
 
 ## Known issues in the original codebase
 These are not Postman problems; they come from the original service implementation:

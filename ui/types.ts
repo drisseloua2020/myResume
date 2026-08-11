@@ -1,8 +1,3 @@
-export enum AppMode {
-  FORMAT_EXISTING = 'MODE_A',
-  CREATE_SCRATCH = 'MODE_B',
-}
-
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
@@ -133,19 +128,6 @@ export interface UserInputData {
     region: 'US' | 'EU';
     photo: boolean;
   };
-}
-
-export interface ParsedResponse {
-  json?: any;
-  gapAndFix?: string[];
-  resumeAts?: string;
-  resumeHuman?: string;
-  resumeTargeted?: string;
-  resumePhoto?: string;
-  coverLetterFull?: string;
-  coverLetterShort?: string;
-  coldEmail?: string;
-  raw?: string;
 }
 
 export interface SectionContent {

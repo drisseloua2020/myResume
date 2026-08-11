@@ -6,8 +6,9 @@ from app.api.deps import get_current_user, get_db
 from app.api.routes.common import to_resume_draft_out, to_resume_out, to_resume_summary_out
 from app.models.entities import Resume, ResumeDraft, User
 from app.schemas.common import IdResponse, OkResponse
-from app.schemas.resumes import CreateResumeIn, DraftIn, LatestResumeEnvelope, ResumeDraftEnvelope, ResumeEnvelope, ResumesEnvelope, UpdateResumeIn
+from app.schemas.resumes import CreateResumeIn, DraftIn, LatestResumeEnvelope, ParseResumeUploadIn, ParseResumeUploadOut, ResumeDraftEnvelope, ResumeEnvelope, ResumesEnvelope, UpdateResumeIn
 from app.services.activity import log_activity, new_prefixed_id
+from app.services.resume_parser import ResumeParseError, parse_resume_upload
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 @router.post("/", response_model=IdResponse, status_code=status.HTTP_201_CREATED)
 def create_resume(payload: CreateResumeIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> IdResponse:
@@ -31,6 +32,15 @@ def latest_draft(templateId: str | None = Query(default=None), current_user: Use
     stmt = select(ResumeDraft).where(ResumeDraft.user_id == current_user.id)
     if templateId is not None: stmt = stmt.where(ResumeDraft.template_id == templateId)
     draft = db.scalar(stmt.order_by(desc(ResumeDraft.updated_at)).limit(1)); return ResumeDraftEnvelope(draft=to_resume_draft_out(draft) if draft else None)
+@router.post("/parse-upload", response_model=ParseResumeUploadOut)
+def parse_upload(payload: ParseResumeUploadIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ParseResumeUploadOut:
+    try:
+        result = parse_resume_upload(payload.fileData.model_dump(), import_format=payload.importFormat)
+    except ResumeParseError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    log_activity(db, current_user.id, "RESUME_PARSE", details=f"File: {payload.fileData.name or 'uploaded resume'}", user_name=current_user.name)
+    db.commit()
+    return ParseResumeUploadOut(resume=result.resume, warnings=result.warnings, confidence=result.confidence, document=result.document, atsReport=result.ats_report)
 @router.put("/{resume_id}", response_model=OkResponse)
 def update_resume(resume_id: str, payload: UpdateResumeIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> OkResponse:
     if payload.templateId is None and payload.title is None and payload.content is None: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nothing to update")

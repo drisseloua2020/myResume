@@ -1,7 +1,7 @@
 # ResumeForge
 
 ##  Overview
-ResumeForge is a full-stack web application for generating and managing resumes dynamically.
+ResumeForge is a full-stack web application for parsing ATS resumes, editing structured resume content, and managing saved resumes.
 
 It consists of:
 - Frontend: React (TypeScript, Vite)

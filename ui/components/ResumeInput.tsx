@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AppMode, UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, User, PersonalDetails } from '../types';
+import { UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, User, PersonalDetails } from '../types';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
@@ -10,7 +10,6 @@ import { uploadProfilePhoto } from '../services/uploadService';
 import { generateCoverLetter } from '../services/coverLetterService';
 
 interface ResumeInputProps {
-  onGenerate: (data: UserInputData, mode: AppMode) => void;
   onImport: (data: UserInputData) => void;
   onTemplateChange: (templateId: string) => void;
   onNewResume?: () => void;
@@ -660,7 +659,6 @@ function addCanvasToPdfPages(
 }
 
 const ResumeInput: React.FC<ResumeInputProps> = ({ 
-  onGenerate, 
   onImport,
   onTemplateChange,
   onNewResume,
@@ -1900,7 +1898,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                           value={jobDescription}
                           onChange={e => setJobDescription(e.target.value)}
                           className="mt-1 w-full h-64 p-4 bg-slate-50 border border-slate-200 rounded focus:border-[#1a91f0] outline-none text-sm leading-relaxed"
-                          placeholder="Paste job description here so AI can tailor your cover letter..."
+                          placeholder="Paste job description here to tailor your cover letter..."
                           required={activeTab === 'cover_letter' && jobSourceMode === 'paste'}
                       />
                     </div>

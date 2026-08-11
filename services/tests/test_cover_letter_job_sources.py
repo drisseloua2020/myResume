@@ -1,33 +1,6 @@
 from __future__ import annotations
 
 
-class _FakeGeminiResponse:
-    text = """COVER_LETTER_FULL:
-Dear hiring team,
-
-I am excited to apply for the Platform Engineer role.
-
-COVER_LETTER_SHORT:
-I am excited to apply.
-
-COLD_EMAIL:
-Hello, I would like to connect about this role."""
-
-
-class _FakeGeminiModels:
-    def __init__(self):
-        self.calls = []
-
-    def generate_content(self, **kwargs):
-        self.calls.append(kwargs)
-        return _FakeGeminiResponse()
-
-
-class _FakeGeminiClient:
-    def __init__(self):
-        self.models = _FakeGeminiModels()
-
-
 def _signup(client, email: str = "cover-url@example.com") -> str:
     response = client.post(
         "/auth/signup",
@@ -39,8 +12,6 @@ def _signup(client, email: str = "cover-url@example.com") -> str:
 
 def test_generate_cover_letter_from_job_url_fetches_description(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
     monkeypatch.setattr(
         "app.api.routes.cover_letters._fetch_job_description_from_url",
         lambda url: ("Platform Engineer\nBuild internal developer platforms and APIs.", "Platform Engineer"),
@@ -62,16 +33,12 @@ def test_generate_cover_letter_from_job_url_fetches_description(client, monkeypa
     assert payload["jobUrl"] == "https://jobs.example.com/platform-engineer"
     assert "Build internal developer platforms" in payload["jobDescription"]
     assert payload["content"]["resumeReference"] == "Platform Engineer (classic_pro)"
-
-    contents = fake_client.models.calls[0]["contents"][0]
-    assert "https://jobs.example.com/platform-engineer" in contents
-    assert "Build internal developer platforms" in contents
+    assert payload["content"]["generationSource"] == "local_script"
+    assert "Build internal developer platforms" in payload["content"]["coverLetterFull"]
 
 
 def test_generate_cover_letter_prefers_job_title_over_resume_title(client, monkeypatch):
     token = _signup(client, "cover-title@example.com")
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
     monkeypatch.setattr(
         "app.api.routes.cover_letters._fetch_job_description_from_url",
         lambda url: (
@@ -96,41 +63,13 @@ def test_generate_cover_letter_prefers_job_title_over_resume_title(client, monke
     assert response.status_code == 201, response.text
     payload = response.json()["coverLetter"]
     assert payload["title"] == "Software Architect"
-
-    contents = fake_client.models.calls[0]["contents"][0]
-    assert "jobTitleFromDescription" in contents
-    assert "Software Architect" in contents
-    assert "Senior Developer Cover Letter" not in contents
+    assert "Software Architect role" in payload["content"]["coverLetterFull"]
+    assert "Senior Developer Cover Letter" not in payload["content"]["coverLetterFull"]
 
 
 def test_generate_cover_letter_normalizes_noisy_job_board_title(client, monkeypatch):
     token = _signup(client, "cover-noisy-title@example.com")
     noisy_title = "Software Architect - AI Accelerated Engineering Lead (Central) - 617 - Slalom"
-
-    class _NoisyTitleGeminiResponse:
-        text = f"""COVER_LETTER_FULL:
-I am excited to apply for the {noisy_title} role.
-
-COVER_LETTER_SHORT:
-Applying for {noisy_title}.
-
-COLD_EMAIL:
-I am interested in {noisy_title}."""
-
-    class _NoisyTitleGeminiModels:
-        def __init__(self):
-            self.calls = []
-
-        def generate_content(self, **kwargs):
-            self.calls.append(kwargs)
-            return _NoisyTitleGeminiResponse()
-
-    class _NoisyTitleGeminiClient:
-        def __init__(self):
-            self.models = _NoisyTitleGeminiModels()
-
-    fake_client = _NoisyTitleGeminiClient()
-    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
     monkeypatch.setattr(
         "app.api.routes.cover_letters._fetch_job_description_from_url",
         lambda url: (
@@ -156,10 +95,6 @@ I am interested in {noisy_title}."""
     assert noisy_title not in payload["content"]["coldEmail"]
     assert "Software Architect role" in payload["content"]["coverLetterFull"]
 
-    contents = fake_client.models.calls[0]["contents"][0]
-    assert '"jobTitleFromDescription": "Software Architect"' in contents
-    assert noisy_title not in contents
-
 
 def test_generate_cover_letter_returns_error_when_job_url_cannot_be_processed(client, monkeypatch):
     token = _signup(client, "cover-url-error@example.com")
@@ -181,8 +116,6 @@ def test_generate_cover_letter_returns_error_when_job_url_cannot_be_processed(cl
 
 def test_generate_cover_letter_strips_uploaded_binary_resume_context(client, monkeypatch):
     token = _signup(client, "cover-sanitize@example.com")
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
     monkeypatch.setattr(
         "app.api.routes.cover_letters._fetch_job_description_from_url",
         lambda url: (
@@ -214,16 +147,22 @@ def test_generate_cover_letter_strips_uploaded_binary_resume_context(client, mon
     )
 
     assert response.status_code == 201, response.text
-    contents = fake_client.models.calls[0]["contents"][0]
-    assert "Software Architect" in contents
-    assert "Experienced architect with AI delivery background." in contents
-    assert "Led AI platform work." in contents
-    assert "fileData" not in contents
-    assert "profileImageData" not in contents
-    assert binary_blob not in contents
+    content = response.json()["coverLetter"]["content"]
+    generated_text = "\n".join(
+        [
+            content["coverLetterFull"],
+            content["coverLetterShort"],
+            content["coldEmail"],
+        ]
+    )
+    assert "Software Architect" in generated_text
+    assert "Led AI platform work." in generated_text
+    assert "fileData" not in generated_text
+    assert "profileImageData" not in generated_text
+    assert binary_blob not in generated_text
 
 
-def test_generate_cover_letter_uses_local_fallback_when_ai_fails(client, monkeypatch):
+def test_generate_cover_letter_uses_local_script(client, monkeypatch):
     token = _signup(client, "cover-fallback@example.com")
     monkeypatch.setattr(
         "app.api.routes.cover_letters._fetch_job_description_from_url",
@@ -231,10 +170,6 @@ def test_generate_cover_letter_uses_local_fallback_when_ai_fails(client, monkeyp
             "Software Architect\nDesign AI-enabled platforms, mentor engineering teams, and build reliable delivery practices.",
             "Software Architect",
         ),
-    )
-    monkeypatch.setattr(
-        "app.api.routes.cover_letters.get_gemini_client",
-        lambda: (_ for _ in ()).throw(RuntimeError("Missing GEMINI_API_KEY")),
     )
 
     response = client.post(
@@ -261,14 +196,13 @@ def test_generate_cover_letter_uses_local_fallback_when_ai_fails(client, monkeyp
     assert response.status_code == 201, response.text
     payload = response.json()["coverLetter"]
     assert payload["title"] == "Software Architect"
+    assert payload["content"]["generationSource"] == "local_script"
     assert "Dear Hiring Team" in payload["content"]["coverLetterFull"]
     assert "platform engineering and AI delivery experience" in payload["content"]["coverLetterFull"]
 
 
-def test_download_cover_letter_pdf(client, monkeypatch):
+def test_download_cover_letter_pdf(client):
     token = _signup(client, "cover-pdf@example.com")
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: fake_client)
 
     created = client.post(
         "/cover-letters/generate",
