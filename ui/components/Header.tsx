@@ -33,8 +33,17 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
     <nav className="bg-[#2e3d50] text-white h-16 flex items-center justify-between px-6 lg:px-12 shadow-md z-50 sticky top-0">
       <div className="flex items-center gap-8">
         <div onClick={() => setActiveTab(tabs[0].key)} className="flex items-center gap-2 cursor-pointer">
-          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center font-bold text-lg">
-            My
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-white/20">
+            <img
+              src="/site-icon.svg"
+              alt="MyResumes logo"
+              className="h-8 w-8 rounded-md object-contain"
+              onError={(event) => {
+                event.currentTarget.classList.add('hidden');
+                event.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+            <span className="hidden text-sm font-black text-blue-600">My</span>
           </div>
           <span className="font-bold text-xl tracking-tight">Resumes</span>
         </div>
