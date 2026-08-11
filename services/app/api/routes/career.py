@@ -132,8 +132,10 @@ def export_resume(payload: ExportResumeIn, current_user: User = Depends(get_curr
 
 
 @router.post("/import/linkedin", response_model=LinkedInImportOut)
-def import_linkedin(payload: LinkedInImportIn) -> LinkedInImportOut:
+def import_linkedin(payload: LinkedInImportIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> LinkedInImportOut:
     result = import_linkedin_profile(payload.profileText)
+    log_activity(db, current_user.id, "CAREER_LINKEDIN_IMPORT", details="Imported pasted LinkedIn profile text", user_name=current_user.name)
+    db.commit()
     return LinkedInImportOut(**result)
 
 

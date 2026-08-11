@@ -61,6 +61,14 @@ VITE_API_URL=<API_ORIGIN>
 
 ---
 
+## Career Toolkit
+
+MyResume includes a deterministic Career Toolkit with no LLM or agentic-AI API calls. It supports ATS scoring against a pasted job description, keyword gap detection, job-description parsing, section-level match reports, bullet quality checks, resume risk/completeness checks, ATS-safe text/DOCX/PDF export payloads, LinkedIn text import, job tracker records, application packets, achievements, resume versions, share-link metadata, data export/delete controls, and a no-LLM feature catalog.
+
+Backend entry points are under `/career/*`; the logged-in frontend tab is **Career Toolkit**.
+
+---
+
 ##  CI/CD
 
 - CI: GitHub Actions (test + build)
