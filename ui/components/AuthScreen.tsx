@@ -107,8 +107,17 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
           <button onClick={() => setPublicPage('home')} className="flex items-center gap-2 cursor-pointer">
-                     <div className="w-10 h-10 bg-[#1a91f0] rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">My</span>
+                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200">
+                        <img
+                          src="/site-icon.svg"
+                          alt="MyResumes logo"
+                          className="h-9 w-9 rounded-md object-contain"
+                          onError={(event) => {
+                            event.currentTarget.classList.add('hidden');
+                            event.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <span className="hidden text-sm font-black text-[#1a91f0]">My</span>
                      </div>
                      <span className="font-bold text-xl tracking-tight text-slate-800">Resumes</span>
           </button>
