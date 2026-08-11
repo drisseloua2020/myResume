@@ -17,6 +17,7 @@ import TemplateSelector from './components/TemplateSelector';
 import CareerBlogPage from './components/CareerBlogPage';
 import ResumeGuidePage from './components/ResumeGuidePage';
 import ResumeExamplesPage from './components/ResumeExamplesPage';
+import CareerToolkitPage from './components/CareerToolkitPage';
 import AgentReviewModal from './components/AgentReviewModal';
 import ConfirmNewResumeModal from './components/ConfirmNewResumeModal';
 import { authService } from './services/authService';
@@ -1364,6 +1365,10 @@ const App: React.FC = () => {
           <CoverLettersPage />
         </div>
       );
+    }
+
+    if (activeTab === 'career_tools') {
+      return <CareerToolkitPage currentResume={visibleEditorData as UserInputData} />;
     }
 
     if (activeTab === 'resumes') {

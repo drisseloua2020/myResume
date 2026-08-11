@@ -15,6 +15,7 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
 
   const userTabs: Tab[] = [
     { key: 'resumes', label: 'View Resume' },
+    { key: 'career_tools', label: 'Career Toolkit' },
     { key: 'cover_letters', label: 'Cover Letters' },
     { key: 'workspace', label: 'Editor' },
   ];
