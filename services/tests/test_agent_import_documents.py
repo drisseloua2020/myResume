@@ -10,63 +10,6 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 PDF_MIME = "application/pdf"
 
 
-class _FakeGeminiResponse:
-    text = """RESUME_JSON:
-{"header":{"name":"Alex Resume","title":"Engineer","location":"","phone":"","email":"","links":[]},"summary":"","skills":{"Skills":[]},"experience":[],"education":[]}
-
-GAP_AND_FIX_LIST:
-N/A
-
-RESUME_ATS:
-N/A
-
-RESUME_HUMAN:
-N/A
-
-RESUME_TARGETED:
-N/A
-
-RESUME_WITH_PHOTO:
-N/A
-
-COVER_LETTER_FULL:
-N/A - no job description provided
-
-COVER_LETTER_SHORT:
-N/A - no job description provided
-
-COLD_EMAIL:
-N/A - no job description provided"""
-
-
-class _FakeGeminiModels:
-    def __init__(self):
-        self.calls = []
-
-    def generate_content(self, **kwargs):
-        self.calls.append(kwargs)
-        return _FakeGeminiResponse()
-
-
-class _FakeGeminiClient:
-    def __init__(self):
-        self.models = _FakeGeminiModels()
-
-
-class _FailingGeminiModels:
-    def __init__(self):
-        self.calls = []
-
-    def generate_content(self, **kwargs):
-        self.calls.append(kwargs)
-        raise RuntimeError("Gemini unavailable")
-
-
-class _FailingGeminiClient:
-    def __init__(self):
-        self.models = _FailingGeminiModels()
-
-
 def _signup(client) -> str:
     response = client.post(
         "/auth/signup",
@@ -129,12 +72,23 @@ def _pdf_bytes(lines: list[str]) -> bytes:
     return output.getvalue()
 
 
-def test_generate_resume_extracts_docx_text_before_ai_parse(client, monkeypatch):
+def test_generate_resume_legacy_endpoint_extracts_docx_text_with_parser(client):
     token = _signup(client)
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
-    resume_bytes = _docx_bytes("Alex Resume\nSenior Python Engineer\nBuilt APIs")
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Alex Resume",
+            "Senior Python Engineer",
+            "alex@example.com",
+            "SUMMARY",
+            "Backend engineer building APIs.",
+            "SKILLS",
+            "Python, FastAPI",
+            "EXPERIENCE",
+            "Senior Python Engineer - Example Co - 2021 - Present",
+            "Built APIs",
+        ])
+    )
     encoded_resume = base64.b64encode(resume_bytes).decode("ascii")
     response = client.post(
         "/agent/generate-resume",
@@ -152,22 +106,15 @@ def test_generate_resume_extracts_docx_text_before_ai_parse(client, monkeypatch)
     )
 
     assert response.status_code == 200, response.text
-    contents = fake_client.models.calls[0]["contents"]
-    joined = "\n".join(part for part in contents if isinstance(part, str))
-    assert "EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT" in joined
-    assert "UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS" in joined
-    assert "Alex Resume" in joined
-    assert "Senior Python Engineer" in joined
-    assert encoded_resume not in joined
-    assert '"textExtracted": true' in joined
-    assert '"name": "alex-resume.docx"' in joined
-    assert '"parsedResumeJson"' in joined
+    text = response.json()["text"]
+    assert "Parsed with the deterministic ATS parser" in text
+    assert "Alex Resume" in text
+    assert "Senior Python Engineer" in text
+    assert encoded_resume not in text
 
 
-def test_generate_resume_uses_understood_pdf_json_when_ai_json_is_weak(client, monkeypatch):
+def test_generate_resume_uses_local_pdf_json(client):
     token = _signup(client)
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _pdf_bytes([
         "Morgan Smart",
@@ -199,12 +146,6 @@ def test_generate_resume_uses_understood_pdf_json_when_ai_json_is_weak(client, m
 
     assert response.status_code == 200, response.text
 
-    contents = fake_client.models.calls[0]["contents"]
-    joined = "\n".join(part for part in contents if isinstance(part, str))
-    assert "EXTRACTED_RESUME_TEXT_FROM_PDF" in joined
-    assert "UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS" in joined
-    assert joined.index("EXTRACTED_RESUME_TEXT_FROM_PDF") < joined.index("UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS")
-
     text = response.json()["text"]
     json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
     resume_json = json.loads(json_blob)
@@ -222,10 +163,8 @@ def test_generate_resume_uses_understood_pdf_json_when_ai_json_is_weak(client, m
     ]
 
 
-def test_generate_resume_accepts_ats_pdf_and_word_imports(client, monkeypatch):
+def test_parse_upload_accepts_ats_pdf_and_word_imports(client):
     token = _signup(client)
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     ats_lines = [
         "Jordan Carter",
@@ -243,41 +182,34 @@ def test_generate_resume_accepts_ats_pdf_and_word_imports(client, monkeypatch):
         "BS Computer Science",
     ]
     cases = [
-        (PDF_MIME, "jordan-ats.pdf", _pdf_bytes(ats_lines), "EXTRACTED_RESUME_TEXT_FROM_PDF"),
-        (DOCX_MIME, "jordan-ats.docx", _docx_bytes("\n".join(ats_lines)), "EXTRACTED_RESUME_TEXT_FROM_WORD_DOCUMENT"),
+        (PDF_MIME, "jordan-ats.pdf", _pdf_bytes(ats_lines), "pdf"),
+        (DOCX_MIME, "jordan-ats.docx", _docx_bytes("\n".join(ats_lines)), "docx"),
     ]
 
-    for mime_type, name, resume_bytes, extract_marker in cases:
+    for mime_type, name, resume_bytes, kind in cases:
         response = client.post(
-            "/agent/generate-resume",
+            "/resumes/parse-upload",
             headers={"Authorization": f"Bearer {token}"},
             json={
-                "mode": "MODE_A",
-                "input": {
-                    "importFormat": "ats",
-                    "fileData": {
-                        "mimeType": mime_type,
-                        "name": name,
-                        "data": base64.b64encode(resume_bytes).decode("ascii"),
-                    },
+                "importFormat": "ats",
+                "fileData": {
+                    "mimeType": mime_type,
+                    "name": name,
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
                 },
             },
         )
 
         assert response.status_code == 200, response.text
-        contents = fake_client.models.calls[-1]["contents"]
-        joined = "\n".join(part for part in contents if isinstance(part, str))
-        assert extract_marker in joined
-        assert "ATS_IMPORT_VALIDATION" in joined
-        assert '"validated": true' in joined
-        assert '"importFormat": "ats"' in joined
-        assert "UNDERSTOOD_RESUME_JSON_FOR_TEMPLATE_FIELDS" in joined
+        payload = response.json()
+        assert payload["atsReport"]["validated"] is True
+        assert payload["document"]["kind"] == kind
+        assert payload["document"]["name"] == name
+        assert payload["resume"]["header"]["name"] == "Jordan Carter"
 
 
-def test_generate_resume_rejects_readable_non_ats_import_before_ai_parse(client, monkeypatch):
+def test_generate_resume_rejects_readable_non_ats_import_before_parser(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "Jordan Carter\n"
@@ -303,7 +235,6 @@ def test_generate_resume_rejects_readable_non_ats_import_before_ai_parse(client,
     assert response.status_code == 422, response.text
     assert "does not look like an ATS resume" in response.json()["detail"]
     assert "Detected sections: none." in response.json()["detail"]
-    assert fake_client.models.calls == []
 
 
 def test_generate_resume_rejects_unsupported_import_file_type(client):
@@ -327,10 +258,8 @@ def test_generate_resume_rejects_unsupported_import_file_type(client):
     assert response.json()["detail"] == "Supported import formats: PDF, DOC, DOCX."
 
 
-def test_generate_resume_rejects_unreadable_docx_before_ai_parse(client, monkeypatch):
+def test_generate_resume_rejects_unreadable_docx_before_parser(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     empty_docx = _docx_bytes("")
     response = client.post(
@@ -350,13 +279,10 @@ def test_generate_resume_rejects_unreadable_docx_before_ai_parse(client, monkeyp
 
     assert response.status_code == 422, response.text
     assert "Could not extract readable text" in response.json()["detail"]
-    assert fake_client.models.calls == []
 
 
-def test_generate_resume_falls_back_to_local_import_parser_when_ai_fails(client, monkeypatch):
+def test_generate_resume_falls_back_to_local_import_parser_with_parser(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -387,10 +313,9 @@ def test_generate_resume_falls_back_to_local_import_parser_when_ai_fails(client,
     )
 
     assert response.status_code == 200, response.text
-    assert len(fake_client.models.calls) == 1
 
     text = response.json()["text"]
-    assert "Imported with local parser because AI generation was unavailable" in text
+    assert "Parsed with the deterministic ATS parser" in text
     json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
     resume_json = json.loads(json_blob)
 
@@ -401,10 +326,8 @@ def test_generate_resume_falls_back_to_local_import_parser_when_ai_fails(client,
     assert resume_json["experience"] == []
 
 
-def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(client, monkeypatch):
+def test_generate_resume_parses_pdf_resume_into_editor_fields_with_parser(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _pdf_bytes([
         "Alex Resume",
@@ -465,8 +388,6 @@ def test_generate_resume_parses_pdf_resume_into_editor_fields_when_ai_fails(clie
 
 def test_generate_resume_parses_compact_pdf_rows_into_structured_fields(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _pdf_bytes([
         "Jordan Candidate",
@@ -527,8 +448,6 @@ def test_generate_resume_parses_compact_pdf_rows_into_structured_fields(client, 
 
 def test_generate_resume_parses_multiline_pdf_job_details(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _pdf_bytes([
         "Taylor Builder",
@@ -611,8 +530,6 @@ def test_generate_resume_parses_multiline_pdf_job_details(client, monkeypatch):
 
 def test_generate_resume_filters_unaligned_pdf_noise_from_template_json(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FakeGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _pdf_bytes([
         "Taylor Builder",
@@ -679,10 +596,8 @@ def test_generate_resume_filters_unaligned_pdf_noise_from_template_json(client, 
     ]
 
 
-def test_generate_resume_collects_common_resume_date_formats_when_ai_fails(client, monkeypatch):
+def test_generate_resume_collects_common_resume_date_formats_with_parser(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -740,8 +655,6 @@ def test_generate_resume_collects_common_resume_date_formats_when_ai_fails(clien
 
 def test_generate_resume_recognizes_title_first_header_and_non_tech_roles(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -805,8 +718,6 @@ def test_generate_resume_recognizes_title_first_header_and_non_tech_roles(client
 
 def test_generate_resume_keeps_short_action_lines_as_job_description(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -855,8 +766,6 @@ def test_generate_resume_keeps_short_action_lines_as_job_description(client, mon
 
 def test_generate_resume_keeps_hyphenated_detail_fragments_out_of_job_titles(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -905,8 +814,6 @@ def test_generate_resume_keeps_hyphenated_detail_fragments_out_of_job_titles(cli
 
 def test_generate_resume_moves_non_experience_education_sections_into_skills(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -974,8 +881,6 @@ def test_generate_resume_moves_non_experience_education_sections_into_skills(cli
 
 def test_generate_resume_preserves_standard_ats_sections_as_additional_sections(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -1045,8 +950,6 @@ def test_generate_resume_preserves_standard_ats_sections_as_additional_sections(
 
 def test_generate_resume_groups_labeled_skill_lines_under_skills(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([
@@ -1098,8 +1001,6 @@ def test_generate_resume_groups_labeled_skill_lines_under_skills(client, monkeyp
 
 def test_generate_resume_moves_skill_lines_out_of_education_section(client, monkeypatch):
     token = _signup(client)
-    fake_client = _FailingGeminiClient()
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: fake_client)
 
     resume_bytes = _docx_bytes(
         "\n".join([

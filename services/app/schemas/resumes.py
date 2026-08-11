@@ -14,6 +14,19 @@ class UpdateResumeIn(StrictModel):
 class DraftIn(StrictModel):
     templateId: str | None = Field(default=None, max_length=80)
     content: dict[str, Any] | list[Any] | str | int | float | bool | None
+class ResumeUploadFileData(StrictModel):
+    mimeType: str = Field(min_length=1, max_length=200)
+    data: str = Field(min_length=1)
+    name: str | None = Field(default=None, max_length=255)
+class ParseResumeUploadIn(StrictModel):
+    importFormat: str | None = Field(default="ats", max_length=80)
+    fileData: ResumeUploadFileData
+class ParseResumeUploadOut(StrictModel):
+    resume: dict[str, Any]
+    warnings: list[str]
+    confidence: dict[str, Any]
+    document: dict[str, Any]
+    atsReport: dict[str, Any]
 class ResumeSummaryOut(StrictModel):
     id: str
     templateId: str

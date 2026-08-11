@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ipaddress
-import json
 import re
 import textwrap
 from html.parser import HTMLParser
@@ -15,19 +14,17 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.api.routes.common import to_cover_letter_out
 from app.models.entities import CoverLetter, User
-from app.prompts import RESUME_FORGE_SYSTEM_PROMPT
 from app.schemas.common import OkResponse
 from app.schemas.cover_letters import CoverLetterEnvelope, CoverLettersEnvelope, GenerateCoverLetterIn
 from app.services.activity import log_activity, new_prefixed_id
-from app.services.gemini import get_gemini_client, get_model_name, make_config
 
 router = APIRouter(prefix="/cover-letters", tags=["cover-letters"])
 
 MAX_JOB_DESCRIPTION_CHARS = 20000
 MAX_JOB_SOURCE_CHARS = 500000
 JOB_URL_ERROR = "Could not process the job URL. Paste the job description instead."
-MAX_RESUME_PROMPT_STRING_CHARS = 12000
-MAX_RESUME_PROMPT_COLLECTION_ITEMS = 80
+MAX_RESUME_CONTEXT_STRING_CHARS = 12000
+MAX_RESUME_CONTEXT_COLLECTION_ITEMS = 80
 JOB_TITLE_KEYWORDS = (
     "administrator",
     "analyst",
@@ -82,17 +79,6 @@ class _VisibleTextParser(HTMLParser):
         return "".join(self._chunks)
 
 
-def extract(raw_text: str, start_marker: str, end_marker: str | None) -> str | None:
-    start_index = raw_text.find(start_marker)
-    if start_index == -1:
-        return None
-    start = start_index + len(start_marker)
-    end = raw_text.find(end_marker, start) if end_marker else len(raw_text)
-    if end == -1:
-        end = len(raw_text)
-    return raw_text[start:end].strip()
-
-
 def _clean_text(text: str) -> str:
     normalized = text.replace("\r", "\n")
     normalized = re.sub(r"[ \t\f\v]+", " ", normalized)
@@ -109,7 +95,7 @@ def _html_to_text(html: str) -> str:
 
 
 def _sanitize_resume_context(value, *, depth: int = 0):
-    """Remove uploaded binary blobs before sending resume context to the AI model."""
+    """Remove uploaded binary blobs before deriving local cover-letter highlights."""
     if depth > 8:
         return "[TRUNCATED]"
 
@@ -134,13 +120,13 @@ def _sanitize_resume_context(value, *, depth: int = 0):
     if isinstance(value, list):
         return [
             _sanitize_resume_context(item, depth=depth + 1)
-            for item in value[:MAX_RESUME_PROMPT_COLLECTION_ITEMS]
+            for item in value[:MAX_RESUME_CONTEXT_COLLECTION_ITEMS]
         ]
 
     if isinstance(value, str):
         cleaned = _clean_text(value)
-        if len(cleaned) > MAX_RESUME_PROMPT_STRING_CHARS:
-            return f"{cleaned[:MAX_RESUME_PROMPT_STRING_CHARS]}...[TRUNCATED]"
+        if len(cleaned) > MAX_RESUME_CONTEXT_STRING_CHARS:
+            return f"{cleaned[:MAX_RESUME_CONTEXT_STRING_CHARS]}...[TRUNCATED]"
         return cleaned
 
     return value
@@ -549,7 +535,7 @@ I would be glad to discuss how that experience maps to your team's needs.
 Best,
 {name}"""
 
-    raw = "LOCAL_FALLBACK_COVER_LETTER: Gemini generation failed, so ResumeForge created a conservative saved draft from the parsed job description and resume context."
+    raw = "LOCAL_SCRIPT_COVER_LETTER: ResumeForge created a deterministic saved draft from the parsed job description and resume context."
     return full, short, cold_email, raw
 
 
@@ -573,46 +559,16 @@ def generate(payload: GenerateCoverLetterIn, current_user: User = Depends(get_cu
     )
     resume_context = _sanitize_resume_context(payload.resumeJson)
     resume_reference = _resume_reference(resume_context, payload.templateId)
-    user_prompt = f"""You are generating ONLY cover letter outputs.
-Use JOB_TITLE_FROM_DESCRIPTION as the position the candidate is applying to.
-Use only JOB_TITLE_FROM_DESCRIPTION in the cover letter body.
-Never spell out a longer job-board title, requisition title, tracking number, company suffix, or location suffix.
-Do not use the resume target role, resume title, or current role as the applied-for position unless it matches JOB_TITLE_FROM_DESCRIPTION.
-
-Return EXACTLY these sections (no resume sections):
-COVER_LETTER_FULL:
-<text>
-
-COVER_LETTER_SHORT:
-<text>
-
-COLD_EMAIL:
-<text>
-
-USER_CONTEXT_JSON:
-{json.dumps({'name': current_user.name, 'email': current_user.email, 'templateId': payload.templateId, 'jobTitleFromDescription': title, 'jobUrl': job_url, 'jobDescription': job_description_for_generation, 'resumeJson': resume_context}, indent=2)}"""
-    try:
-        client = get_gemini_client()
-        model = get_model_name()
-        response = client.models.generate_content(model=model, contents=[user_prompt], config=make_config(RESUME_FORGE_SYSTEM_PROMPT))
-        raw = response.text or ""
-        cover_letter_full = extract(raw, "COVER_LETTER_FULL:", "COVER_LETTER_SHORT:") or raw.strip()
-        cover_letter_short = extract(raw, "COVER_LETTER_SHORT:", "COLD_EMAIL:") or ""
-        cold_email = extract(raw, "COLD_EMAIL:", None) or ""
-        cover_letter_full = _replace_noisy_job_title_variants(cover_letter_full, title, noisy_title_variants)
-        cover_letter_short = _replace_noisy_job_title_variants(cover_letter_short, title, noisy_title_variants)
-        cold_email = _replace_noisy_job_title_variants(cold_email, title, noisy_title_variants)
-        if not cover_letter_full.strip():
-            raise RuntimeError("AI response did not include cover letter content")
-        generation_source = "ai"
-    except Exception:
-        cover_letter_full, cover_letter_short, cold_email, raw = _build_local_cover_letter(
-            title,
-            job_description_for_generation,
-            resume_context,
-            current_user,
-        )
-        generation_source = "local_fallback"
+    cover_letter_full, cover_letter_short, cold_email, raw = _build_local_cover_letter(
+        title,
+        job_description_for_generation,
+        resume_context,
+        current_user,
+    )
+    cover_letter_full = _replace_noisy_job_title_variants(cover_letter_full, title, noisy_title_variants)
+    cover_letter_short = _replace_noisy_job_title_variants(cover_letter_short, title, noisy_title_variants)
+    cold_email = _replace_noisy_job_title_variants(cold_email, title, noisy_title_variants)
+    generation_source = "local_script"
 
     entity = CoverLetter(
         id=new_prefixed_id("cl"),

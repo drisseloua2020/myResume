@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import ResumeInput from './components/ResumeInput';
-import ResultsDisplay from './components/ResultsDisplay';
 import ResumeLibraryPage from './components/ResumeLibraryPage';
 import CoverLettersPage from './components/CoverLettersPage';
 import ProfileSyncPage from './components/ProfileSyncPage';
@@ -20,14 +19,13 @@ import ResumeGuidePage from './components/ResumeGuidePage';
 import ResumeExamplesPage from './components/ResumeExamplesPage';
 import AgentReviewModal from './components/AgentReviewModal';
 import ConfirmNewResumeModal from './components/ConfirmNewResumeModal';
-import { generateResumeContent } from './services/geminiService';
 import { authService } from './services/authService';
 import { setSession, clearSession, SESSION_EXPIRED_EVENT } from './services/apiClient';
 import { getOAuthBackendCallbackRedirect, isOAuthCallbackPath } from './services/oauthRedirect';
 import { agentService } from './services/agentService';
-import { saveDraft, getLatestResume, saveResume } from './services/resumeService';
+import { saveDraft, getLatestResume, parseResumeUpload, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
-import { AppMode, UserInputData, ParsedResponse, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
+import { UserInputData, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
 
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
@@ -694,7 +692,6 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('workspace');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
-  const [results, setResults] = useState<ParsedResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [generatorTab, setGeneratorTab] = useState<'create' | 'upload' | 'cover_letter'>('create');
@@ -718,7 +715,6 @@ const App: React.FC = () => {
         // ignore
       }
       setError(null);
-      setResults(null);
       setEditorData(null);
       setLoadedResumeId(null);
       setLoadedResumeTitle(null);
@@ -751,7 +747,6 @@ const App: React.FC = () => {
       ? resume.content as Partial<UserInputData>
       : {};
 
-    setResults(null);
     setError(null);
     setSelectedTemplateId(resume.templateId);
     setEditorData({ ...resumeContent, templateId: resume.templateId });
@@ -764,7 +759,6 @@ const App: React.FC = () => {
 
   const startNewResume = () => {
     setShowNewResumeConfirm(false);
-    setResults(null);
     setError(null);
     setEditorData(null);
     setLoadedResumeId(null);
@@ -778,7 +772,6 @@ const App: React.FC = () => {
   const resetEditorForDeletedResume = (deletedResumeId: string, options?: { isLibraryEmpty?: boolean }) => {
     if (loadedResumeId !== deletedResumeId && !options?.isLibraryEmpty) return;
 
-    setResults(null);
     setError(null);
     setEditorData(emptyEditorData());
     setLoadedResumeId(null);
@@ -874,7 +867,6 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User, initialTemplateId?: string) => {
     setCurrentUser(user);
-    setResults(null);
     setEditorData(null);
     setLoadedResumeId(null);
     setLoadedResumeTitle(null);
@@ -901,7 +893,6 @@ const App: React.FC = () => {
     void authService.logout();
     setCurrentUser(null);
     setSelectedTemplateId(undefined);
-    setResults(null);
     setEditorData(null);
     setLoadedResumeId(null);
     setLoadedResumeTitle(null);
@@ -916,24 +907,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerate = async (data: UserInputData, mode: AppMode) => {
-    if (!currentUser) return;
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Ensure workspace state is persisted before AI processing
-      await saveDraft({ templateId: data.templateId || selectedTemplateId, content: { ...data, templateId: data.templateId || selectedTemplateId } });
-      authService.logActivity(currentUser.id, currentUser.name, 'RESUME_GENERATE', `Mode: ${mode}, Template: ${data.templateId || 'None'}`);
-      const parsedResults = await generateResumeContent(data, mode);
-      setResults(parsedResults);
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   // Helper to map JSON to State
   const mapJsonToState = (json: any): Partial<UserInputData> => {
       if (!json) return {};
@@ -1277,11 +1250,13 @@ const App: React.FC = () => {
     setError(null);
     try {
         authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', 'Importing document to Editor');
-        // We use FORMAT_EXISTING mode to parse the uploaded document.
-        const parsedResults = await generateResumeContent(data, AppMode.FORMAT_EXISTING);
+        const parsedResults = await parseResumeUpload({
+          importFormat: data.importFormat || 'ats',
+          fileData: data.fileData!,
+        });
         
-        if (parsedResults.json) {
-            const mappedData = mapJsonToState(parsedResults.json);
+        if (parsedResults.resume) {
+            const mappedData = mapJsonToState({ RESUME_JSON: parsedResults.resume });
             const templateId = selectedTemplateId || data.templateId || DEFAULT_IMPORTED_TEMPLATE_ID;
             const importedContent: UserInputData = {
               role: data.role,
@@ -1309,8 +1284,6 @@ const App: React.FC = () => {
             });
             // Switch to Create tab to show the editor
             setGeneratorTab('create');
-            // Ensure no results overlay is showing
-            setResults(null);
         } else {
             throw new Error("Could not parse resume data structure.");
         }
@@ -1446,10 +1419,6 @@ const App: React.FC = () => {
       );
     }
 
-    if (results) {
-      return <ResultsDisplay results={results} templateId={selectedTemplateId} onReset={() => setResults(null)} />;
-    }
-
     if (activeTab !== 'workspace') {
       // Fallback to editor.
       setActiveTab('workspace');
@@ -1461,7 +1430,6 @@ const App: React.FC = () => {
       <div className="w-full px-4 lg:px-8 py-8 space-y-4">
         <ResumeInput 
           key={`resume-input-${workspaceResetKey}`}
-          onGenerate={handleGenerate} 
           onImport={handleImport}
           onTemplateChange={setSelectedTemplateId}
           onNewResume={() => setShowNewResumeConfirm(true)}

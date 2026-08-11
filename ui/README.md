@@ -1,8 +1,6 @@
-# Run and deploy your AI Studio app
+# Run and deploy MyResumes
 
 This contains everything you need to run your app locally.
-
-If this project is imported from AI Studio, keep generated preview or drive URLs private unless they are intentionally shared.
 
 ## Run Locally
 
@@ -11,23 +9,20 @@ If this project is imported from AI Studio, keep generated preview or drive URLs
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Point the frontend to the FastAPI backend if needed:
+   `VITE_API_URL=http://localhost:3000`
 3. Run the app:
    `npm run dev`
 
 
-## Security note: do not expose Gemini API keys in the browser
+## Security note
 
-This project now calls Gemini from the backend (`site_backend`) so your API key is **never** shipped to the client.
+Resume parsing and cover letter generation are deterministic backend scripts. They do not call Gemini, LLMs, or agentic AI services.
 
-1) Set your key in `site_backend/.env` as:
-- `GEMINI_API_KEY=...`
+1) (Optional) Point the frontend to your backend with `VITE_API_URL`.
 
-2) (Optional) Point the frontend to your backend:
-- Create `myResume/.env.local` with `VITE_API_URL=http://localhost:3000`
-
-3) Run:
-- Backend: `cd site_backend && npm i && npm run dev`
+2) Run:
+- Backend: `cd services && python -m uvicorn app.main:app --reload`
 - Frontend: `npm i && npm run dev`
 
 Also: never commit `.env` files containing secrets.

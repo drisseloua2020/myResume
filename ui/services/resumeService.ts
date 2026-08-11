@@ -20,6 +20,14 @@ export type ResumeDraft = {
   updatedAt: string;
 };
 
+export type ParsedResumeUpload = {
+  resume: Record<string, unknown>;
+  warnings: string[];
+  confidence: Record<string, unknown>;
+  document: Record<string, unknown>;
+  atsReport: Record<string, unknown>;
+};
+
 export async function saveResume(payload: { templateId: string; title: string; content: any }): Promise<{ id: string }> {
   return api.post<{ id: string }>('/resumes', payload);
 }
@@ -57,4 +65,15 @@ export async function getLatestDraft(templateId?: string): Promise<ResumeDraft |
   const qs = templateId ? `?templateId=${encodeURIComponent(templateId)}` : '';
   const res = await api.get<{ draft: ResumeDraft | null }>(`/resumes/latest-draft${qs}`);
   return res.draft;
+}
+
+export async function parseResumeUpload(payload: {
+  importFormat?: 'ats';
+  fileData: {
+    mimeType: string;
+    data: string;
+    name?: string;
+  };
+}): Promise<ParsedResumeUpload> {
+  return api.post<ParsedResumeUpload>('/resumes/parse-upload', payload);
 }

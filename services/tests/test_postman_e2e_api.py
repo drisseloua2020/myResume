@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
+from io import BytesIO
 from uuid import uuid4
+from zipfile import ZipFile
 
 from sqlalchemy.orm import Session
 
@@ -10,28 +13,6 @@ from app.models.entities import User
 
 TEMPLATE_ID = "modern_tech"
 SOURCE_TO_CONNECT = "linkedin"
-
-
-class _FakeGeminiResponse:
-    text = """COVER_LETTER_FULL:
-Dear Hiring Manager,
-
-I am excited to apply for this role.
-
-COVER_LETTER_SHORT:
-I am excited to apply for this role.
-
-COLD_EMAIL:
-Could we schedule time to discuss the opportunity?"""
-
-
-class _FakeGeminiModels:
-    def generate_content(self, **_kwargs):
-        return _FakeGeminiResponse()
-
-
-class _FakeGeminiClient:
-    models = _FakeGeminiModels()
 
 
 def _auth_headers(token: str) -> dict[str, str]:
@@ -57,9 +38,21 @@ def _promote_to_admin(db_session: Session, user_id: str) -> None:
     db_session.commit()
 
 
+def _docx_bytes(text: str) -> bytes:
+    body = "".join(f"<w:p><w:r><w:t>{part}</w:t></w:r></w:p>" for part in text.splitlines())
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>{body}</w:body>
+</w:document>"""
+
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as docx:
+        docx.writestr("[Content_Types].xml", "")
+        docx.writestr("word/document.xml", document_xml)
+    return buffer.getvalue()
+
+
 def _install_external_service_fakes(monkeypatch) -> None:
-    monkeypatch.setattr("app.api.routes.agent.get_gemini_client", lambda: _FakeGeminiClient())
-    monkeypatch.setattr("app.api.routes.cover_letters.get_gemini_client", lambda: _FakeGeminiClient())
     monkeypatch.setattr("app.api.routes.admin.send_support_email", lambda **_kwargs: None)
 
 
@@ -218,16 +211,38 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
     assert agent_updates.status_code == 200, agent_updates.text
     assert agent_updates.json()["updates"]
 
-    generated_resume = client.post(
-        "/agent/generate-resume",
+    ats_resume = _docx_bytes(
+        "\n".join([
+            user_name,
+            "Software Engineer",
+            f"{user_email} | Austin, TX",
+            "SUMMARY",
+            "Software engineer building reliable business applications.",
+            "SKILLS",
+            "Python, React, APIs",
+            "EXPERIENCE",
+            "Software Engineer - Example Co - 2021 - Present",
+            "Built API workflows for internal users.",
+            "EDUCATION",
+            "State University",
+            "BS Computer Science",
+        ])
+    )
+    parsed_resume = client.post(
+        "/resumes/parse-upload",
         headers=user_headers,
         json={
-            "mode": "MODE_B",
-            "input": {"targetRole": "Software Engineer", "personalDetails": {"firstName": "Postman"}},
+            "importFormat": "ats",
+            "fileData": {
+                "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "name": "postman-ats.docx",
+                "data": base64.b64encode(ats_resume).decode("ascii"),
+            },
         },
     )
-    assert generated_resume.status_code == 200, generated_resume.text
-    assert "COVER_LETTER_FULL" in generated_resume.json()["text"]
+    assert parsed_resume.status_code == 200, parsed_resume.text
+    assert parsed_resume.json()["atsReport"]["validated"] is True
+    assert parsed_resume.json()["resume"]["header"]["name"] == user_name
 
     generated_cover_letter = client.post(
         "/cover-letters/generate",

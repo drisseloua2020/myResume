@@ -125,13 +125,13 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           </div>
 
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={handleLoginClick}
               className="text-slate-600 hover:text-[#1a91f0] font-semibold text-sm px-4 py-2"
             >
               Log In
             </button>
-            <button 
+            <button
               onClick={handleStartCreate}
               className="bg-[#1a91f0] hover:bg-[#1170cd] text-white px-6 py-2.5 rounded-full font-bold text-sm transition-transform transform hover:-translate-y-0.5 shadow-md"
             >
@@ -175,7 +175,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       {/* --- Hero Section --- */}
       <header className="relative pt-16 pb-24 overflow-hidden bg-slate-50/50">
          <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col md:flex-row items-center gap-12">
-            
+
             {/* Left Text */}
             <div className="flex-1 text-center md:text-left">
                 <span className="text-[#1a91f0] font-bold tracking-wider text-sm uppercase mb-4 block">
@@ -189,7 +189,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 Use professional field-tested resume templates that follow the exact "resume rules" employers look for. Easy to use and done within minutes.
                 </p>
                 <div className="flex flex-col sm:flex-row justify-center md:justify-start gap-4 mb-10">
-                <button 
+                <button
                     onClick={handleStartCreate}
                     className="bg-[#1a91f0] text-white text-lg font-bold px-10 py-4 rounded-full shadow-lg hover:shadow-xl hover:bg-[#1170cd] transition-all transform hover:-translate-y-1"
                 >
@@ -211,7 +211,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
                 {/* The Resume Paper */}
                 <div className="relative w-[380px] h-[540px] bg-white rounded shadow-2xl border border-slate-100 transform rotate-y-[-5deg] rotate-x-[5deg] hover:rotate-y-[0deg] hover:rotate-x-[0deg] transition-transform duration-700 ease-out flex overflow-hidden select-none z-20">
-                    
+
                     {/* Sidebar (Dark) */}
                     <div className="w-[35%] bg-slate-900 text-white p-4 flex flex-col gap-4">
                         {/* Photo */}
@@ -277,7 +277,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1">
                                  <span className="w-1.5 h-1.5 bg-[#1a91f0] rounded-full"></span> Experience
                               </h3>
-                              
+
                               <div className="mb-3">
                                  <div className="flex justify-between items-baseline mb-0.5">
                                     <h4 className="text-sm font-bold text-slate-900">CTO</h4>
@@ -288,7 +288,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                                     Experienced professional with a proven track record of success in delivering high-quality results. Skilled in adapting to new challenges.
                                  </p>
                               </div>
-                              
+
                               <div>
                                  <div className="flex justify-between items-baseline mb-0.5">
                                     <h4 className="text-sm font-bold text-slate-900">Senior Dev</h4>
@@ -321,7 +321,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       <section className="py-20 bg-slate-50 border-b border-slate-200">
          <div className="max-w-6xl mx-auto px-6 text-center">
             <h2 className="text-3xl font-bold text-slate-900 mb-16">Build your resume in 3 steps</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                {/* Step 1 */}
                <div className="flex flex-col items-center">
@@ -364,7 +364,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-             
+
              {/* FREE PLAN */}
              <div className="border border-slate-200 rounded-2xl p-8 hover:border-[#1a91f0]/50 hover:shadow-xl transition-all duration-300 relative">
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{PLAN_DETAILS[SubscriptionPlan.FREE].name}</h3>
@@ -388,7 +388,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                      Includes Ads
                   </li>
                 </ul>
-                <button 
+                <button
                   onClick={() => handlePlanSelected(SubscriptionPlan.FREE)}
                   className="w-full py-3 rounded-lg border-2 border-slate-200 text-slate-700 font-bold hover:border-slate-800 hover:text-slate-900 transition-colors"
                 >
@@ -479,10 +479,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             <span className="text-[#1a91f0] font-bold tracking-widest uppercase text-sm mb-4 block">Our Mission</span>
             <h2 className="text-3xl md:text-5xl font-bold mb-8">Democratizing Career Success</h2>
             <div className="h-1 w-24 bg-gradient-to-r from-blue-500 to-purple-500 mx-auto mb-10 rounded-full"></div>
-            
+
             <p className="text-xl text-slate-300 leading-relaxed mb-12">
-               We are technical experts aiming to promote the easy use of technology for affordable cost to no cost. 
-               We believe that high-quality career tools—like AI-powered resume building and optimization—should be accessible to everyone, 
+               We are technical experts aiming to promote the easy use of technology for affordable cost to no cost.
+               We believe that high-quality career tools—like ATS resume parsing, editing, and cover letter support—should be accessible to everyone,
                regardless of their budget.
             </p>
 
@@ -593,14 +593,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
       {/* --- MODALS --- */}
       {activeModal === 'pricing' && (
-        <PricingModal 
+        <PricingModal
           onClose={() => setActiveModal('none')}
           onSelectPlan={handlePlanSelected}
         />
       )}
 
       {(activeModal === 'login' || activeModal === 'signup') && (
-        <AuthModal 
+        <AuthModal
            mode={activeModal}
            selectedPlan={selectedPlan}
            selectedTemplateId={selectedTemplateId}
@@ -613,7 +613,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
              setOauthError(null);
              setActiveModal(m);
            }}
-           onAuthSuccess={handleAuthSuccess} 
+           onAuthSuccess={handleAuthSuccess}
         />
       )}
     </div>
@@ -634,7 +634,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl relative z-10 overflow-hidden animate-fade-in-up">
-        
+
         <div className="p-8 text-center border-b border-slate-100">
           <h2 className="text-3xl font-bold text-slate-800 mb-2">Choose your plan</h2>
           <p className="text-slate-500">Select the best option to kickstart your career.</p>
@@ -646,7 +646,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
         <div className="p-8 bg-slate-50">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              {/* Free Plan */}
-             <div 
+             <div
                onClick={() => setSelected(SubscriptionPlan.FREE)}
                className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all bg-white ${selected === SubscriptionPlan.FREE ? 'border-slate-500 shadow-lg ring-1 ring-slate-500' : 'border-slate-200 hover:border-slate-300'}`}
              >
@@ -720,9 +720,9 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
              </div>
           </div>
         </div>
-        
+
         <div className="p-6 border-t border-slate-100 flex justify-end">
-             <button 
+             <button
                onClick={() => onSelectPlan(SubscriptionPlan.FREE)}
                className="bg-[#1a91f0] hover:bg-[#1170cd] text-white text-lg font-bold px-12 py-3 rounded-full shadow-md transition-transform transform hover:-translate-y-0.5"
              >
@@ -791,7 +791,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-fade-in-up">
-        
+
         {/* Header */}
         <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
            <div>
@@ -873,7 +873,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
                 onChange={e => setFormData({ ...formData, password: e.target.value })}
               />
             </div>
-            
+
             <button
               type="submit"
               disabled={loading}

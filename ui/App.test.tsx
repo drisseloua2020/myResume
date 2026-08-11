@@ -2,13 +2,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { generateResumeContent } from './services/geminiService';
 import {
   deleteResume,
   getLatestDraft,
   getLatestResume,
   getResume,
   listResumes,
+  parseResumeUpload,
   saveDraft,
   saveResume,
   updateResume,
@@ -41,16 +41,13 @@ vi.mock('./services/agentService', () => ({
   },
 }));
 
-vi.mock('./services/geminiService', () => ({
-  generateResumeContent: vi.fn(),
-}));
-
 vi.mock('./services/resumeService', () => ({
   deleteResume: vi.fn(),
   getResume: vi.fn(),
   listResumes: vi.fn(),
   getLatestResume: vi.fn(),
   getLatestDraft: vi.fn(),
+  parseResumeUpload: vi.fn(),
   saveDraft: vi.fn(),
   saveResume: vi.fn(),
   updateResume: vi.fn(),
@@ -72,6 +69,14 @@ vi.mock('./services/coverLetterService', () => ({
   generateCoverLetter: vi.fn(),
 }));
 
+const parsedResumeResult = (resume: Record<string, unknown>) => ({
+  resume,
+  warnings: [],
+  confidence: {},
+  document: {},
+  atsReport: {},
+});
+
 describe('App import flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,8 +87,7 @@ describe('App import flow', () => {
     vi.mocked(deleteResume).mockResolvedValue(undefined);
     vi.mocked(saveDraft).mockResolvedValue(undefined);
     vi.mocked(saveResume).mockResolvedValue({ id: 'res_imported' });
-    vi.mocked(generateResumeContent).mockResolvedValue({
-      json: {
+    vi.mocked(parseResumeUpload).mockResolvedValue(parsedResumeResult({
         header: {
           name: 'Alex Resume',
           email: 'alex@example.com',
@@ -104,8 +108,7 @@ describe('App import flow', () => {
           },
         ],
         education: [],
-      },
-    });
+    }));
   });
 
   it('creates a new saved resume record when a PDF resume is imported', async () => {
@@ -152,9 +155,7 @@ describe('App import flow', () => {
 
   it('maps flexible parsed resume JSON into live editor fields', async () => {
     const user = userEvent.setup();
-    vi.mocked(generateResumeContent).mockResolvedValueOnce({
-      json: {
-        RESUME_JSON: {
+    vi.mocked(parseResumeUpload).mockResolvedValueOnce(parsedResumeResult({
           header: {
             full_name: 'Jordan Candidate',
             title: 'Software Architect',
@@ -195,9 +196,7 @@ describe('App import flow', () => {
             },
           ],
           certifications: ['AWS Certified Solutions Architect'],
-        },
-      },
-    });
+    }));
 
     const { container } = render(<App />);
 
@@ -257,9 +256,7 @@ describe('App import flow', () => {
 
   it('maps intelligent scan labels into the correct editor fields', async () => {
     const user = userEvent.setup();
-    vi.mocked(generateResumeContent).mockResolvedValueOnce({
-      json: {
-        'Resume JSON': {
+    vi.mocked(parseResumeUpload).mockResolvedValueOnce(parsedResumeResult({
           'Candidate Info': {
             'Full Name': 'Avery Stone',
             'Professional Title': 'Registered Nurse',
@@ -291,9 +288,7 @@ describe('App import flow', () => {
               Items: ['Patient Care', 'EHR Documentation'],
             },
           ],
-        },
-      },
-    });
+    }));
 
     const { container } = render(<App />);
 
@@ -341,9 +336,7 @@ describe('App import flow', () => {
 
   it('maps labeled skill lines into separate skills categories', async () => {
     const user = userEvent.setup();
-    vi.mocked(generateResumeContent).mockResolvedValueOnce({
-      json: {
-        RESUME_JSON: {
+    vi.mocked(parseResumeUpload).mockResolvedValueOnce(parsedResumeResult({
           header: {
             name: 'Taylor Skills',
             title: 'Solutions Architect',
@@ -361,9 +354,7 @@ describe('App import flow', () => {
           ],
           experience: [],
           education: [],
-        },
-      },
-    });
+    }));
 
     const { container } = render(<App />);
 
@@ -402,9 +393,7 @@ describe('App import flow', () => {
 
   it('moves skill-looking education lines into skills while keeping only schools in education', async () => {
     const user = userEvent.setup();
-    vi.mocked(generateResumeContent).mockResolvedValueOnce({
-      json: {
-        RESUME_JSON: {
+    vi.mocked(parseResumeUpload).mockResolvedValueOnce(parsedResumeResult({
           header: {
             name: 'Taylor Mixed',
             title: 'Solutions Architect',
@@ -424,9 +413,7 @@ describe('App import flow', () => {
           ],
           skills: [],
           experience: [],
-        },
-      },
-    });
+    }));
 
     const { container } = render(<App />);
 
@@ -465,9 +452,7 @@ describe('App import flow', () => {
 
   it('folds undated imported job fragments into the previous dated job description', async () => {
     const user = userEvent.setup();
-    vi.mocked(generateResumeContent).mockResolvedValueOnce({
-      json: {
-        RESUME_JSON: {
+    vi.mocked(parseResumeUpload).mockResolvedValueOnce(parsedResumeResult({
           header: {
             name: 'Riley Defender',
             title: 'Security Analyst',
@@ -488,9 +473,7 @@ describe('App import flow', () => {
           ],
           education: [],
           skills: [],
-        },
-      },
-    });
+    }));
 
     const { container } = render(<App />);
 
@@ -519,9 +502,7 @@ describe('App import flow', () => {
 
   it('keeps full street addresses and nested contact details in the right imported fields', async () => {
     const user = userEvent.setup();
-    vi.mocked(generateResumeContent).mockResolvedValueOnce({
-      json: {
-        resume: {
+    vi.mocked(parseResumeUpload).mockResolvedValueOnce(parsedResumeResult({
           personalDetails: {
             firstName: 'Sam',
             lastName: 'Structured',
@@ -543,9 +524,7 @@ describe('App import flow', () => {
             },
           ],
           education: [],
-        },
-      },
-    });
+    }));
 
     const { container } = render(<App />);
 

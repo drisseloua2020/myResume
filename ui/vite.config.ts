@@ -20,8 +20,7 @@ export default defineConfig(() => {
           "127.0.0.1",
         ],
     },
-    // DO NOT expose secret API keys to the browser bundle.
-    // Use the backend (/agent/generate-resume) as a proxy for Gemini requests.
+    // Resume imports use the backend deterministic parser at /resumes/parse-upload.
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
