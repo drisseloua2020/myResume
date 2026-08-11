@@ -119,7 +119,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                         />
                         <span className="hidden text-sm font-black text-[#1a91f0]">My</span>
                      </div>
-                     <span className="font-bold text-xl tracking-tight text-slate-800">Resumes</span>
+                     <span className="font-bold text-xl tracking-tight text-slate-800"> My Resumes</span>
           </button>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
              <button onClick={() => navigateToSection('templates')} className="hover:text-[#1a91f0] transition-colors">Resume Templates</button>

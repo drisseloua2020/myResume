@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.admin import router as admin_router
 from app.api.routes.agent import router as agent_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.career import router as career_router
 from app.api.routes.cover_letters import router as cover_letters_router
 from app.api.routes.profile import router as profile_router
 from app.api.routes.resumes import router as resumes_router
@@ -29,6 +30,7 @@ app.include_router(auth_router)
 app.include_router(agent_router)
 app.include_router(resumes_router)
 app.include_router(cover_letters_router)
+app.include_router(career_router)
 app.include_router(profile_router)
 app.include_router(admin_router)
 app.include_router(uploads_router)
