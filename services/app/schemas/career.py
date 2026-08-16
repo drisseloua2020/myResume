@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.schemas.base import StrictModel
 
@@ -12,10 +12,18 @@ CareerStatus = Literal["saved", "applied", "interview", "offer", "rejected"]
 
 class AnalyzeCareerIn(StrictModel):
     resumeJson: dict[str, Any] = Field(default_factory=dict)
-    jobDescription: str = Field(default="", max_length=50000)
+    jobDescription: str = Field(max_length=50000)
     jobUrl: str | None = Field(default=None, max_length=2000)
     targetCountry: str | None = Field(default="US", max_length=40)
     targetLanguage: str | None = Field(default="en", max_length=40)
+
+    @field_validator("jobDescription")
+    @classmethod
+    def validate_job_description(cls, value: str) -> str:
+        clean = value.strip()
+        if len(clean) < 20:
+            raise ValueError("Paste a job description with at least 20 characters.")
+        return clean
 
 
 class AnalyzeCareerOut(StrictModel):
