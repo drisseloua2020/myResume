@@ -514,7 +514,17 @@ def _looks_like_phone(line: str) -> bool:
 
 
 def _extract_phone(line: str) -> str:
-    match = re.search(r"(?:\+?\(?\d[\d().\-\s]{6,}\d)", line)
+    searchable = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", " ", line)
+    searchable = re.sub(r"https?://\S+|(?:linkedin|github)\.com/\S+", " ", searchable, flags=re.I)
+    match = re.search(
+        r"(?<![A-Za-z0-9])"
+        r"(?:"
+        r"(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}"
+        r"|\d{3}[\s.-]\d{4}"
+        r")"
+        r"(?![A-Za-z0-9])",
+        searchable,
+    )
     return match.group(0).strip() if match else ""
 
 
