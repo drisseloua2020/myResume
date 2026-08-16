@@ -79,6 +79,17 @@ def test_career_analyze_scores_resume_and_reports_keywords(client):
     assert report["templates"]["followUpEmail"]
 
 
+def test_career_analyze_requires_pasted_job_description(client):
+    token = _signup(client, "career-short-description@example.com")
+    response = client.post(
+        "/career/analyze",
+        headers=_headers(token),
+        json={"resumeJson": _resume(), "jobDescription": "too short"},
+    )
+
+    assert response.status_code == 422, response.text
+
+
 def test_career_exports_resume_formats_and_validates_pdf(client):
     token = _signup(client, "career-export@example.com")
     response = client.post(

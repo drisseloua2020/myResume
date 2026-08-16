@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResumeInput from './ResumeInput';
 import { saveResume } from '../services/resumeService';
 import { generateCoverLetter } from '../services/coverLetterService';
+import { analyzeCareer } from '../services/careerService';
 import { uploadProfilePhoto } from '../services/uploadService';
 import { SubscriptionPlan, UserRole } from '../types';
 
@@ -95,6 +96,10 @@ vi.mock('../services/coverLetterService', () => ({
   generateCoverLetter: vi.fn(),
 }));
 
+vi.mock('../services/careerService', () => ({
+  analyzeCareer: vi.fn(),
+}));
+
 describe('ResumeInput', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -120,6 +125,34 @@ describe('ResumeInput', () => {
         coldEmail: 'Hello',
       },
     });
+    vi.mocked(analyzeCareer).mockResolvedValue({
+      report: {
+        noLlmCalls: true,
+        privacyBadge: 'No LLM calls: deterministic local rules only',
+        atsScore: 82,
+        job: {
+          title: 'Cloud Platform Engineer',
+          company: 'Acme Systems',
+          location: 'Remote',
+          salary: '$140,000',
+          responsibilities: ['Build APIs'],
+          requirements: ['AWS'],
+          keywords: { hardSkills: ['Cloud'], softSkills: ['Communication'], tools: ['AWS'], certifications: [] },
+        },
+        missingKeywords: { all: ['Terraform'], hardSkills: [], softSkills: [], tools: ['Terraform'], certifications: [] },
+        includedKeywords: ['AWS', 'Cloud'],
+        sectionMatches: [{ section: 'experience', matched: ['AWS'], missing: ['Terraform'], score: 80 }],
+        bulletQuality: { averageScore: 75, bullets: [] },
+        riskScan: { score: 90, risks: [] },
+        completeness: { score: 88, checks: [] },
+        skillTaxonomy: { normalized: ['AWS'], duplicates: [] },
+        readyToApplyChecklist: [{ label: 'ATS score is 75 or higher', passed: true }],
+        linkedinChecklist: [],
+        templates: { followUpEmail: 'Hello follow up' },
+        featureCoverage: [],
+        exportsPreview: { atsText: 'Resume text' },
+      },
+    } as any);
   });
 
   it('restores and persists the include-photo status from a loaded resume record', async () => {
@@ -1129,6 +1162,55 @@ describe('ResumeInput', () => {
     }
     expect(drawImage.mock.calls[1][1]).toBe(320);
     expect(drawImage.mock.calls[1][5]).toBe(320);
+  });
+
+  it('runs ATS scoring against a pasted job description from the editor', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ResumeInput
+        onGenerate={vi.fn()}
+        onImport={vi.fn()}
+        onTemplateChange={vi.fn()}
+        isLoading={false}
+        role={UserRole.USER}
+        userPlan={SubscriptionPlan.FREE}
+        selectedTemplateId="classic_pro"
+        user={{
+          id: 'usr_1',
+          name: 'Resume User',
+          email: 'resume@example.com',
+          role: UserRole.USER,
+          plan: SubscriptionPlan.FREE,
+          status: 'Active',
+          createdAt: '2026-05-25T00:00:00Z',
+          paidAmount: '$0.00',
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /^ats score$/i }));
+    await user.type(
+      screen.getByLabelText(/pasted job description/i),
+      'Cloud Platform Engineer role requiring AWS, Terraform, APIs, and stakeholder communication.'
+    );
+    await user.click(screen.getByRole('button', { name: /run ats score/i }));
+
+    await waitFor(() => {
+      expect(analyzeCareer).toHaveBeenCalledWith(expect.objectContaining({
+        jobDescription: expect.stringContaining('Cloud Platform Engineer'),
+        resumeJson: expect.objectContaining({
+          personalDetails: expect.objectContaining({
+            firstName: 'Resume',
+            lastName: 'User',
+            email: 'resume@example.com',
+          }),
+        }),
+      }));
+    });
+    expect(await screen.findByText('82')).toBeInTheDocument();
+    expect(screen.getByText('Terraform')).toBeInTheDocument();
+    expect(screen.getByText(/without llm calls/i)).toBeInTheDocument();
   });
 
   it('creates and saves a cover letter from a job URL', async () => {
