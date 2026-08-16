@@ -208,6 +208,44 @@ def test_parse_upload_accepts_ats_pdf_and_word_imports(client):
         assert payload["resume"]["header"]["name"] == "Jordan Carter"
 
 
+def test_parse_upload_ignores_embedded_numeric_ids_when_reading_header(client):
+    token = _signup(client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Postman User a41044172ca3",
+            "Software Engineer",
+            "postman.a41044172ca3@example.com | Austin, TX",
+            "SUMMARY",
+            "Software engineer building reliable business applications.",
+            "SKILLS",
+            "Python, React, APIs",
+            "EXPERIENCE",
+            "Software Engineer - Example Co - 2021 - Present",
+            "Built API workflows for internal users.",
+        ])
+    )
+
+    response = client.post(
+        "/resumes/parse-upload",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "importFormat": "ats",
+            "fileData": {
+                "mimeType": DOCX_MIME,
+                "name": "postman-ats.docx",
+                "data": base64.b64encode(resume_bytes).decode("ascii"),
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    header = response.json()["resume"]["header"]
+    assert header["name"] == "Postman User a41044172ca3"
+    assert header["title"] == "Software Engineer"
+    assert header["phone"] == ""
+
+
 def test_generate_resume_rejects_readable_non_ats_import_before_parser(client, monkeypatch):
     token = _signup(client)
 
