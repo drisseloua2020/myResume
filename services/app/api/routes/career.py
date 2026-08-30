@@ -342,6 +342,6 @@ def delete_career_data(current_user: User = Depends(get_current_user), db: Sessi
         rows = db.scalars(select(model).where(model.user_id == current_user.id)).all()
         for row in rows:
             db.delete(row)
-    log_activity(db, current_user.id, "CAREER_DATA_DELETE", details="Deleted career toolkit records", user_name=current_user.name)
+    log_activity(db, current_user.id, "CAREER_DATA_DELETE", details="Deleted career intelligence records", user_name=current_user.name)
     db.commit()
     return OkResponse(ok=True)

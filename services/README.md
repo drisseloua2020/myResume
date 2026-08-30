@@ -1,6 +1,6 @@
-# ResumeForge Services - Production Python Port
+# MyResumes Career Management Services
 
-This is a second-pass FastAPI conversion of the original TypeScript services. It upgrades the first port with SQLAlchemy 2.0 ORM models, Alembic migrations, stricter Pydantic v2 schemas, pytest coverage, and a cleaner service layout.
+This FastAPI service powers the MyResumes career management platform. It supports resume assets, career intelligence workflows, cover letters, profile sources, admin operations, SQLAlchemy 2.0 ORM models, Alembic migrations, stricter Pydantic v2 schemas, pytest coverage, and a cleaner service layout.
 
 ## Quick start
 

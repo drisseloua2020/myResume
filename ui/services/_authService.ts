@@ -5,7 +5,7 @@ const INITIAL_USERS: User[] = [
   {
     id: '1',
     name: 'Admin User',
-    email: 'admin@resumeforge.com',
+    email: 'admin@myresumes.net',
     password: 'password',
     role: UserRole.ADMIN,
     plan: SubscriptionPlan.YEARLY,

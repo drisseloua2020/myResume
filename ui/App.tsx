@@ -1250,7 +1250,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-        authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', 'Importing document to Editor');
+        authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', 'Importing document to Career Workspace');
         const parsedResults = await parseResumeUpload({
           importFormat: data.importFormat || 'ats',
           fileData: data.fileData!,
@@ -1430,7 +1430,7 @@ const App: React.FC = () => {
       return null;
     }
 
-    // Editor View - FULL WIDTH for Split Screen
+    // Career Workspace View - FULL WIDTH for Split Screen
     return (
       <div className="w-full px-4 lg:px-8 py-8 space-y-4">
         <ResumeInput 

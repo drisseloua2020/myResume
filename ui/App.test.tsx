@@ -705,7 +705,7 @@ describe('App import flow', () => {
 
     await screen.findByDisplayValue('Tech Co');
 
-    await user.click(screen.getByRole('button', { name: /view resume/i }));
+    await user.click(screen.getByRole('button', { name: /career assets/i }));
     expect(await screen.findByText('Existing Resume')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /delete/i }));
@@ -715,7 +715,7 @@ describe('App import flow', () => {
       expect(deleteResume).toHaveBeenCalledWith('res_existing');
     });
 
-    await user.click(screen.getByRole('button', { name: /^editor$/i }));
+    await user.click(screen.getByRole('button', { name: /career workspace/i }));
 
     await waitFor(() => {
       expect(screen.queryByDisplayValue('Tech Co')).not.toBeInTheDocument();

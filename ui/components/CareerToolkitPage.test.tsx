@@ -97,7 +97,7 @@ describe('CareerToolkitPage', () => {
     const user = userEvent.setup();
     render(<CareerToolkitPage />);
 
-    expect(await screen.findByText(/career toolkit/i)).toBeInTheDocument();
+    expect(await screen.findByText(/career intelligence/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /run ats analysis/i }));
 
     await waitFor(() => {

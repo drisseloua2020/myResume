@@ -297,7 +297,7 @@ def _fetch_job_description_from_url(job_url: str) -> tuple[str, str]:
             clean_url,
             follow_redirects=True,
             timeout=10.0,
-            headers={"User-Agent": "ResumeForgeBot/1.0 (+https://resumeforge.local)"},
+            headers={"User-Agent": "MyResumesCareerBot/1.0 (+https://www.myresumes.net)"},
         )
     except httpx.RequestError as exc:
         raise ValueError(JOB_URL_ERROR) from exc
@@ -535,7 +535,7 @@ I would be glad to discuss how that experience maps to your team's needs.
 Best,
 {name}"""
 
-    raw = "LOCAL_SCRIPT_COVER_LETTER: ResumeForge created a deterministic saved draft from the parsed job description and resume context."
+    raw = "LOCAL_SCRIPT_COVER_LETTER: MyResumes created a deterministic saved draft from the parsed job description and resume context."
     return full, short, cold_email, raw
 
 

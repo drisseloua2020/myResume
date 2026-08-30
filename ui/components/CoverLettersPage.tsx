@@ -107,7 +107,7 @@ export default function CoverLettersPage() {
     const reference = resumeReferenceFromDraft(draft);
 
     if (!hasResumeData(draft)) {
-      setError('Please create or import a resume in Editor first. Then come back to generate a cover letter.');
+      setError('Please create or import a resume in Career Workspace first. Then come back to generate a cover letter.');
       return;
     }
     if (jobSourceMode === 'url' && !canGenerateFromUrl) {
@@ -191,7 +191,7 @@ export default function CoverLettersPage() {
           ) : hasResumeData(latestDraft) ? (
             <>Latest resume automatically linked: <b>{resumeReference}</b></>
           ) : (
-            <>No resume draft found. Open <b>Editor</b> to create or import a resume first.</>
+            <>No resume draft found. Open <b>Career Workspace</b> to create or import a resume first.</>
           )}
         </div>
       </div>

@@ -1,4 +1,4 @@
-"""career toolkit tables
+"""career intelligence tables
 
 Revision ID: 0002_career_toolkit
 Revises: 0001_initial
