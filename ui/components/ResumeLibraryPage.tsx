@@ -199,7 +199,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
     <div className="mx-auto max-w-[96rem] space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900">View Resume</h2>
+          <h2 className="text-3xl font-bold text-slate-900">Career Assets</h2>
           <p className="mt-2 text-slate-600">Open a saved resume, review it visually, download it as PDF, or send it back to the editor.</p>
         </div>
         <button
@@ -225,7 +225,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
             <div className="px-4 py-6 text-slate-500">Loading...</div>
           ) : itemsWithTemplate.length === 0 ? (
             <div className="px-4 py-6 text-slate-600">
-              You have not saved any resumes yet. Open Editor, complete a resume, then save it.
+              You have not saved any resumes yet. Open Career Workspace, complete a resume, then save it.
             </div>
           ) : (
             <div>
@@ -308,7 +308,7 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
             <div className="flex h-[520px] items-center justify-center rounded bg-white border border-dashed border-slate-300 text-center text-slate-600">
               <div>
                 <div className="font-semibold text-slate-900">Select a resume to view it</div>
-                <p className="mt-1 text-sm">Saved resumes appear on the left after you create or import them in Editor.</p>
+                <p className="mt-1 text-sm">Saved resumes appear on the left after you create or import them in Career Workspace.</p>
               </div>
             </div>
           )}

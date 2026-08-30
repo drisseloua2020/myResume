@@ -1,6 +1,6 @@
 # Manual End-to-End Test Plan
 
-This plan validates the ResumeForge / My Resumes site from public entry through authenticated user workflows, admin workflows, generated artifacts, and production-domain behavior.
+This plan validates the MyResumes career management platform from public entry through authenticated user workflows, admin workflows, generated artifacts, and production-domain behavior.
 
 Use placeholders for environment-specific values:
 
@@ -191,14 +191,14 @@ Approver, if waived:
 | --- | --- | --- | --- | --- |
 | GEN-01 | P0 | Generate resume content | Complete editor data and click generate/resume action. | Generation completes; results view shows ATS, Human, Targeted, Photo, Gap/Fix, and cover letter sections as applicable. |
 | GEN-02 | P0 | Save generated result | Save from results view. | Resume is saved and appears in library. |
-| GEN-03 | P1 | Generation error handling | Temporarily use invalid AI provider config in staging or simulate backend error. | UI shows a non-crashing error message; user data remains in editor. |
+| GEN-03 | P1 | Generation error handling | Simulate a backend generation or export error in staging. | UI shows a non-crashing error message; user data remains in editor. |
 | GEN-04 | P1 | Activity logging | Generate resume as standard user. | Activity appears in admin logs as a resume generation event. |
 
 ## 11. Resume Library
 
 | ID | Priority | Test | Steps | Expected Result |
 | --- | --- | --- | --- | --- |
-| LIB-01 | P0 | List resumes | Open View Resume / Resume Library. | Saved resumes list with title, template, and timestamps. |
+| LIB-01 | P0 | List resumes | Open Career Assets / Resume Library. | Saved resumes list with title, template, and timestamps. |
 | LIB-02 | P0 | Load resume | Select a saved resume and load it into editor. | Editor fields and template match saved resume. |
 | LIB-03 | P0 | Download resume PDF | Open a saved resume and download PDF. | PDF downloads; content is readable; no clipped or overlapping major sections. |
 | LIB-04 | P1 | Delete resume | Delete a test resume and confirm modal. | Resume disappears from library; refresh confirms deletion. |

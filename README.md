@@ -1,7 +1,7 @@
-# ResumeForge
+# MyResumes Career Platform
 
 ##  Overview
-ResumeForge is a full-stack web application for parsing ATS resumes, editing structured resume content, and managing saved resumes.
+MyResumes is a full-stack career management platform for building a structured career profile, parsing ATS resumes, editing career assets, analyzing opportunities, and managing saved resumes.
 
 It consists of:
 - Frontend: React (TypeScript, Vite)
@@ -61,11 +61,11 @@ VITE_API_URL=<API_ORIGIN>
 
 ---
 
-## Career Toolkit
+## Career Intelligence
 
-MyResume includes a deterministic Career Toolkit with no LLM or agentic-AI API calls. It supports ATS scoring against a pasted job description, keyword gap detection, job-description parsing, section-level match reports, bullet quality checks, resume risk/completeness checks, ATS-safe text/DOCX/PDF export payloads, LinkedIn text import, job tracker records, application packets, achievements, resume versions, share-link metadata, data export/delete controls, and a no-LLM feature catalog.
+MyResumes includes deterministic Career Intelligence features with no LLM or agentic-AI API calls. It supports ATS scoring against a pasted job description, keyword gap detection, job-description parsing, section-level match reports, bullet quality checks, resume risk/completeness checks, ATS-safe text/DOCX/PDF export payloads, LinkedIn text import, job tracker records, application packets, achievements, resume versions, share-link metadata, data export/delete controls, and a no-LLM feature catalog.
 
-Backend entry points are under `/career/*`; the logged-in frontend tab is **Career Toolkit**.
+Backend entry points are under `/career/*`; the logged-in frontend tab is **Career Intelligence**.
 
 ---
 

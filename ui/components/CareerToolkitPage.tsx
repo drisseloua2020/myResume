@@ -108,7 +108,7 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
         }
         await refreshRecords();
       } catch (error: any) {
-        if (alive) setMessage(error?.message || 'Career toolkit could not load.');
+        if (alive) setMessage(error?.message || 'Career Intelligence could not load.');
       }
     }
     load();
@@ -161,7 +161,7 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
   async function saveVersion(kind: string) {
     setBusy(true);
     try {
-      await createResumeVersion({ kind, title: `${resumeTitle} - ${kind}`, content: resume, changeSummary: `Saved from Career Toolkit as ${kind}.` });
+      await createResumeVersion({ kind, title: `${resumeTitle} - ${kind}`, content: resume, changeSummary: `Saved from Career Intelligence as ${kind}.` });
       await refreshRecords();
       setMessage('Resume version saved.');
     } catch (error: any) {
@@ -217,7 +217,7 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
       <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">No LLM calls</div>
-          <h2 className="mt-3 text-3xl font-black text-slate-900">Career Toolkit</h2>
+          <h2 className="mt-3 text-3xl font-black text-slate-900">Career Intelligence</h2>
           <p className="mt-2 max-w-3xl text-sm text-slate-600">ATS scoring, deterministic job parsing, application tracking, saved achievements, exports, and privacy controls powered by local rules.</p>
         </div>
         <div className="flex flex-wrap gap-2">
