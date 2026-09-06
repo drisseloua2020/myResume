@@ -1,5 +1,5 @@
 {
   "name": "MyResumes",
-  "description": "Career management platform with ATS resume assets, opportunity analysis, saved resumes, live preview, and cover letter generation.",
+  "description": "ATS resume parser and structured resume editor with saved resumes, live preview, and cover letter generation.",
   "requestFramePermissions": []
 }

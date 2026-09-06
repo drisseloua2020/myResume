@@ -1,32 +1,23 @@
 import React from 'react';
 import { User } from '../types';
-import { featureFlags as defaultFeatureFlags, type FeatureFlags } from '../services/featureFlags';
 
 interface HeaderProps {
   currentUser: User;
   onLogout: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  featureFlags?: FeatureFlags;
 }
 
 type Tab = { key: string; label: string };
 
-const Header: React.FC<HeaderProps> = ({
-  currentUser,
-  onLogout,
-  activeTab,
-  setActiveTab,
-  featureFlags = defaultFeatureFlags,
-}) => {
+const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setActiveTab }) => {
   const isAdmin = currentUser.role === 'admin';
-  const useCareerOSNavigation = featureFlags.careerOSExperience && featureFlags.careerOSNavigation;
 
   const userTabs: Tab[] = [
-    { key: 'resumes', label: useCareerOSNavigation ? 'Assets' : 'Career Assets' },
-    { key: 'career_tools', label: useCareerOSNavigation ? 'Intelligence' : 'Career Intelligence' },
+    { key: 'resumes', label: 'View Resume' },
+    { key: 'career_tools', label: 'Career Toolkit' },
     { key: 'cover_letters', label: 'Cover Letters' },
-    { key: 'workspace', label: useCareerOSNavigation ? 'Career OS' : 'Career Workspace' },
+    { key: 'workspace', label: 'Editor' },
   ];
 
   const adminTabs: Tab[] = [

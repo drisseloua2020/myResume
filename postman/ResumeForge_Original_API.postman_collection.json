@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "41a1eb8c-c474-4981-94e5-24ea848c19b1",
-    "name": "MyResumes Career Platform API - Full Endpoint Tests",
+    "name": "ResumeForge Original API - Full Endpoint Tests",
     "description": "Postman collection generated from the original Express/TypeScript codebase. It exercises every declared endpoint in the original services project, including admin routes. Mailer-dependent requests are included but skipped by default via environment flags.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

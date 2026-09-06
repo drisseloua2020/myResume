@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App, { normalizeAppTab } from './App';
+import App from './App';
 import {
   deleteResume,
   getLatestDraft,
@@ -75,18 +75,6 @@ const parsedResumeResult = (resume: Record<string, unknown>) => ({
   confidence: {},
   document: {},
   atsReport: {},
-});
-
-describe('App tab migration compatibility', () => {
-  it('keeps legacy resume builder tab names routed to the workspace editor', () => {
-    expect(normalizeAppTab('workspace')).toBe('workspace');
-    expect(normalizeAppTab('generator')).toBe('workspace');
-    expect(normalizeAppTab('builder')).toBe('workspace');
-    expect(normalizeAppTab('resume_builder')).toBe('workspace');
-    expect(normalizeAppTab('career_os')).toBe('workspace');
-    expect(normalizeAppTab('career-os')).toBe('workspace');
-    expect(normalizeAppTab('resumes')).toBe('resumes');
-  });
 });
 
 describe('App import flow', () => {
@@ -717,7 +705,7 @@ describe('App import flow', () => {
 
     await screen.findByDisplayValue('Tech Co');
 
-    await user.click(screen.getByRole('button', { name: /career assets/i }));
+    await user.click(screen.getByRole('button', { name: /view resume/i }));
     expect(await screen.findByText('Existing Resume')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /delete/i }));
@@ -727,7 +715,7 @@ describe('App import flow', () => {
       expect(deleteResume).toHaveBeenCalledWith('res_existing');
     });
 
-    await user.click(screen.getByRole('button', { name: /career workspace/i }));
+    await user.click(screen.getByRole('button', { name: /^editor$/i }));
 
     await waitFor(() => {
       expect(screen.queryByDisplayValue('Tech Co')).not.toBeInTheDocument();

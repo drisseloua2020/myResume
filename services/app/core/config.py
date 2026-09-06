@@ -32,10 +32,6 @@ class Settings(BaseSettings):
     microsoft_oauth_tenant: str = "common"
     linkedin_oauth_client_id: str = ""
     linkedin_oauth_client_secret: str = ""
-    ai_gateway_enabled: bool = False
-    ai_gateway_provider: str = ""
-    ai_gateway_url: str = ""
-    ai_gateway_api_key: str = ""
     @property
     def upload_root(self) -> Path:
         path = Path(self.upload_dir)
@@ -54,8 +50,6 @@ class Settings(BaseSettings):
             raise RuntimeError("DATABASE_URL is required")
         if not self.jwt_secret:
             raise RuntimeError("JWT_SECRET is required")
-        if self.ai_gateway_enabled and not self.ai_gateway_url:
-            raise RuntimeError("AI_GATEWAY_URL is required when AI_GATEWAY_ENABLED=true")
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()

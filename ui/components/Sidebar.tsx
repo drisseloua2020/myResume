@@ -13,10 +13,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout, activeTab, set
     <div className="w-64 bg-slate-900 text-white min-h-screen flex flex-col fixed left-0 top-0">
       <div className="p-6 border-b border-slate-700">
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded bg-blue-500 text-sm font-black text-white">My</span>
-          MyResumes
+          <span className="text-blue-500">⚡</span> ResumeForge
         </h1>
-        <p className="text-xs text-slate-400 mt-1">Career Management Platform</p>
+        <p className="text-xs text-slate-400 mt-1">AI-Powered Career Tools</p>
       </div>
 
       <div className="flex-1 py-6 px-4 space-y-2">
@@ -29,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout, activeTab, set
             activeTab === 'generator' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
           }`}
         >
-          Career Workspace
+          Resume Generator
         </button>
         <button
           onClick={() => setActiveTab('history')}
@@ -37,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onLogout, activeTab, set
             activeTab === 'history' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
           }`}
         >
-          Career Assets
+          My Documents
         </button>
         <button
           onClick={() => setActiveTab('settings')}

@@ -1,6 +1,6 @@
-# MyResumes Career Platform Postman project
+# ResumeForge Postman project
 
-This Postman project was generated from the original Express/TypeScript codebase in `services.zip`, not from the Python port.
+This Postman project was generated from the **original Express/TypeScript codebase** in `services.zip`, not from the Python port.
 
 ## Files
 - `ResumeForge_Original_API.postman_collection.json`
@@ -20,8 +20,8 @@ It includes requests for every original endpoint:
 
 ## Default environment assumptions
 - Base URL: `http://localhost:3000`
-- Admin credentials should match the configured local seed data:
-  - email: `admin@myresumes.net`
+- Admin credentials come from the original seed SQL:
+  - email: `admin@resumeforge.com`
   - password: `password`
 
 The collection generates a fresh normal user automatically on every run.

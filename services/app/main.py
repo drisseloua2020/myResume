@@ -21,7 +21,7 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         dispose_engine()
-app = FastAPI(title="MyResumes Career Management API", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="ResumeForge API - Python", version="2.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 @app.get('/health', response_model=HealthResponse)
 def health() -> HealthResponse:
