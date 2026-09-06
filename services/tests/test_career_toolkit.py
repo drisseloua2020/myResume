@@ -68,6 +68,8 @@ def test_career_analyze_scores_resume_and_reports_keywords(client):
     assert response.status_code == 200, response.text
     report = response.json()["report"]
     assert report["noLlmCalls"] is True
+    assert report["aiPolicy"]["currentMode"] == "deterministic"
+    assert report["aiPolicy"]["llmCallsAllowed"] is False
     assert report["job"]["title"] == "Platform Engineer"
     assert report["job"]["company"] == "Acme Systems"
     assert report["atsScore"] >= 50
@@ -182,5 +184,8 @@ def test_linkedin_import_and_feature_catalog_are_deterministic(client):
 
     features = client.get("/career/features", headers=_headers(token))
     assert features.status_code == 200, features.text
-    assert all(item["llmCalls"] is False for item in features.json()["features"])
-    assert any(item["name"] == "Job tracker Kanban" for item in features.json()["features"])
+    feature_payload = features.json()
+    assert feature_payload["aiPolicy"]["currentMode"] == "deterministic"
+    assert feature_payload["aiPolicy"]["llmCallsAllowed"] is False
+    assert all(item["llmCalls"] is False for item in feature_payload["features"])
+    assert any(item["name"] == "Job tracker Kanban" for item in feature_payload["features"])

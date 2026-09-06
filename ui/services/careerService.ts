@@ -4,6 +4,7 @@ import type { UserInputData } from '../types';
 export type CareerAnalysisReport = {
   noLlmCalls: boolean;
   privacyBadge: string;
+  aiPolicy?: AIUsagePolicy;
   atsScore: number;
   job: {
     title: string;
@@ -26,6 +27,19 @@ export type CareerAnalysisReport = {
   templates: Record<string, string>;
   featureCoverage: Array<{ group: string; name: string; operation: string; llmCalls: boolean }>;
   exportsPreview: { atsText: string };
+};
+
+export type AIUsagePolicy = {
+  rule: string;
+  defaultMode: 'deterministic';
+  currentMode: 'deterministic' | 'ai_gateway';
+  noLlmByDefault: boolean;
+  llmCallsAllowed: boolean;
+  gateway: {
+    enabled: boolean;
+    configured: boolean;
+    provider?: string | null;
+  };
 };
 
 export type CareerJob = {
@@ -128,7 +142,10 @@ export function createResumeVersion(payload: { resumeId?: string; jobApplication
   return api.post('/career/resume-versions', payload);
 }
 
-export function getCareerFeatures(): Promise<{ features: Array<{ group: string; name: string; operation: string; llmCalls: boolean }> }> {
+export function getCareerFeatures(): Promise<{
+  features: Array<{ group: string; name: string; operation: string; llmCalls: boolean }>;
+  aiPolicy?: AIUsagePolicy;
+}> {
   return api.get('/career/features');
 }
 

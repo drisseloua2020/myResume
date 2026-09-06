@@ -50,12 +50,17 @@ For Render, do not add local development ports to HTTPS public service URLs. Use
 ```bash
 # UI static site / web service
 VITE_API_URL=<API_ORIGIN>
+VITE_FEATURE_CAREER_OS_EXPERIENCE=false
+VITE_FEATURE_CAREER_OS_NAVIGATION=false
 
 # Backend web service
 OAUTH_FRONTEND_URL=<FRONTEND_ORIGIN>
 OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>
 CORS_ORIGINS=<FRONTEND_ORIGIN>,<ROOT_ORIGIN>
 OAUTH_COOKIE_SECURE=true
+AI_GATEWAY_ENABLED=false
+AI_GATEWAY_PROVIDER=
+AI_GATEWAY_URL=
 GOOGLE_OAUTH_CLIENT_ID=...
 GOOGLE_OAUTH_CLIENT_SECRET=...
 ```
@@ -92,7 +97,12 @@ If the API also gets a custom domain, use that API domain consistently instead:
 
 ```bash
 VITE_API_URL=<API_ORIGIN>
+VITE_FEATURE_CAREER_OS_EXPERIENCE=false
+VITE_FEATURE_CAREER_OS_NAVIGATION=false
 OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>
+AI_GATEWAY_ENABLED=false
+AI_GATEWAY_PROVIDER=
+AI_GATEWAY_URL=
 ```
 
 ```text
@@ -108,6 +118,10 @@ To verify the deployed backend value, open:
 ```
 
 The `googleAuthorizedRedirectUri` value in that response is the value that must exist in Google Cloud Console.
+
+## AI usage policy
+
+The service runs deterministic/no-LLM workflows by default. Future AI gateway work must remain disabled unless `AI_GATEWAY_ENABLED=true`; credentials, provider names, or gateway URLs alone do not enable AI behavior. If `AI_GATEWAY_ENABLED=true` is set, `AI_GATEWAY_URL` is required before the backend will start.
 
 If Google has already been configured to redirect to the UI origin, the frontend also supports forwarding this path to the API callback:
 

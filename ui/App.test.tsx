@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import App from './App';
+import App, { normalizeAppTab } from './App';
 import {
   deleteResume,
   getLatestDraft,
@@ -75,6 +75,18 @@ const parsedResumeResult = (resume: Record<string, unknown>) => ({
   confidence: {},
   document: {},
   atsReport: {},
+});
+
+describe('App tab migration compatibility', () => {
+  it('keeps legacy resume builder tab names routed to the workspace editor', () => {
+    expect(normalizeAppTab('workspace')).toBe('workspace');
+    expect(normalizeAppTab('generator')).toBe('workspace');
+    expect(normalizeAppTab('builder')).toBe('workspace');
+    expect(normalizeAppTab('resume_builder')).toBe('workspace');
+    expect(normalizeAppTab('career_os')).toBe('workspace');
+    expect(normalizeAppTab('career-os')).toBe('workspace');
+    expect(normalizeAppTab('resumes')).toBe('resumes');
+  });
 });
 
 describe('App import flow', () => {
