@@ -3,7 +3,6 @@ import type { UserInputData } from '../types';
 import { getLatestResume } from '../services/resumeService';
 import {
   analyzeCareer,
-  AIUsagePolicy,
   CareerAchievement,
   CareerAnalysisReport,
   CareerJob,
@@ -39,19 +38,6 @@ Responsibilities
 Requirements
 - Experience with AWS, Terraform, Python, security, and stakeholder communication.
 - Preferred AWS Certified background.`;
-
-const defaultAiPolicy: AIUsagePolicy = {
-  rule: 'MyResumes runs deterministic local workflows with no LLM calls by default. An AI gateway may be used only when explicitly enabled.',
-  defaultMode: 'deterministic',
-  currentMode: 'deterministic',
-  noLlmByDefault: true,
-  llmCallsAllowed: false,
-  gateway: {
-    enabled: false,
-    configured: false,
-    provider: null,
-  },
-};
 
 function ScoreRing({ score }: { score: number }) {
   const color = score >= 80 ? 'text-emerald-600' : score >= 60 ? 'text-amber-600' : 'text-red-600';
@@ -90,7 +76,6 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
   const [versions, setVersions] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, any>>({});
   const [features, setFeatures] = useState<Array<{ group: string; name: string; operation: string; llmCalls: boolean }>>([]);
-  const [aiPolicy, setAiPolicy] = useState<AIUsagePolicy>(defaultAiPolicy);
   const [linkedinText, setLinkedinText] = useState('');
   const [achievementText, setAchievementText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -109,7 +94,6 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
     setVersions(versionRes.versions);
     setAnalytics(analyticsRes.analytics);
     setFeatures(featureRes.features);
-    setAiPolicy(featureRes.aiPolicy || defaultAiPolicy);
   }
 
   useEffect(() => {
@@ -124,7 +108,7 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
         }
         await refreshRecords();
       } catch (error: any) {
-        if (alive) setMessage(error?.message || 'Career Intelligence could not load.');
+        if (alive) setMessage(error?.message || 'Career toolkit could not load.');
       }
     }
     load();
@@ -177,7 +161,7 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
   async function saveVersion(kind: string) {
     setBusy(true);
     try {
-      await createResumeVersion({ kind, title: `${resumeTitle} - ${kind}`, content: resume, changeSummary: `Saved from Career Intelligence as ${kind}.` });
+      await createResumeVersion({ kind, title: `${resumeTitle} - ${kind}`, content: resume, changeSummary: `Saved from Career Toolkit as ${kind}.` });
       await refreshRecords();
       setMessage('Resume version saved.');
     } catch (error: any) {
@@ -228,15 +212,13 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
     }, {});
   }, [features]);
 
-  const aiPolicyLabel = aiPolicy.currentMode === 'deterministic' ? 'No LLM calls' : 'AI gateway enabled';
-
   return (
     <div className="mx-auto max-w-[94rem] px-4 py-8 lg:px-8">
       <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{aiPolicyLabel}</div>
-          <h2 className="mt-3 text-3xl font-black text-slate-900">Career Intelligence</h2>
-          <p className="mt-2 max-w-3xl text-sm text-slate-600">{aiPolicy.rule}</p>
+          <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">No LLM calls</div>
+          <h2 className="mt-3 text-3xl font-black text-slate-900">Career Toolkit</h2>
+          <p className="mt-2 max-w-3xl text-sm text-slate-600">ATS scoring, deterministic job parsing, application tracking, saved achievements, exports, and privacy controls powered by local rules.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button disabled={busy} onClick={() => saveVersion('base')} className="rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Save Base Version</button>

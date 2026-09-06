@@ -1,6 +1,6 @@
 # Manual End-to-End Test Plan
 
-This plan validates the MyResumes career management platform from public entry through authenticated user workflows, admin workflows, generated artifacts, and production-domain behavior.
+This plan validates the ResumeForge / My Resumes site from public entry through authenticated user workflows, admin workflows, generated artifacts, and production-domain behavior.
 
 Use placeholders for environment-specific values:
 
@@ -185,21 +185,20 @@ Approver, if waived:
 | PHOTO-04 | P1 | Too-large photo | Upload file larger than configured max. | API rejects upload; UI keeps local photo or shows clear upload error. |
 | PHOTO-05 | P1 | Other user photo access | Try to fetch another user's protected photo URL, if available in test data. | Access is denied or not found. |
 
-## 10. Deterministic Resume Builder And AI Policy
+## 10. AI Resume Generation And Results
 
 | ID | Priority | Test | Steps | Expected Result |
 | --- | --- | --- | --- | --- |
-| GEN-01 | P0 | Save resume from builder | Complete editor data and save the resume. | Resume is saved without LLM calls and appears in library. |
-| GEN-02 | P0 | Deterministic Career analysis | Run ATS analysis from Career Intelligence against a pasted job description. | Report shows deterministic/no-LLM policy and keyword analysis. |
-| GEN-03 | P1 | Analysis error handling | Simulate a backend analysis or export error in staging. | UI shows a non-crashing error message; user data remains in editor. |
-| GEN-04 | P1 | AI gateway stays disabled by default | Verify `/career/features` in staging without `AI_GATEWAY_ENABLED=true`. | Response reports deterministic mode and `llmCallsAllowed=false`. |
-| GEN-05 | P1 | Gateway requires explicit configuration | Set `AI_GATEWAY_ENABLED=true` without `AI_GATEWAY_URL` in a disposable staging environment. | Backend rejects startup/configuration instead of silently enabling AI behavior. |
+| GEN-01 | P0 | Generate resume content | Complete editor data and click generate/resume action. | Generation completes; results view shows ATS, Human, Targeted, Photo, Gap/Fix, and cover letter sections as applicable. |
+| GEN-02 | P0 | Save generated result | Save from results view. | Resume is saved and appears in library. |
+| GEN-03 | P1 | Generation error handling | Temporarily use invalid AI provider config in staging or simulate backend error. | UI shows a non-crashing error message; user data remains in editor. |
+| GEN-04 | P1 | Activity logging | Generate resume as standard user. | Activity appears in admin logs as a resume generation event. |
 
 ## 11. Resume Library
 
 | ID | Priority | Test | Steps | Expected Result |
 | --- | --- | --- | --- | --- |
-| LIB-01 | P0 | List resumes | Open Career Assets / Resume Library. | Saved resumes list with title, template, and timestamps. |
+| LIB-01 | P0 | List resumes | Open View Resume / Resume Library. | Saved resumes list with title, template, and timestamps. |
 | LIB-02 | P0 | Load resume | Select a saved resume and load it into editor. | Editor fields and template match saved resume. |
 | LIB-03 | P0 | Download resume PDF | Open a saved resume and download PDF. | PDF downloads; content is readable; no clipped or overlapping major sections. |
 | LIB-04 | P1 | Delete resume | Delete a test resume and confirm modal. | Resume disappears from library; refresh confirms deletion. |

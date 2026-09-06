@@ -113,7 +113,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                      <span className="font-bold text-xl tracking-tight text-slate-800">Resumes</span>
           </button>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
-             <button onClick={() => navigateToSection('templates')} className="hover:text-[#1a91f0] transition-colors">Career Assets</button>
+             <button onClick={() => navigateToSection('templates')} className="hover:text-[#1a91f0] transition-colors">Resume Templates</button>
              <button onClick={() => navigateToSection('pricing')} className="hover:text-[#1a91f0] transition-colors">Pricing</button>
              <button onClick={() => navigateToSection('about')} className="hover:text-[#1a91f0] transition-colors">About Us</button>
              <button onClick={() => setPublicPage('career_blog')} className="hover:text-[#1a91f0] transition-colors">
@@ -135,7 +135,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               onClick={handleStartCreate}
               className="bg-[#1a91f0] hover:bg-[#1170cd] text-white px-6 py-2.5 rounded-full font-bold text-sm transition-transform transform hover:-translate-y-0.5 shadow-md"
             >
-              Start My Career Profile
+              Create My Resume
             </button>
           </div>
         </div>
@@ -179,27 +179,27 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             {/* Left Text */}
             <div className="flex-1 text-center md:text-left">
                 <span className="text-[#1a91f0] font-bold tracking-wider text-sm uppercase mb-4 block">
-                Career Management Platform
+                Online Resume Builder
                 </span>
-                <h1 className="max-w-2xl mx-auto md:mx-0 text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.12] mb-6">
-                Manage your career, not just your resume. <br/>
-                <span className="text-[#1a91f0]">Turn your experience into opportunity.</span>
+                <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 leading-[1.1] mb-6">
+                Only 2% of resumes make it past the first round. <br/>
+                <span className="text-[#1a91f0]">Be in the top 2%.</span>
                 </h1>
                 <p className="text-lg text-slate-500 mb-8 max-w-xl mx-auto md:mx-0">
-                Build a structured career profile, understand how your background maps to target roles, and create ATS-ready resumes, cover letters, and career assets from one trusted source.
+                Use professional field-tested resume templates that follow the exact "resume rules" employers look for. Easy to use and done within minutes.
                 </p>
                 <div className="flex flex-col sm:flex-row justify-center md:justify-start gap-4 mb-10">
                 <button
                     onClick={handleStartCreate}
                     className="bg-[#1a91f0] text-white text-lg font-bold px-10 py-4 rounded-full shadow-lg hover:shadow-xl hover:bg-[#1170cd] transition-all transform hover:-translate-y-1"
                 >
-                    Start My Career Profile
+                    Create My Resume
                 </button>
                 </div>
                 <div className="flex items-center justify-center md:justify-start gap-4 text-sm text-slate-400">
-                    <span className="flex items-center gap-1"><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg> Career Profile</span>
-                    <span className="flex items-center gap-1"><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg> Opportunity Matching</span>
-                    <span className="flex items-center gap-1"><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg> ATS-Ready Assets</span>
+                    <span className="flex items-center gap-1"><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg> ATS-Friendly</span>
+                    <span className="flex items-center gap-1"><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg> Expert Tips</span>
+                    <span className="flex items-center gap-1"><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg> Fast Download</span>
                 </div>
             </div>
 
@@ -311,8 +311,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       {/* --- Templates Section --- */}
       <section id="templates" className="py-20 bg-white">
          <div className="max-w-7xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Career-Ready Resume Templates</h2>
-            <p className="text-slate-500 mb-12 max-w-2xl mx-auto">Choose a resume format for your first career asset. You can always change it later.</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">Professional Resume Templates</h2>
+            <p className="text-slate-500 mb-12 max-w-2xl mx-auto">Select a template to get started. You can always change it later.</p>
             <TemplateSelector onSelect={handleTemplateSelect} />
          </div>
       </section>
@@ -320,7 +320,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
       {/* --- How It Works --- */}
       <section className="py-20 bg-slate-50 border-b border-slate-200">
          <div className="max-w-6xl mx-auto px-6 text-center">
-            <h2 className="text-3xl font-bold text-slate-900 mb-16">Manage your career in 3 steps</h2>
+            <h2 className="text-3xl font-bold text-slate-900 mb-16">Build your resume in 3 steps</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                {/* Step 1 */}
@@ -328,8 +328,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   <div className="w-20 h-20 bg-white rounded-full shadow-md flex items-center justify-center mb-6 text-[#1a91f0]">
                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-3">1. Build Your Profile</h3>
-                  <p className="text-slate-500 leading-relaxed">Import or enter your career history once so the platform can organize your experience, skills, and accomplishments.</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-3">1. Pick a Template</h3>
+                  <p className="text-slate-500 leading-relaxed">Choose from our gallery of professional, ATS-friendly templates designed by career experts.</p>
                </div>
 
                {/* Step 2 */}
@@ -337,8 +337,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                    <div className="w-20 h-20 bg-white rounded-full shadow-md flex items-center justify-center mb-6 text-[#1a91f0]">
                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-3">2. Analyze Opportunities</h3>
-                  <p className="text-slate-500 leading-relaxed">Compare your career profile against target roles and identify strengths, gaps, and next actions.</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-3">2. Customize</h3>
+                  <p className="text-slate-500 leading-relaxed">Fill in your details. Our AI writer will help you find the right words to describe your experience.</p>
                </div>
 
                {/* Step 3 */}
@@ -346,8 +346,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                    <div className="w-20 h-20 bg-white rounded-full shadow-md flex items-center justify-center mb-6 text-[#1a91f0]">
                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-3">3. Create Career Assets</h3>
-                  <p className="text-slate-500 leading-relaxed">Generate targeted resumes, cover letters, and application materials from the same career source of truth.</p>
+                  <h3 className="text-xl font-bold text-slate-800 mb-3">3. Download</h3>
+                  <p className="text-slate-500 leading-relaxed">Download your polished resume in PDF or TXT format and start applying to jobs immediately.</p>
                </div>
             </div>
          </div>
@@ -372,7 +372,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                    <span className="text-4xl font-extrabold text-slate-900">{PLAN_DETAILS[SubscriptionPlan.FREE].price}</span>
                 </div>
                 <p className="text-slate-500 text-sm mb-6 pb-6 border-b border-slate-100">
-                  Perfect for getting started with your career profile and first resume.
+                  Perfect for getting started with your first resume.
                 </p>
                 <ul className="space-y-4 mb-8">
                   <li className="flex items-center gap-3 text-sm text-slate-700">
@@ -381,7 +381,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   </li>
                    <li className="flex items-center gap-3 text-sm text-slate-700">
                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
-                     ATS-Friendly Career Assets
+                     ATS-Friendly Templates
                   </li>
                   <li className="flex items-center gap-3 text-sm text-slate-400">
                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
@@ -417,7 +417,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   </li>
                    <li className="flex items-center gap-3 text-sm text-slate-700">
                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
-                     Advanced Career Tailoring
+                     Advanced AI Tailoring
                   </li>
                   <li className="flex items-center gap-3 text-sm text-slate-700">
                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
@@ -482,7 +482,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
             <p className="text-xl text-slate-300 leading-relaxed mb-12">
                We are technical experts aiming to promote the easy use of technology for affordable cost to no cost.
-               We believe that high-quality career management tools, including ATS resume parsing, opportunity analysis, editing, and cover letter support, should be accessible to everyone,
+               We believe that high-quality career tools—like ATS resume parsing, editing, and cover letter support—should be accessible to everyone,
                regardless of their budget.
             </p>
 
@@ -550,7 +550,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                    <h4 className="font-bold text-white mb-4">MyResumes</h4>
                    <ul className="space-y-2 text-sm">
                       <li><a href="#" className="hover:text-white">Homepage</a></li>
-                      <li><a href="#templates" className="hover:text-white">Career Assets</a></li>
+                      <li><a href="#templates" className="hover:text-white">Resume Templates</a></li>
                       <li><a href="#" className="hover:text-white">Cover Letters</a></li>
                    </ul>
                 </div>

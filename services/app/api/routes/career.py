@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user, get_db
-from app.core.ai_policy import ai_usage_policy
 from app.models.entities import Achievement, JobApplication, Resume, ResumeShare, ResumeVersion, User
 from app.schemas.career import (
     AchievementOut,
@@ -119,7 +118,6 @@ def analyze(payload: AnalyzeCareerIn, current_user: User = Depends(get_current_u
         country=payload.targetCountry or "US",
         language=payload.targetLanguage or "en",
     )
-    report["aiPolicy"] = ai_usage_policy()
     log_activity(db, current_user.id, "CAREER_ANALYZE", details=f"ATS score: {report['atsScore']}", user_name=current_user.name)
     db.commit()
     return AnalyzeCareerOut(report=report)
@@ -143,7 +141,7 @@ def import_linkedin(payload: LinkedInImportIn, current_user: User = Depends(get_
 
 @router.get("/features", response_model=CareerFeatureCatalogOut)
 def features() -> CareerFeatureCatalogOut:
-    return CareerFeatureCatalogOut(features=feature_catalog(), aiPolicy=ai_usage_policy())
+    return CareerFeatureCatalogOut(features=feature_catalog())
 
 
 @router.post("/jobs", response_model=JobApplicationEnvelope, status_code=status.HTTP_201_CREATED)
@@ -334,7 +332,7 @@ def data_export(current_user: User = Depends(get_current_user), db: Session = De
         "jobs": [_job_out(job).model_dump(mode="json") for job in jobs],
         "achievements": [_achievement_out(item).model_dump(mode="json") for item in achievements],
         "resumeVersions": [_version_out(item).model_dump(mode="json") for item in versions],
-        "privacy": {"noLlmCalls": True, "deleteEndpoint": "/career/data", "aiPolicy": ai_usage_policy()},
+        "privacy": {"noLlmCalls": True, "deleteEndpoint": "/career/data"},
     }
 
 
@@ -344,6 +342,6 @@ def delete_career_data(current_user: User = Depends(get_current_user), db: Sessi
         rows = db.scalars(select(model).where(model.user_id == current_user.id)).all()
         for row in rows:
             db.delete(row)
-    log_activity(db, current_user.id, "CAREER_DATA_DELETE", details="Deleted career intelligence records", user_name=current_user.name)
+    log_activity(db, current_user.id, "CAREER_DATA_DELETE", details="Deleted career toolkit records", user_name=current_user.name)
     db.commit()
     return OkResponse(ok=True)
