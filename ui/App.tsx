@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import ResumeInput from './components/ResumeInput';
@@ -27,6 +27,21 @@ import { agentService } from './services/agentService';
 import { saveDraft, getLatestResume, parseResumeUpload, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
 import { UserInputData, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
+
+const RESUME_BUILDER_TAB_ALIASES = new Set([
+  'workspace',
+  'generator',
+  'builder',
+  'resume_builder',
+  'career_os',
+  'career-os',
+  'careerOS',
+]);
+
+export const normalizeAppTab = (tab: string): string => {
+  const normalizedTab = tab.trim();
+  return RESUME_BUILDER_TAB_ALIASES.has(normalizedTab) ? 'workspace' : normalizedTab;
+};
 
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
@@ -691,7 +706,10 @@ const computeImportedResumeTitle = (content: Partial<UserInputData>): string => 
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('workspace');
+  const [activeTab, setActiveTabState] = useState<string>('workspace');
+  const setActiveTab = useCallback((tab: string) => {
+    setActiveTabState(normalizeAppTab(tab));
+  }, []);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);

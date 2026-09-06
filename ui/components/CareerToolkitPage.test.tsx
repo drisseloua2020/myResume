@@ -41,6 +41,18 @@ vi.mock('../services/careerService', () => ({
 const report = {
   noLlmCalls: true,
   privacyBadge: 'No LLM calls: deterministic local rules only',
+  aiPolicy: {
+    rule: 'MyResumes runs deterministic local workflows with no LLM calls by default. An AI gateway may be used only when explicitly enabled.',
+    defaultMode: 'deterministic',
+    currentMode: 'deterministic',
+    noLlmByDefault: true,
+    llmCallsAllowed: false,
+    gateway: {
+      enabled: false,
+      configured: false,
+      provider: null,
+    },
+  },
   atsScore: 82,
   job: {
     title: 'Platform Engineer',
@@ -83,7 +95,10 @@ describe('CareerToolkitPage', () => {
     vi.mocked(listAchievements).mockResolvedValue({ achievements: [] });
     vi.mocked(listResumeVersions).mockResolvedValue({ versions: [] });
     vi.mocked(getCareerAnalytics).mockResolvedValue({ analytics: { total: 0, byStatus: {} } });
-    vi.mocked(getCareerFeatures).mockResolvedValue({ features: [{ group: 'ATS and Resume Quality', name: 'ATS score', operation: 'deterministic', llmCalls: false }] });
+    vi.mocked(getCareerFeatures).mockResolvedValue({
+      features: [{ group: 'ATS and Resume Quality', name: 'ATS score', operation: 'deterministic', llmCalls: false }],
+      aiPolicy: report.aiPolicy,
+    });
     vi.mocked(analyzeCareer).mockResolvedValue({ report } as any);
     vi.mocked(createCareerJob).mockResolvedValue({ job: {} as any });
     vi.mocked(createAchievement).mockResolvedValue({ achievements: [] });
@@ -98,6 +113,7 @@ describe('CareerToolkitPage', () => {
     render(<CareerToolkitPage />);
 
     expect(await screen.findByText(/career intelligence/i)).toBeInTheDocument();
+    expect(screen.getByText(/gateway may be used only when explicitly enabled/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /run ats analysis/i }));
 
     await waitFor(() => {

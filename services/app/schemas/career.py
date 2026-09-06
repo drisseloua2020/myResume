@@ -196,3 +196,4 @@ class CareerAnalyticsOut(StrictModel):
 
 class CareerFeatureCatalogOut(StrictModel):
     features: list[dict[str, Any]]
+    aiPolicy: dict[str, Any]

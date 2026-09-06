@@ -56,14 +56,21 @@ npm run dev
 DATABASE_URL=<DATABASE_URL>
 JWT_SECRET=<JWT_SECRET>
 APP_ENV=development
+AI_GATEWAY_ENABLED=false
+AI_GATEWAY_PROVIDER=
+AI_GATEWAY_URL=
 
 VITE_API_URL=<API_ORIGIN>
+VITE_FEATURE_CAREER_OS_EXPERIENCE=false
+VITE_FEATURE_CAREER_OS_NAVIGATION=false
 
 ---
 
 ## Career Intelligence
 
-MyResumes includes deterministic Career Intelligence features with no LLM or agentic-AI API calls. It supports ATS scoring against a pasted job description, keyword gap detection, job-description parsing, section-level match reports, bullet quality checks, resume risk/completeness checks, ATS-safe text/DOCX/PDF export payloads, LinkedIn text import, job tracker records, application packets, achievements, resume versions, share-link metadata, data export/delete controls, and a no-LLM feature catalog.
+MyResumes includes deterministic Career Intelligence features with no LLM or agentic-AI API calls by default. It supports ATS scoring against a pasted job description, keyword gap detection, job-description parsing, section-level match reports, bullet quality checks, resume risk/completeness checks, ATS-safe text/DOCX/PDF export payloads, LinkedIn text import, job tracker records, application packets, achievements, resume versions, share-link metadata, data export/delete controls, and a no-LLM feature catalog.
+
+AI usage rule: deterministic/no-LLM operation is the default. A future AI gateway may be used only when `AI_GATEWAY_ENABLED=true` and gateway configuration is present; API keys or gateway URLs alone must not activate AI behavior.
 
 Backend entry points are under `/career/*`; the logged-in frontend tab is **Career Intelligence**.
 

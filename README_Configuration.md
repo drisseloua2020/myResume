@@ -80,15 +80,22 @@ OAUTH_FRONTEND_URL=<FRONTEND_ORIGIN>
 OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>
 CORS_ORIGINS=<FRONTEND_ORIGIN>,<ROOT_ORIGIN>
 OAUTH_COOKIE_SECURE=true
+AI_GATEWAY_ENABLED=false
+AI_GATEWAY_PROVIDER=
+AI_GATEWAY_URL=
 ```
 
 Frontend service:
 
 ```text
 VITE_API_URL=<API_ORIGIN>
+VITE_FEATURE_CAREER_OS_EXPERIENCE=false
+VITE_FEATURE_CAREER_OS_NAVIGATION=false
 ```
 
-After changing `VITE_API_URL`, redeploy/rebuild the frontend because Vite bakes environment variables into the compiled bundle.
+After changing `VITE_API_URL` or any `VITE_FEATURE_*` flag, redeploy/rebuild the frontend because Vite bakes environment variables into the compiled bundle. `VITE_FEATURE_CAREER_OS_EXPERIENCE` is the parent switch for the new Career OS experience. When it is enabled, `VITE_FEATURE_CAREER_OS_NAVIGATION` defaults on unless explicitly set to `false`.
+
+AI usage rule: the backend runs deterministic/no-LLM workflows by default. Keep `AI_GATEWAY_ENABLED=false` unless a future gateway-backed feature is intentionally launched. Setting gateway credentials, provider names, or URLs without `AI_GATEWAY_ENABLED=true` must not enable AI behavior; setting `AI_GATEWAY_ENABLED=true` also requires `AI_GATEWAY_URL`.
 
 Secrets must stay outside Git. Store these in Render environment variables or a secret manager, not in documentation:
 
@@ -97,6 +104,7 @@ GOOGLE_OAUTH_CLIENT_ID
 GOOGLE_OAUTH_CLIENT_SECRET
 JWT_SECRET
 DATABASE_URL
+AI_GATEWAY_API_KEY
 ```
 
 ## Google OAuth Client
