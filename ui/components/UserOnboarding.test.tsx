@@ -21,7 +21,7 @@ describe('UserOnboarding', () => {
 
     expect(screen.getByRole('img', { name: /samanta/i })).toBeInTheDocument();
     expect(screen.getByText(/Hi, I am Samanta/i)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /shape your profile/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Where are you starting from today/i })).toBeInTheDocument();
     expect(screen.getByText(/Question 1 of/i)).toBeInTheDocument();
     expect(screen.getByText(careerOnboardingQuestions[0].prompt)).toBeInTheDocument();
     expect(screen.queryByText(careerOnboardingQuestions[1].prompt)).not.toBeInTheDocument();

@@ -133,7 +133,7 @@ describe('App import flow', () => {
     await user.type(passwordInput, 'secret123');
     await user.click(screen.getAllByRole('button', { name: /sign in/i })[0]);
 
-    expect(await screen.findByRole('heading', { name: /shape your profile/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Where are you starting from today/i })).toBeInTheDocument();
     expect(screen.getByText(/Hi, I am Samanta/i)).toBeInTheDocument();
     expect(screen.getByText(/Where are you starting from today/i)).toBeInTheDocument();
 
@@ -165,7 +165,7 @@ describe('App import flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: /shape your profile/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Where are you starting from today/i })).toBeInTheDocument();
     expect(screen.getByText(/Hi, I am Samanta/i)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
   });
