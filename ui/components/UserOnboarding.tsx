@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { User } from '../types';
 
 export interface CareerOnboardingAnswers {
@@ -16,63 +16,326 @@ export const careerOnboardingQuestions: Array<{
   key: keyof CareerOnboardingAnswers;
   label: string;
   prompt: string;
-  placeholder?: string;
-  options?: string[];
+  helper: string;
+  options: Array<{
+    value: string;
+    title: string;
+    detail: string;
+  }>;
 }> = [
   {
     key: 'currentExperience',
-    label: 'Current experience',
-    prompt: 'What role, field, or type of work have you been doing most recently?',
-    placeholder: 'Example: Customer support lead with 5 years in SaaS operations.',
+    label: 'Starting point',
+    prompt: 'Where are you starting from today?',
+    helper: 'Samara will use this to set the right level of confidence and detail.',
+    options: [
+      {
+        value: 'Student or new graduate',
+        title: 'Student or new graduate',
+        detail: 'I am building my first strong career profile.',
+      },
+      {
+        value: 'Early career professional',
+        title: 'Early career professional',
+        detail: 'I have some experience and want a sharper direction.',
+      },
+      {
+        value: 'Experienced specialist',
+        title: 'Experienced specialist',
+        detail: 'I want my depth, results, and expertise to stand out.',
+      },
+      {
+        value: 'Manager or team lead',
+        title: 'Manager or team lead',
+        detail: 'I need leadership, ownership, and outcomes up front.',
+      },
+      {
+        value: 'Executive or founder',
+        title: 'Executive or founder',
+        detail: 'I want a profile built around strategy and scale.',
+      },
+      {
+        value: 'Career changer',
+        title: 'Career changer',
+        detail: 'I need my transferable strengths to read clearly.',
+      },
+    ],
   },
   {
     key: 'strengths',
     label: 'Career strengths',
-    prompt: 'Which skills, tools, accomplishments, or industries should define your career profile?',
-    placeholder: 'Example: Team leadership, CRM operations, process improvement, Salesforce.',
+    prompt: 'What should your profile lead with?',
+    helper: 'Pick the strongest signal recruiters should notice first.',
+    options: [
+      {
+        value: 'Technical skills',
+        title: 'Technical skills',
+        detail: 'Systems, tools, engineering, data, platforms, or AI.',
+      },
+      {
+        value: 'Leadership and coaching',
+        title: 'Leadership and coaching',
+        detail: 'Teams, mentoring, decisions, culture, and accountability.',
+      },
+      {
+        value: 'Operations and process',
+        title: 'Operations and process',
+        detail: 'Execution, workflows, logistics, delivery, and quality.',
+      },
+      {
+        value: 'Sales and customer growth',
+        title: 'Sales and customer growth',
+        detail: 'Revenue, accounts, retention, pipeline, and relationships.',
+      },
+      {
+        value: 'Creative communication',
+        title: 'Creative communication',
+        detail: 'Content, design, storytelling, campaigns, and brand.',
+      },
+      {
+        value: 'Data and strategy',
+        title: 'Data and strategy',
+        detail: 'Analysis, planning, insights, research, and decisions.',
+      },
+    ],
   },
   {
     key: 'targetRoles',
-    label: 'Target roles',
-    prompt: 'Which jobs or roles are you trying to match with right now?',
-    placeholder: 'Example: Customer Success Manager, Operations Manager, Program Coordinator.',
+    label: 'Target direction',
+    prompt: 'Which role family should Samara tune your profile toward?',
+    helper: 'This guides resume wording, keyword focus, and matching suggestions.',
+    options: [
+      {
+        value: 'Software and IT',
+        title: 'Software and IT',
+        detail: 'Development, support, cybersecurity, cloud, or systems.',
+      },
+      {
+        value: 'Business operations',
+        title: 'Business operations',
+        detail: 'Program, project, admin, logistics, or operations roles.',
+      },
+      {
+        value: 'Customer success',
+        title: 'Customer success',
+        detail: 'Support, onboarding, account care, retention, or service.',
+      },
+      {
+        value: 'Sales and growth',
+        title: 'Sales and growth',
+        detail: 'Business development, partnerships, revenue, or growth.',
+      },
+      {
+        value: 'Marketing and content',
+        title: 'Marketing and content',
+        detail: 'Brand, campaigns, communications, design, or media.',
+      },
+      {
+        value: 'Finance and administration',
+        title: 'Finance and administration',
+        detail: 'Accounting, analysis, office, compliance, or coordination.',
+      },
+      {
+        value: 'Healthcare or education',
+        title: 'Healthcare or education',
+        detail: 'Care, teaching, training, student support, or community roles.',
+      },
+      {
+        value: 'Open to several paths',
+        title: 'Open to several paths',
+        detail: 'I want help finding the best direction from my experience.',
+      },
+    ],
   },
   {
     key: 'marketStatus',
     label: 'Job-market status',
     prompt: 'Where are you in the job market today?',
+    helper: 'Samara will match the pace to your current urgency.',
     options: [
-      'Actively applying',
-      'Exploring better options',
-      'Changing careers',
-      'Returning to the workforce',
-      'Upskilling before applying',
-      'Not looking yet',
+      {
+        value: 'Actively applying',
+        title: 'Actively applying',
+        detail: 'I need a stronger profile for current applications.',
+      },
+      {
+        value: 'Exploring better options',
+        title: 'Exploring better options',
+        detail: 'I am employed or stable, but looking for a better fit.',
+      },
+      {
+        value: 'Changing careers',
+        title: 'Changing careers',
+        detail: 'I want to reposition my experience for a new path.',
+      },
+      {
+        value: 'Returning to the workforce',
+        title: 'Returning to the workforce',
+        detail: 'I need a confident profile after time away.',
+      },
+      {
+        value: 'Upskilling before applying',
+        title: 'Upskilling before applying',
+        detail: 'I am building readiness before I start applying.',
+      },
+      {
+        value: 'Not looking yet',
+        title: 'Not looking yet',
+        detail: 'I want a clear profile before making a move.',
+      },
     ],
   },
   {
     key: 'shortTermGoal',
-    label: 'Short-term goal',
-    prompt: 'What do you want to accomplish in the next 3 to 6 months?',
-    placeholder: 'Example: Land interviews for remote CSM roles and improve my resume positioning.',
+    label: 'Next win',
+    prompt: 'What is the next career win you want?',
+    helper: 'Choose the outcome that would make this profile feel useful right away.',
+    options: [
+      {
+        value: 'Build a resume from scratch',
+        title: 'Build a resume from scratch',
+        detail: 'I need a clean profile and resume foundation.',
+      },
+      {
+        value: 'Refresh an existing resume',
+        title: 'Refresh an existing resume',
+        detail: 'I have content, but it needs sharper positioning.',
+      },
+      {
+        value: 'Get ready to apply',
+        title: 'Get ready to apply',
+        detail: 'I want to be application-ready soon.',
+      },
+      {
+        value: 'Prepare for interviews',
+        title: 'Prepare for interviews',
+        detail: 'I want my story, achievements, and examples aligned.',
+      },
+      {
+        value: 'Shift into a new field',
+        title: 'Shift into a new field',
+        detail: 'I need help translating my background.',
+      },
+      {
+        value: 'Grow into a promotion',
+        title: 'Grow into a promotion',
+        detail: 'I want to show readiness for the next level.',
+      },
+    ],
   },
   {
     key: 'futureGoal',
     label: 'Future direction',
-    prompt: 'Where do you want your career to move in the next 1 to 3 years?',
-    placeholder: 'Example: Move into people management or become a senior operations leader.',
+    prompt: 'Where should this profile point over the next few years?',
+    helper: 'A little future context helps Samara avoid short-sighted recommendations.',
+    options: [
+      {
+        value: 'Become a senior expert',
+        title: 'Become a senior expert',
+        detail: 'I want to deepen my craft and be known for excellence.',
+      },
+      {
+        value: 'Move into management',
+        title: 'Move into management',
+        detail: 'I want more leadership, influence, and team ownership.',
+      },
+      {
+        value: 'Change industries',
+        title: 'Change industries',
+        detail: 'I want my profile to travel into a different market.',
+      },
+      {
+        value: 'Build a portfolio career',
+        title: 'Build a portfolio career',
+        detail: 'I want flexible work, projects, consulting, or freelancing.',
+      },
+      {
+        value: 'Start or grow a business',
+        title: 'Start or grow a business',
+        detail: 'I want a profile that supports entrepreneurship.',
+      },
+      {
+        value: 'Stabilize and earn more',
+        title: 'Stabilize and earn more',
+        detail: 'I want better income, consistency, and long-term security.',
+      },
+    ],
   },
   {
     key: 'jobPreferences',
-    label: 'Matching preferences',
-    prompt: 'What preferences or constraints should job matching respect?',
-    placeholder: 'Example: Remote or hybrid, New York area, salary above $95k, no heavy travel.',
+    label: 'Matching preference',
+    prompt: 'What should job matching respect first?',
+    helper: 'Start with the preference that would most affect your decision.',
+    options: [
+      {
+        value: 'Remote-first roles',
+        title: 'Remote-first roles',
+        detail: 'I want remote opportunities prioritized.',
+      },
+      {
+        value: 'Hybrid near me',
+        title: 'Hybrid near me',
+        detail: 'I am open to local office time with flexibility.',
+      },
+      {
+        value: 'Local on-site work',
+        title: 'Local on-site work',
+        detail: 'I prefer roles where I can work in person.',
+      },
+      {
+        value: 'Higher salary range',
+        title: 'Higher salary range',
+        detail: 'Compensation growth is my strongest filter.',
+      },
+      {
+        value: 'Flexible schedule',
+        title: 'Flexible schedule',
+        detail: 'I need schedule flexibility or better balance.',
+      },
+      {
+        value: 'Mission-driven work',
+        title: 'Mission-driven work',
+        detail: 'I care most about purpose, culture, and values.',
+      },
+    ],
   },
   {
     key: 'supportNeeds',
     label: 'Assistant focus',
     prompt: 'Where should the assistant help first?',
-    placeholder: 'Example: Clarify my target role, rewrite my summary, find resume gaps, match jobs.',
+    helper: 'Samara will start with this after onboarding.',
+    options: [
+      {
+        value: 'Shape my career story',
+        title: 'Shape my career story',
+        detail: 'Help me explain who I am and where I am headed.',
+      },
+      {
+        value: 'Find profile gaps',
+        title: 'Find profile gaps',
+        detail: 'Show what is missing before I apply.',
+      },
+      {
+        value: 'Improve resume wording',
+        title: 'Improve resume wording',
+        detail: 'Make my bullets, summary, and skills more effective.',
+      },
+      {
+        value: 'Match me to roles',
+        title: 'Match me to roles',
+        detail: 'Suggest roles that fit my background and goals.',
+      },
+      {
+        value: 'Plan next skills',
+        title: 'Plan next skills',
+        detail: 'Help me decide what to learn or prove next.',
+      },
+      {
+        value: 'Organize applications',
+        title: 'Organize applications',
+        detail: 'Keep my job search structured and moving.',
+      },
+    ],
   },
 ];
 
@@ -80,7 +343,7 @@ const emptyAnswers: CareerOnboardingAnswers = {
   currentExperience: '',
   strengths: '',
   targetRoles: '',
-  marketStatus: 'Actively applying',
+  marketStatus: '',
   shortTermGoal: '',
   futureGoal: '',
   jobPreferences: '',
@@ -95,86 +358,173 @@ interface UserOnboardingProps {
 
 const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSkip }) => {
   const [answers, setAnswers] = useState<CareerOnboardingAnswers>(emptyAnswers);
+  const [step, setStep] = useState(0);
+
+  const currentQuestion = careerOnboardingQuestions[step];
+  const selectedAnswer = answers[currentQuestion.key];
+  const progress = Math.round(((step + 1) / careerOnboardingQuestions.length) * 100);
+  const isLastStep = step === careerOnboardingQuestions.length - 1;
+  const answeredCount = useMemo(
+    () => Object.values(answers).filter(Boolean).length,
+    [answers],
+  );
 
   const updateAnswer = (key: keyof CareerOnboardingAnswers, value: string) => {
     setAnswers((current) => ({ ...current, [key]: value }));
   };
 
+  const goToPreviousStep = () => {
+    setStep((current) => Math.max(current - 1, 0));
+  };
+
+  const continueOnboarding = () => {
+    if (!selectedAnswer) return;
+    if (isLastStep) {
+      onComplete(answers);
+      return;
+    }
+    setStep((current) => Math.min(current + 1, careerOnboardingQuestions.length - 1));
+  };
+
   const firstName = user.name?.split(' ')[0] || 'there';
 
   return (
-    <section className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-8 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-          <aside className="rounded border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-700">
-              AI assistant assessment
-            </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-              User Onboarding
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Hi {firstName}, answer a few questions so the assistant can understand your experience, career goals, job-market timing, and the opportunities worth matching.
-            </p>
-            <div className="mt-6 rounded bg-slate-900 p-5 text-white">
-              <div className="text-sm font-bold text-blue-200">Career profile intake</div>
-              <p className="mt-2 text-sm leading-6 text-slate-200">
-                I will look for your current career level, target direction, near-term priorities, future path, and matching constraints before you start editing your resume.
+    <section className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-[#f5fbfb] px-4 py-6 text-slate-950 sm:py-8 lg:px-8">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(120deg,#0f766e_0%,#124559_52%,#f97363_100%)] opacity-95" aria-hidden="true" />
+      <div className="pointer-events-none absolute left-0 top-44 h-px w-full bg-white/70" aria-hidden="true" />
+
+      <div className="relative mx-auto flex min-h-[calc(100vh-7rem)] w-full max-w-5xl flex-col">
+        <header className="text-center text-white">
+          <div className="samara-avatar-shell mx-auto">
+            <span className="samara-signal samara-signal-one" aria-hidden="true" />
+            <span className="samara-signal samara-signal-two" aria-hidden="true" />
+            <img
+              src="/samara-ai-assistant.png"
+              alt="Samara, AI career assistant"
+              className="samara-avatar"
+            />
+          </div>
+
+          <p className="mt-3 text-sm font-bold uppercase tracking-[0.18em] text-teal-100">
+            Samara career profile
+          </p>
+          <h1 className="mx-auto mt-2 max-w-3xl text-3xl font-black tracking-tight sm:text-4xl">
+            Hi {firstName}, let us shape your profile one choice at a time.
+          </h1>
+        </header>
+
+        <form
+          className="mx-auto mt-6 flex w-full max-w-4xl flex-1 flex-col rounded-lg border border-slate-200 bg-white/95 p-4 shadow-xl shadow-teal-950/10 backdrop-blur sm:p-6 lg:p-8"
+          onSubmit={(event) => {
+            event.preventDefault();
+            continueOnboarding();
+          }}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-teal-700">
+                Question {step + 1} of {careerOnboardingQuestions.length}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {answeredCount} selected so far
               </p>
             </div>
-          </aside>
-
-          <form
-            className="rounded border border-slate-200 bg-white p-5 shadow-sm"
-            onSubmit={(event) => {
-              event.preventDefault();
-              onComplete(answers);
-            }}
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              {careerOnboardingQuestions.map((question) => (
-                <label key={question.key} className="block rounded border border-slate-200 bg-slate-50 p-4">
-                  <span className="block text-xs font-black uppercase tracking-wide text-slate-500">{question.label}</span>
-                  <span className="mt-1 block text-sm font-bold leading-5 text-slate-900">{question.prompt}</span>
-                  {question.options ? (
-                    <select
-                      value={answers[question.key]}
-                      onChange={(event) => updateAnswer(question.key, event.target.value)}
-                      className="mt-3 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    >
-                      {question.options.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <textarea
-                      value={answers[question.key]}
-                      onChange={(event) => updateAnswer(question.key, event.target.value)}
-                      placeholder={question.placeholder}
-                      className="mt-3 h-28 w-full resize-none rounded border border-slate-300 bg-white p-3 text-sm leading-5 text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  )}
-                </label>
-              ))}
+            <div
+              className="h-2 w-full overflow-hidden rounded bg-slate-100 sm:w-56"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-valuetext={`${step + 1} of ${careerOnboardingQuestions.length} questions`}
+            >
+              <div
+                className="h-full rounded bg-[linear-gradient(90deg,#0d9488,#f97363)] transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
             </div>
+          </div>
 
-            <div className="mt-5 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="onboarding-step mt-7" key={currentQuestion.key}>
+            <span className="inline-flex rounded bg-[#fff1ee] px-3 py-1 text-sm font-bold text-[#bf4d3d]">
+              {currentQuestion.label}
+            </span>
+            <h2 className="mt-4 max-w-3xl text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              {currentQuestion.prompt}
+            </h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+              {currentQuestion.helper}
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {currentQuestion.options.map((option) => {
+                const isSelected = selectedAnswer === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => updateAnswer(currentQuestion.key, option.value)}
+                    className={[
+                      'group min-h-28 rounded-lg border p-4 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2',
+                      isSelected
+                        ? 'border-teal-600 bg-teal-50 shadow-md shadow-teal-900/10'
+                        : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-teal-300 hover:bg-slate-50 hover:shadow-md hover:shadow-slate-900/5',
+                    ].join(' ')}
+                  >
+                    <span className="flex items-start gap-3">
+                      <span
+                        className={[
+                          'mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded border text-sm font-black transition',
+                          isSelected
+                            ? 'border-teal-600 bg-teal-600 text-white'
+                            : 'border-slate-300 bg-white text-transparent group-hover:border-teal-400',
+                        ].join(' ')}
+                        aria-hidden="true"
+                      >
+                        {isSelected ? '✓' : ''}
+                      </span>
+                      <span>
+                        <span className="block text-base font-black text-slate-950">
+                          {option.title}
+                        </span>
+                        <span className="mt-1 block text-sm leading-6 text-slate-600">
+                          {option.detail}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-auto flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              onClick={onSkip}
+              className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+            >
+              Skip for now
+            </button>
+            <div className="flex gap-3">
               <button
                 type="button"
-                onClick={onSkip}
-                className="rounded border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                onClick={goToPreviousStep}
+                disabled={step === 0}
+                className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Skip for now
+                Back
               </button>
               <button
                 type="submit"
-                className="rounded bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700"
+                disabled={!selectedAnswer}
+                className="rounded bg-[#124559] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#0b3443] focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                Complete onboarding
+                {isLastStep ? 'Complete profile' : 'Next'}
               </button>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </section>
   );
