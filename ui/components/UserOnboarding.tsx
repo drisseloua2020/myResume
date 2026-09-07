@@ -390,7 +390,13 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
 
   return (
     <section className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-white px-4 py-6 text-slate-950 sm:py-8 lg:px-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(135deg,#020617_0%,#020617_45%,#1d4ed8_100%)]" aria-hidden="true" />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-56"
+        style={{
+          background: 'linear-gradient(90deg, rgb(46 61 80 / var(--tw-bg-opacity, 1)) 0%, rgb(46 61 80 / 0.92) 48%, #ffffff 100%)',
+        }}
+        aria-hidden="true"
+      />
       <div className="pointer-events-none absolute left-0 top-44 h-px w-full bg-blue-200/40" aria-hidden="true" />
 
       <div className="relative mx-auto flex min-h-[calc(100vh-7rem)] w-full max-w-5xl flex-col">
@@ -414,10 +420,7 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
             </div>
           </div>
 
-          <p className="mt-4 text-center text-sm font-bold uppercase tracking-[0.18em] text-blue-100">
-            Samanta career profile
-          </p>
-          <h1 className="mx-auto mt-2 max-w-3xl text-center text-3xl font-black tracking-tight sm:text-4xl">
+          <h1 className="mx-auto mt-4 max-w-3xl text-center text-3xl font-black tracking-tight sm:text-4xl">
             Hi {firstName}, let us shape your profile one choice at a time.
           </h1>
         </header>
