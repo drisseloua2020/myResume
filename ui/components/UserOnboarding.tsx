@@ -27,7 +27,7 @@ export const careerOnboardingQuestions: Array<{
     key: 'currentExperience',
     label: 'Starting point',
     prompt: 'Where are you starting from today?',
-    helper: 'Samara will use this to set the right level of confidence and detail.',
+    helper: 'Samanta will use this to set the right level of confidence and detail.',
     options: [
       {
         value: 'Student or new graduate',
@@ -102,7 +102,7 @@ export const careerOnboardingQuestions: Array<{
   {
     key: 'targetRoles',
     label: 'Target direction',
-    prompt: 'Which role family should Samara tune your profile toward?',
+    prompt: 'Which role family should Samanta tune your profile toward?',
     helper: 'This guides resume wording, keyword focus, and matching suggestions.',
     options: [
       {
@@ -151,7 +151,7 @@ export const careerOnboardingQuestions: Array<{
     key: 'marketStatus',
     label: 'Job-market status',
     prompt: 'Where are you in the job market today?',
-    helper: 'Samara will match the pace to your current urgency.',
+    helper: 'Samanta will match the pace to your current urgency.',
     options: [
       {
         value: 'Actively applying',
@@ -227,7 +227,7 @@ export const careerOnboardingQuestions: Array<{
     key: 'futureGoal',
     label: 'Future direction',
     prompt: 'Where should this profile point over the next few years?',
-    helper: 'A little future context helps Samara avoid short-sighted recommendations.',
+    helper: 'A little future context helps Samanta avoid short-sighted recommendations.',
     options: [
       {
         value: 'Become a senior expert',
@@ -303,7 +303,7 @@ export const careerOnboardingQuestions: Array<{
     key: 'supportNeeds',
     label: 'Assistant focus',
     prompt: 'Where should the assistant help first?',
-    helper: 'Samara will start with this after onboarding.',
+    helper: 'Samanta will start with this after onboarding.',
     options: [
       {
         value: 'Shape my career story',
@@ -389,32 +389,41 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
   const firstName = user.name?.split(' ')[0] || 'there';
 
   return (
-    <section className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-[#f5fbfb] px-4 py-6 text-slate-950 sm:py-8 lg:px-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(120deg,#0f766e_0%,#124559_52%,#f97363_100%)] opacity-95" aria-hidden="true" />
-      <div className="pointer-events-none absolute left-0 top-44 h-px w-full bg-white/70" aria-hidden="true" />
+    <section className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-white px-4 py-6 text-slate-950 sm:py-8 lg:px-8">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[linear-gradient(135deg,#020617_0%,#020617_45%,#1d4ed8_100%)]" aria-hidden="true" />
+      <div className="pointer-events-none absolute left-0 top-44 h-px w-full bg-blue-200/40" aria-hidden="true" />
 
       <div className="relative mx-auto flex min-h-[calc(100vh-7rem)] w-full max-w-5xl flex-col">
-        <header className="text-center text-white">
-          <div className="samara-avatar-shell mx-auto">
-            <span className="samara-signal samara-signal-one" aria-hidden="true" />
-            <span className="samara-signal samara-signal-two" aria-hidden="true" />
-            <img
-              src="/samara-ai-assistant.png"
-              alt="Samara, AI career assistant"
-              className="samara-avatar"
-            />
+        <header className="text-white">
+          <div className="mx-auto flex max-w-4xl flex-col items-center justify-center gap-4 text-center sm:flex-row sm:text-left">
+            <div className="samanta-avatar-shell flex-none">
+              <span className="samanta-signal samanta-signal-one" aria-hidden="true" />
+              <span className="samanta-signal samanta-signal-two" aria-hidden="true" />
+              <img
+                src="/samanta-ai-assistant.png"
+                alt="Samanta, AI career assistant"
+                className="samanta-avatar"
+              />
+            </div>
+
+            <div className="samanta-speech" aria-label="Samanta introduction">
+              <p className="text-base font-black text-slate-950">Hi, I am Samanta...</p>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                I will guide you one choice at a time.
+              </p>
+            </div>
           </div>
 
-          <p className="mt-3 text-sm font-bold uppercase tracking-[0.18em] text-teal-100">
-            Samara career profile
+          <p className="mt-4 text-center text-sm font-bold uppercase tracking-[0.18em] text-blue-100">
+            Samanta career profile
           </p>
-          <h1 className="mx-auto mt-2 max-w-3xl text-3xl font-black tracking-tight sm:text-4xl">
+          <h1 className="mx-auto mt-2 max-w-3xl text-center text-3xl font-black tracking-tight sm:text-4xl">
             Hi {firstName}, let us shape your profile one choice at a time.
           </h1>
         </header>
 
         <form
-          className="mx-auto mt-6 flex w-full max-w-4xl flex-1 flex-col rounded-lg border border-slate-200 bg-white/95 p-4 shadow-xl shadow-teal-950/10 backdrop-blur sm:p-6 lg:p-8"
+          className="mx-auto mt-6 flex w-full max-w-4xl flex-1 flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-xl shadow-blue-950/10 sm:p-6 lg:p-8"
           onSubmit={(event) => {
             event.preventDefault();
             continueOnboarding();
@@ -422,7 +431,7 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-teal-700">
+              <p className="text-sm font-bold text-blue-700">
                 Question {step + 1} of {careerOnboardingQuestions.length}
               </p>
               <p className="mt-1 text-sm text-slate-500">
@@ -438,14 +447,14 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
               aria-valuetext={`${step + 1} of ${careerOnboardingQuestions.length} questions`}
             >
               <div
-                className="h-full rounded bg-[linear-gradient(90deg,#0d9488,#f97363)] transition-all duration-300"
+                className="h-full rounded bg-blue-700 transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
 
           <div className="onboarding-step mt-7" key={currentQuestion.key}>
-            <span className="inline-flex rounded bg-[#fff1ee] px-3 py-1 text-sm font-bold text-[#bf4d3d]">
+            <span className="inline-flex rounded bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">
               {currentQuestion.label}
             </span>
             <h2 className="mt-4 max-w-3xl text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
@@ -465,10 +474,10 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
                     aria-pressed={isSelected}
                     onClick={() => updateAnswer(currentQuestion.key, option.value)}
                     className={[
-                      'group min-h-28 rounded-lg border p-4 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2',
+                      'group min-h-28 rounded-lg border p-4 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2',
                       isSelected
-                        ? 'border-teal-600 bg-teal-50 shadow-md shadow-teal-900/10'
-                        : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-teal-300 hover:bg-slate-50 hover:shadow-md hover:shadow-slate-900/5',
+                        ? 'border-blue-700 bg-blue-50 shadow-md shadow-blue-950/10'
+                        : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-md hover:shadow-slate-900/5',
                     ].join(' ')}
                   >
                     <span className="flex items-start gap-3">
@@ -476,8 +485,8 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
                         className={[
                           'mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded border text-sm font-black transition',
                           isSelected
-                            ? 'border-teal-600 bg-teal-600 text-white'
-                            : 'border-slate-300 bg-white text-transparent group-hover:border-teal-400',
+                            ? 'border-blue-700 bg-blue-700 text-white'
+                            : 'border-slate-300 bg-white text-transparent group-hover:border-blue-400',
                         ].join(' ')}
                         aria-hidden="true"
                       >
@@ -502,7 +511,7 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
             <button
               type="button"
               onClick={onSkip}
-              className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+              className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2"
             >
               Skip for now
             </button>
@@ -511,14 +520,14 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
                 type="button"
                 onClick={goToPreviousStep}
                 disabled={step === 0}
-                className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={!selectedAnswer}
-                className="rounded bg-[#124559] px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[#0b3443] focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="rounded bg-blue-700 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {isLastStep ? 'Complete profile' : 'Next'}
               </button>

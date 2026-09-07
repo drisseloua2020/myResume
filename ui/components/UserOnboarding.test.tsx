@@ -16,10 +16,11 @@ const testUser = {
 };
 
 describe('UserOnboarding', () => {
-  it('renders Samara and starts with one career profile question', () => {
+  it('renders Samanta and starts with one career profile question', () => {
     render(<UserOnboarding user={testUser} onComplete={vi.fn()} onSkip={vi.fn()} />);
 
-    expect(screen.getByRole('img', { name: /samara/i })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /samanta/i })).toBeInTheDocument();
+    expect(screen.getByText(/Hi, I am Samanta/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /shape your profile/i })).toBeInTheDocument();
     expect(screen.getByText(/Question 1 of/i)).toBeInTheDocument();
     expect(screen.getByText(careerOnboardingQuestions[0].prompt)).toBeInTheDocument();
