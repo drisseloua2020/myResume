@@ -33,10 +33,9 @@ const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f
 const CAREER_ONBOARDING_STORAGE_PREFIX = 'rf_career_onboarding';
 
 type CareerOnboardingRecord = {
-  status: 'completed' | 'skipped';
+  status: 'completed';
   answers?: CareerOnboardingAnswers;
   completedAt?: string;
-  skippedAt?: string;
 };
 
 const saveCareerOnboardingRecord = (userId: string, record: CareerOnboardingRecord) => {
@@ -53,7 +52,7 @@ const getCareerOnboardingRecord = (userId: string): CareerOnboardingRecord | nul
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<CareerOnboardingRecord>;
-    return parsed.status === 'completed' || parsed.status === 'skipped'
+    return parsed.status === 'completed'
       ? parsed as CareerOnboardingRecord
       : null;
   } catch {
@@ -884,7 +883,7 @@ const App: React.FC = () => {
             }
             setActiveTab('workspace');
             setGeneratorTab('create');
-            applyCareerOnboardingState(u, 'fresh_auth');
+            applyCareerOnboardingState(u);
             checkAgentUpdates();
           }
         })
@@ -898,7 +897,7 @@ const App: React.FC = () => {
     const user = authService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
-      applyCareerOnboardingState(user, 'cached_session');
+      applyCareerOnboardingState(user);
       // Simulate Agent checking for updates on load (simulate email link opening app)
       checkAgentUpdates();
     }
@@ -910,7 +909,7 @@ const App: React.FC = () => {
     setAgentUpdates(updates);
   };
 
-  const applyCareerOnboardingState = (user: User, source: 'fresh_auth' | 'cached_session') => {
+  const applyCareerOnboardingState = (user: User) => {
     const record = getCareerOnboardingRecord(user.id);
 
     if (record?.status === 'completed') {
@@ -919,13 +918,7 @@ const App: React.FC = () => {
       return;
     }
 
-    if (record?.status === 'skipped') {
-      setShowUserOnboarding(false);
-      setShowCareerObjectiveReminder(true);
-      return;
-    }
-
-    setShowUserOnboarding(source === 'fresh_auth');
+    setShowUserOnboarding(true);
     setShowCareerObjectiveReminder(false);
   };
 
@@ -947,7 +940,7 @@ const App: React.FC = () => {
 
     setActiveTab('workspace');
     setGeneratorTab('create');
-    applyCareerOnboardingState(user, 'fresh_auth');
+    applyCareerOnboardingState(user);
     // Trigger agent check after login
     checkAgentUpdates();
   };
@@ -982,12 +975,6 @@ const App: React.FC = () => {
   };
 
   const skipUserOnboarding = () => {
-    if (currentUser) {
-      saveCareerOnboardingRecord(currentUser.id, {
-        status: 'skipped',
-        skippedAt: new Date().toISOString(),
-      });
-    }
     setShowUserOnboarding(false);
     setShowCareerObjectiveReminder(true);
     setActiveTab('workspace');
