@@ -81,10 +81,17 @@ const parsedResumeResult = (resume: Record<string, unknown>) => ({
   atsReport: {},
 });
 
+const careerOnboardingStorageKey = 'rf_career_onboarding:usr_1';
+const completedCareerOnboardingRecord = JSON.stringify({
+  status: 'completed',
+  completedAt: '2026-09-07T00:00:00.000Z',
+});
+
 describe('App import flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    localStorage.setItem(careerOnboardingStorageKey, completedCareerOnboardingRecord);
     window.history.replaceState({}, '', '/');
     vi.mocked(authService.getCurrentUser).mockReturnValue(testUser);
     vi.mocked(authService.login).mockResolvedValue(testUser);
@@ -122,6 +129,7 @@ describe('App import flow', () => {
 
   it('shows user onboarding after email login and opens the editor after skip', async () => {
     const user = userEvent.setup();
+    localStorage.removeItem(careerOnboardingStorageKey);
     vi.mocked(authService.getCurrentUser).mockReturnValueOnce(null);
     vi.mocked(authService.login).mockResolvedValueOnce(testUser);
 
@@ -140,26 +148,35 @@ describe('App import flow', () => {
     await user.click(screen.getByRole('button', { name: /skip for now/i }));
 
     expect(await screen.findByText(/Clarify your career objectives later/i)).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem('rf_career_onboarding:usr_1') || '{}')).toEqual(expect.objectContaining({
-      status: 'skipped',
-      skippedAt: expect.any(String),
-    }));
+    expect(localStorage.getItem(careerOnboardingStorageKey)).toBeNull();
     expect(screen.getByPlaceholderText('First Name')).toBeInTheDocument();
   });
 
-  it('keeps skipped onboarding users in the editor with a career objective reminder', async () => {
-    localStorage.setItem('rf_career_onboarding:usr_1', JSON.stringify({
+  it('shows onboarding again for signed-in users until profile answers are completed', async () => {
+    localStorage.removeItem(careerOnboardingStorageKey);
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /Where are you starting from today/i })).toBeInTheDocument();
+    expect(screen.getByText(/Hi, I am Samanta/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
+  });
+
+  it('ignores skipped onboarding records so the assistant returns on login', async () => {
+    localStorage.setItem(careerOnboardingStorageKey, JSON.stringify({
       status: 'skipped',
       skippedAt: '2026-09-07T00:00:00.000Z',
     }));
 
     render(<App />);
 
-    expect(await screen.findByText(/Clarify your career objectives later/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('First Name')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Where are you starting from today/i })).toBeInTheDocument();
+    expect(screen.getByText(/Hi, I am Samanta/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
   });
 
   it('shows user onboarding after a Google OAuth callback', async () => {
+    localStorage.removeItem(careerOnboardingStorageKey);
     window.history.replaceState({}, '', '/?token=oauth-token');
     vi.mocked(authService.refreshMe).mockResolvedValueOnce(testUser);
 
