@@ -16,15 +16,28 @@ const testUser = {
 };
 
 describe('UserOnboarding', () => {
-  it('renders the assistant intake questions for career profile and job matching', () => {
+  it('renders Samara and starts with one career profile question', () => {
     render(<UserOnboarding user={testUser} onComplete={vi.fn()} onSkip={vi.fn()} />);
 
-    expect(screen.getByRole('heading', { name: /user onboarding/i })).toBeInTheDocument();
-    expect(screen.getByText(/AI assistant assessment/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /samara/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /shape your profile/i })).toBeInTheDocument();
+    expect(screen.getByText(/Question 1 of/i)).toBeInTheDocument();
+    expect(screen.getByText(careerOnboardingQuestions[0].prompt)).toBeInTheDocument();
+    expect(screen.queryByText(careerOnboardingQuestions[1].prompt)).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
 
-    careerOnboardingQuestions.forEach((question) => {
-      expect(screen.getByText(question.prompt)).toBeInTheDocument();
-    });
+  it('advances through questions one at a time', async () => {
+    const user = userEvent.setup();
+
+    render(<UserOnboarding user={testUser} onComplete={vi.fn()} onSkip={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /Early career professional/i }));
+    await user.click(screen.getByRole('button', { name: /next/i }));
+
+    expect(screen.getByText(careerOnboardingQuestions[1].prompt)).toBeInTheDocument();
+    expect(screen.queryByText(careerOnboardingQuestions[0].prompt)).not.toBeInTheDocument();
   });
 
   it('submits the completed career profile answers', async () => {
@@ -33,47 +46,33 @@ describe('UserOnboarding', () => {
 
     render(<UserOnboarding user={testUser} onComplete={onComplete} onSkip={vi.fn()} />);
 
-    await user.type(
-      screen.getByPlaceholderText(/Customer support lead/i),
-      'Senior support lead in SaaS operations',
-    );
-    await user.type(
-      screen.getByPlaceholderText(/Team leadership/i),
-      'Team leadership, CRM operations, Salesforce',
-    );
-    await user.type(
-      screen.getByPlaceholderText(/Customer Success Manager/i),
-      'Customer Success Manager',
-    );
-    await user.selectOptions(screen.getByRole('combobox'), 'Changing careers');
-    await user.type(
-      screen.getByPlaceholderText(/Land interviews/i),
-      'Land three interviews this quarter',
-    );
-    await user.type(
-      screen.getByPlaceholderText(/Move into people management/i),
-      'Move into people management',
-    );
-    await user.type(
-      screen.getByPlaceholderText(/Remote or hybrid/i),
-      'Remote, salary above $95k',
-    );
-    await user.type(
-      screen.getByPlaceholderText(/Clarify my target role/i),
-      'Clarify my target role first',
-    );
+    const selections = [
+      'Experienced specialist',
+      'Leadership and coaching',
+      'Customer success',
+      'Changing careers',
+      'Get ready to apply',
+      'Move into management',
+      'Remote-first roles',
+      'Improve resume wording',
+    ];
 
-    await user.click(screen.getByRole('button', { name: /complete onboarding/i }));
+    for (const [index, selection] of selections.entries()) {
+      await user.click(screen.getByRole('button', { name: new RegExp(selection, 'i') }));
+      await user.click(screen.getByRole('button', {
+        name: index === selections.length - 1 ? /^complete profile$/i : /^next$/i,
+      }));
+    }
 
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
-      currentExperience: 'Senior support lead in SaaS operations',
-      strengths: 'Team leadership, CRM operations, Salesforce',
-      targetRoles: 'Customer Success Manager',
+      currentExperience: 'Experienced specialist',
+      strengths: 'Leadership and coaching',
+      targetRoles: 'Customer success',
       marketStatus: 'Changing careers',
-      shortTermGoal: 'Land three interviews this quarter',
-      futureGoal: 'Move into people management',
-      jobPreferences: 'Remote, salary above $95k',
-      supportNeeds: 'Clarify my target role first',
+      shortTermGoal: 'Get ready to apply',
+      futureGoal: 'Move into management',
+      jobPreferences: 'Remote-first roles',
+      supportNeeds: 'Improve resume wording',
     }));
   });
 

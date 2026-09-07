@@ -133,9 +133,9 @@ describe('App import flow', () => {
     await user.type(passwordInput, 'secret123');
     await user.click(screen.getAllByRole('button', { name: /sign in/i })[0]);
 
-    expect(await screen.findByRole('heading', { name: /user onboarding/i })).toBeInTheDocument();
-    expect(screen.getByText(/AI assistant assessment/i)).toBeInTheDocument();
-    expect(screen.getByText(/Where are you in the job market today/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /shape your profile/i })).toBeInTheDocument();
+    expect(screen.getByText(/Samara career profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/Where are you starting from today/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /skip for now/i }));
 
@@ -165,8 +165,8 @@ describe('App import flow', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: /user onboarding/i })).toBeInTheDocument();
-    expect(screen.getByText(/AI assistant assessment/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /shape your profile/i })).toBeInTheDocument();
+    expect(screen.getByText(/Samara career profile/i)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
   });
 
