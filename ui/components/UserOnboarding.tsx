@@ -386,8 +386,6 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
     setStep((current) => Math.min(current + 1, careerOnboardingQuestions.length - 1));
   };
 
-  const firstName = user.name?.split(' ')[0] || 'there';
-
   return (
     <section className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-white px-4 py-6 text-slate-950 sm:py-8 lg:px-8">
       <div
@@ -420,9 +418,6 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
             </div>
           </div>
 
-          <h1 className="mx-auto mt-4 max-w-3xl text-center text-3xl font-black tracking-tight sm:text-4xl">
-            Hi {firstName}, let us shape your profile one choice at a time.
-          </h1>
         </header>
 
         <form
