@@ -393,7 +393,7 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-56"
         style={{
-          background: 'linear-gradient(90deg, rgb(46 61 80 / var(--tw-bg-opacity, 1)) 0%, rgb(46 61 80 / 0.92) 48%, #ffffff 100%)',
+          background: 'linear-gradient(to bottom, rgb(46 61 80 / var(--tw-bg-opacity, 1)) 0%, rgb(46 61 80 / 0.9) 45%, #ffffff 100%)',
         }}
         aria-hidden="true"
       />
