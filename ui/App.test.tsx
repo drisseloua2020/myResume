@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { authService } from './services/authService';
 import {
   deleteResume,
   getLatestDraft,
@@ -29,6 +30,9 @@ const testUser = {
 vi.mock('./services/authService', () => ({
   authService: {
     getCurrentUser: vi.fn(() => testUser),
+    login: vi.fn(),
+    signup: vi.fn(),
+    startOAuthLogin: vi.fn(),
     logActivity: vi.fn(),
     refreshMe: vi.fn(),
     logout: vi.fn(),
@@ -80,6 +84,11 @@ const parsedResumeResult = (resume: Record<string, unknown>) => ({
 describe('App import flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    window.history.replaceState({}, '', '/');
+    vi.mocked(authService.getCurrentUser).mockReturnValue(testUser);
+    vi.mocked(authService.login).mockResolvedValue(testUser);
+    vi.mocked(authService.refreshMe).mockResolvedValue(testUser);
     vi.mocked(getLatestResume).mockResolvedValue(null);
     vi.mocked(getLatestDraft).mockResolvedValue(null);
     vi.mocked(listResumes).mockResolvedValue([]);
@@ -109,6 +118,56 @@ describe('App import flow', () => {
         ],
         education: [],
     }));
+  });
+
+  it('shows user onboarding after email login and opens the editor after skip', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authService.getCurrentUser).mockReturnValueOnce(null);
+    vi.mocked(authService.login).mockResolvedValueOnce(testUser);
+
+    const { container } = render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+    await user.type(screen.getAllByPlaceholderText('name@example.com')[0], 'resume@example.com');
+    const passwordInput = container.querySelector('input[type="password"]') as HTMLInputElement;
+    await user.type(passwordInput, 'secret123');
+    await user.click(screen.getAllByRole('button', { name: /sign in/i })[0]);
+
+    expect(await screen.findByRole('heading', { name: /user onboarding/i })).toBeInTheDocument();
+    expect(screen.getByText(/AI assistant assessment/i)).toBeInTheDocument();
+    expect(screen.getByText(/Where are you in the job market today/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /skip for now/i }));
+
+    expect(await screen.findByText(/Clarify your career objectives later/i)).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('rf_career_onboarding:usr_1') || '{}')).toEqual(expect.objectContaining({
+      status: 'skipped',
+      skippedAt: expect.any(String),
+    }));
+    expect(screen.getByPlaceholderText('First Name')).toBeInTheDocument();
+  });
+
+  it('keeps skipped onboarding users in the editor with a career objective reminder', async () => {
+    localStorage.setItem('rf_career_onboarding:usr_1', JSON.stringify({
+      status: 'skipped',
+      skippedAt: '2026-09-07T00:00:00.000Z',
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByText(/Clarify your career objectives later/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('First Name')).toBeInTheDocument();
+  });
+
+  it('shows user onboarding after a Google OAuth callback', async () => {
+    window.history.replaceState({}, '', '/?token=oauth-token');
+    vi.mocked(authService.refreshMe).mockResolvedValueOnce(testUser);
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /user onboarding/i })).toBeInTheDocument();
+    expect(screen.getByText(/AI assistant assessment/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
   });
 
   it('creates a new saved resume record when a PDF resume is imported', async () => {

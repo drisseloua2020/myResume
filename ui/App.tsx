@@ -14,6 +14,7 @@ import AuthScreen from './components/AuthScreen';
 import ContactPage from './components/ContactPage';
 import AccountSettings from './components/AccountSettings';
 import TemplateSelector from './components/TemplateSelector';
+import UserOnboarding, { CareerOnboardingAnswers } from './components/UserOnboarding';
 import CareerBlogPage from './components/CareerBlogPage';
 import ResumeGuidePage from './components/ResumeGuidePage';
 import ResumeExamplesPage from './components/ResumeExamplesPage';
@@ -29,6 +30,36 @@ import type { ResumeRecord } from './services/resumeService';
 import { UserInputData, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
 
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
+const CAREER_ONBOARDING_STORAGE_PREFIX = 'rf_career_onboarding';
+
+type CareerOnboardingRecord = {
+  status: 'completed' | 'skipped';
+  answers?: CareerOnboardingAnswers;
+  completedAt?: string;
+  skippedAt?: string;
+};
+
+const saveCareerOnboardingRecord = (userId: string, record: CareerOnboardingRecord) => {
+  try {
+    localStorage.setItem(`${CAREER_ONBOARDING_STORAGE_PREFIX}:${userId}`, JSON.stringify(record));
+  } catch {
+    // Onboarding state should never block the resume editor.
+  }
+};
+
+const getCareerOnboardingRecord = (userId: string): CareerOnboardingRecord | null => {
+  try {
+    const raw = localStorage.getItem(`${CAREER_ONBOARDING_STORAGE_PREFIX}:${userId}`);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<CareerOnboardingRecord>;
+    return parsed.status === 'completed' || parsed.status === 'skipped'
+      ? parsed as CareerOnboardingRecord
+      : null;
+  } catch {
+    return null;
+  }
+};
 
 const cleanImportedText = (value: unknown): string => {
   if (value === null || value === undefined) return '';
@@ -696,6 +727,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [generatorTab, setGeneratorTab] = useState<'create' | 'upload' | 'cover_letter'>('create');
+  const [showUserOnboarding, setShowUserOnboarding] = useState(false);
+  const [showCareerObjectiveReminder, setShowCareerObjectiveReminder] = useState(false);
 
   // State to hold imported data for the editor
   const [editorData, setEditorData] = useState<Partial<UserInputData> | null>(null);
@@ -725,6 +758,8 @@ const App: React.FC = () => {
       setShowAgentModal(false);
       setShowNewResumeConfirm(false);
       setGeneratorTab('create');
+      setShowUserOnboarding(false);
+      setShowCareerObjectiveReminder(false);
       setActiveTab('workspace');
       // Force editor remount next time user logs in
       setWorkspaceResetKey((k) => k + 1);
@@ -837,11 +872,19 @@ const App: React.FC = () => {
         .then((u) => {
           if (u) {
             setCurrentUser(u);
+            if (u.role === 'admin') {
+              setActiveTab('admin_logs');
+              setShowUserOnboarding(false);
+              setShowCareerObjectiveReminder(false);
+              checkAgentUpdates();
+              return;
+            }
             if (templateIdFromOAuth) {
               setSelectedTemplateId(templateIdFromOAuth);
-              setActiveTab('workspace');
-              setGeneratorTab('create');
             }
+            setActiveTab('workspace');
+            setGeneratorTab('create');
+            applyCareerOnboardingState(u, 'fresh_auth');
             checkAgentUpdates();
           }
         })
@@ -855,6 +898,7 @@ const App: React.FC = () => {
     const user = authService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
+      applyCareerOnboardingState(user, 'cached_session');
       // Simulate Agent checking for updates on load (simulate email link opening app)
       checkAgentUpdates();
     }
@@ -866,6 +910,25 @@ const App: React.FC = () => {
     setAgentUpdates(updates);
   };
 
+  const applyCareerOnboardingState = (user: User, source: 'fresh_auth' | 'cached_session') => {
+    const record = getCareerOnboardingRecord(user.id);
+
+    if (record?.status === 'completed') {
+      setShowUserOnboarding(false);
+      setShowCareerObjectiveReminder(false);
+      return;
+    }
+
+    if (record?.status === 'skipped') {
+      setShowUserOnboarding(false);
+      setShowCareerObjectiveReminder(true);
+      return;
+    }
+
+    setShowUserOnboarding(source === 'fresh_auth');
+    setShowCareerObjectiveReminder(false);
+  };
+
   const handleLogin = (user: User, initialTemplateId?: string) => {
     setCurrentUser(user);
     setEditorData(null);
@@ -874,17 +937,17 @@ const App: React.FC = () => {
     initialResumeLoadUserRef.current = null;
     if (user.role === 'admin') {
       setActiveTab('admin_logs');
+      setShowUserOnboarding(false);
+      setShowCareerObjectiveReminder(false);
       return;
     }
     if (initialTemplateId) {
       setSelectedTemplateId(initialTemplateId);
-      setActiveTab('workspace');
-      setGeneratorTab('create');
-      return;
     }
 
-    // Default landing for users is the editor.
     setActiveTab('workspace');
+    setGeneratorTab('create');
+    applyCareerOnboardingState(user, 'fresh_auth');
     // Trigger agent check after login
     checkAgentUpdates();
   };
@@ -899,7 +962,36 @@ const App: React.FC = () => {
     setLoadedResumeTitle(null);
     initialResumeLoadUserRef.current = null;
     setAgentUpdates([]);
+    setShowUserOnboarding(false);
+    setShowCareerObjectiveReminder(false);
     setWorkspaceResetKey((k) => k + 1);
+  };
+
+  const finishUserOnboarding = (answers: CareerOnboardingAnswers) => {
+    if (currentUser) {
+      saveCareerOnboardingRecord(currentUser.id, {
+        status: 'completed',
+        answers,
+        completedAt: new Date().toISOString(),
+      });
+    }
+    setShowUserOnboarding(false);
+    setShowCareerObjectiveReminder(false);
+    setActiveTab('workspace');
+    setGeneratorTab('create');
+  };
+
+  const skipUserOnboarding = () => {
+    if (currentUser) {
+      saveCareerOnboardingRecord(currentUser.id, {
+        status: 'skipped',
+        skippedAt: new Date().toISOString(),
+      });
+    }
+    setShowUserOnboarding(false);
+    setShowCareerObjectiveReminder(true);
+    setActiveTab('workspace');
+    setGeneratorTab('create');
   };
 
   const handlePlanUpdate = (newPlan: SubscriptionPlan) => {
@@ -1471,7 +1563,31 @@ const App: React.FC = () => {
              {error}
           </div>
         )}
-        {renderContent()}
+        {showUserOnboarding ? (
+          <UserOnboarding
+            user={currentUser}
+            onComplete={finishUserOnboarding}
+            onSkip={skipUserOnboarding}
+          />
+        ) : (
+          <>
+            {showCareerObjectiveReminder && activeTab === 'workspace' && (
+              <div className="mx-auto mt-6 flex w-[calc(100%-2rem)] max-w-6xl flex-col gap-3 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm leading-6">
+                  You skipped onboarding. Clarify your career objectives later so the editor can better support your profile and future job matching.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowUserOnboarding(true)}
+                  className="self-start rounded border border-amber-300 bg-white px-4 py-2 text-sm font-bold text-amber-900 hover:bg-amber-100 sm:self-auto"
+                >
+                  Clarify objectives
+                </button>
+              </div>
+            )}
+            {renderContent()}
+          </>
+        )}
       </main>
 
       {/* New Resume Confirmation Modal */}
