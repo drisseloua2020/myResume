@@ -5,6 +5,7 @@ import ResumeInput from './components/ResumeInput';
 import ResumeLibraryPage from './components/ResumeLibraryPage';
 import CoverLettersPage from './components/CoverLettersPage';
 import ProfileSyncPage from './components/ProfileSyncPage';
+import CareerProfileAnalysisPage from './components/CareerProfileAnalysisPage';
 import AdminActivityLogsPage from './components/AdminActivityLogsPage';
 import AdminAgentUpdatesPage from './components/AdminAgentUpdatesPage';
 import AdminContactMessagesPage from './components/AdminContactMessagesPage';
@@ -27,7 +28,7 @@ import { getOAuthBackendCallbackRedirect, isOAuthCallbackPath } from './services
 import { agentService } from './services/agentService';
 import { saveDraft, getLatestResume, parseResumeUpload, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
-import { getCareerOnboardingProfile, saveCareerOnboardingProfile } from './services/onboardingService';
+import { generateCareerProfileAnalysis, getCareerOnboardingProfile, saveCareerOnboardingProfile } from './services/onboardingService';
 import { UserInputData, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
 
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
@@ -973,16 +974,17 @@ const App: React.FC = () => {
     setUserOnboardingError(null);
     setError(null);
     try {
-      await importResumeFileToWorkspace({
+      const importedResume = await importResumeFileToWorkspace({
         role: currentUser.role,
         plan: currentUser.plan,
         importFormat: 'ats',
         fileData: resumeFileData,
       }, 'Importing onboarding resume to Editor');
       await saveCareerOnboardingProfile(answers);
+      await generateCareerProfileAnalysis({ resumeId: importedResume?.id });
       setShowUserOnboarding(false);
       setShowCareerObjectiveReminder(false);
-      setActiveTab('workspace');
+      setActiveTab('profile_analysis');
       setGeneratorTab('create');
     } catch (err: any) {
       setUserOnboardingError(err?.message || 'Could not complete your career profile setup.');
@@ -1378,6 +1380,12 @@ const App: React.FC = () => {
           content: importedContent,
         });
         setGeneratorTab('create');
+        return {
+          id: saved.id,
+          templateId,
+          title: importedTitle,
+          content: importedContent,
+        };
     } else {
         throw new Error("Could not parse resume data structure.");
     }
@@ -1470,6 +1478,10 @@ const App: React.FC = () => {
 
     if (activeTab === 'career_tools') {
       return <CareerToolkitPage currentResume={visibleEditorData as UserInputData} />;
+    }
+
+    if (activeTab === 'profile_analysis') {
+      return <CareerProfileAnalysisPage />;
     }
 
     if (activeTab === 'resumes') {

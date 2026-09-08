@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user, get_db
-from app.models.entities import Achievement, CareerOnboardingProfile, JobApplication, Resume, ResumeShare, ResumeVersion, User
+from app.models.entities import Achievement, CareerOnboardingProfile, CareerProfileAnalysis, JobApplication, Resume, ResumeShare, ResumeVersion, User
 from app.schemas.career import (
     AchievementOut,
     AchievementsEnvelope,
@@ -16,12 +16,15 @@ from app.schemas.career import (
     CareerOnboardingProfileEnvelope,
     CareerOnboardingProfileIn,
     CareerOnboardingProfileOut,
+    CareerProfileAnalysisEnvelope,
+    CareerProfileAnalysisOut,
     CreateAchievementIn,
     CreateJobApplicationIn,
     CreateResumeShareIn,
     CreateResumeVersionIn,
     ExportResumeIn,
     ExportResumeOut,
+    GenerateCareerProfileAnalysisIn,
     JobApplicationEnvelope,
     JobApplicationOut,
     JobApplicationsEnvelope,
@@ -37,6 +40,7 @@ from app.schemas.common import OkResponse
 from app.services.activity import log_activity, new_prefixed_id
 from app.services.career_tools import (
     analytics_for_jobs,
+    analyze_profile_from_onboarding,
     analyze_resume_against_job,
     create_resume_exports,
     default_packet,
@@ -129,6 +133,35 @@ def _onboarding_profile_out(item: CareerOnboardingProfile) -> CareerOnboardingPr
     )
 
 
+def _onboarding_profile_answers(item: CareerOnboardingProfile) -> dict[str, str]:
+    return {
+        "currentExperience": item.current_experience,
+        "strengths": item.strengths,
+        "targetRoles": item.target_roles,
+        "marketStatus": item.market_status,
+        "shortTermGoal": item.short_term_goal,
+        "futureGoal": item.future_goal,
+        "jobPreferences": item.job_preferences,
+        "supportNeeds": item.support_needs,
+    }
+
+
+def _profile_analysis_out(item: CareerProfileAnalysis) -> CareerProfileAnalysisOut:
+    return CareerProfileAnalysisOut(
+        id=item.id,
+        userId=item.user_id,
+        onboardingProfileId=item.onboarding_profile_id,
+        resumeId=item.resume_id,
+        profileCategory=item.profile_category,
+        resumeCategory=item.resume_category,
+        recommendedJobFamily=item.recommended_job_family,
+        skillFocus=item.skill_focus,
+        analysis=item.analysis if isinstance(item.analysis, dict) else {},
+        createdAt=item.created_at,
+        updatedAt=item.updated_at,
+    )
+
+
 @router.get("/onboarding-profile", response_model=CareerOnboardingProfileEnvelope)
 def get_onboarding_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CareerOnboardingProfileEnvelope:
     profile = db.scalar(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == current_user.id))
@@ -167,6 +200,55 @@ def save_onboarding_profile(payload: CareerOnboardingProfileIn, current_user: Us
     db.commit()
     db.refresh(profile)
     return CareerOnboardingProfileEnvelope(profile=_onboarding_profile_out(profile))
+
+
+@router.get("/profile-analysis", response_model=CareerProfileAnalysisEnvelope)
+def get_profile_analysis(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CareerProfileAnalysisEnvelope:
+    analysis = db.scalar(select(CareerProfileAnalysis).where(CareerProfileAnalysis.user_id == current_user.id))
+    return CareerProfileAnalysisEnvelope(analysis=_profile_analysis_out(analysis) if analysis else None)
+
+
+@router.post("/profile-analysis", response_model=CareerProfileAnalysisEnvelope)
+def generate_profile_analysis(payload: GenerateCareerProfileAnalysisIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CareerProfileAnalysisEnvelope:
+    onboarding_profile = db.scalar(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == current_user.id))
+    if not onboarding_profile:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Complete the Samanta onboarding questionnaire before profile analysis.")
+
+    resume_stmt = select(Resume).where(Resume.user_id == current_user.id)
+    if payload.resumeId:
+        resume_stmt = resume_stmt.where(Resume.id == payload.resumeId)
+    else:
+        resume_stmt = resume_stmt.order_by(desc(Resume.updated_at), desc(Resume.created_at)).limit(1)
+    resume = db.scalar(resume_stmt)
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload or save a resume before profile analysis.")
+
+    resume_content = resume.content if isinstance(resume.content, dict) else {}
+    report = analyze_profile_from_onboarding(
+        resume_content,
+        _onboarding_profile_answers(onboarding_profile),
+        resume_id=resume.id,
+        onboarding_profile_id=onboarding_profile.id,
+    )
+    top_skill = report.get("thingsNeeded", {}).get("prioritySkills", [{}])[0].get("skill", "Role proof") if isinstance(report.get("thingsNeeded"), dict) else "Role proof"
+    analysis = db.scalar(select(CareerProfileAnalysis).where(CareerProfileAnalysis.user_id == current_user.id))
+    if not analysis:
+        analysis = CareerProfileAnalysis(id=new_prefixed_id("cpa"), user_id=current_user.id)
+        db.add(analysis)
+
+    analysis.onboarding_profile_id = onboarding_profile.id
+    analysis.resume_id = resume.id
+    analysis.profile_category = report["profileCategory"]["label"]
+    analysis.resume_category = report["resume"]["category"]
+    analysis.recommended_job_family = report["jobTargets"]["recommendedFamily"]
+    analysis.skill_focus = str(top_skill)
+    analysis.analysis = report
+
+    db.flush()
+    log_activity(db, current_user.id, "CAREER_PROFILE_ANALYSIS", details=analysis.profile_category, user_name=current_user.name)
+    db.commit()
+    db.refresh(analysis)
+    return CareerProfileAnalysisEnvelope(analysis=_profile_analysis_out(analysis))
 
 
 @router.post("/analyze", response_model=AnalyzeCareerOut)
@@ -386,11 +468,13 @@ def create_share(payload: CreateResumeShareIn, current_user: User = Depends(get_
 @router.get("/data-export", response_model=dict)
 def data_export(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, object]:
     onboarding_profile = db.scalar(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == current_user.id))
+    profile_analysis = db.scalar(select(CareerProfileAnalysis).where(CareerProfileAnalysis.user_id == current_user.id))
     jobs = db.scalars(select(JobApplication).where(JobApplication.user_id == current_user.id)).all()
     achievements = db.scalars(select(Achievement).where(Achievement.user_id == current_user.id)).all()
     versions = db.scalars(select(ResumeVersion).where(ResumeVersion.user_id == current_user.id)).all()
     return {
         "onboardingProfile": _onboarding_profile_out(onboarding_profile).model_dump(mode="json") if onboarding_profile else None,
+        "profileAnalysis": _profile_analysis_out(profile_analysis).model_dump(mode="json") if profile_analysis else None,
         "jobs": [_job_out(job).model_dump(mode="json") for job in jobs],
         "achievements": [_achievement_out(item).model_dump(mode="json") for item in achievements],
         "resumeVersions": [_version_out(item).model_dump(mode="json") for item in versions],
@@ -400,7 +484,7 @@ def data_export(current_user: User = Depends(get_current_user), db: Session = De
 
 @router.delete("/data", response_model=OkResponse)
 def delete_career_data(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> OkResponse:
-    for model in (CareerOnboardingProfile, JobApplication, Achievement, ResumeVersion, ResumeShare):
+    for model in (CareerProfileAnalysis, CareerOnboardingProfile, JobApplication, Achievement, ResumeVersion, ResumeShare):
         rows = db.scalars(select(model).where(model.user_id == current_user.id)).all()
         for row in rows:
             db.delete(row)

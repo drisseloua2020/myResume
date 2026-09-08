@@ -4,8 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { authService } from './services/authService';
 import {
+  generateCareerProfileAnalysis,
   getCareerOnboardingProfile,
+  getCareerProfileAnalysis,
   saveCareerOnboardingProfile,
+  type CareerProfileAnalysis,
   type CareerOnboardingProfile,
 } from './services/onboardingService';
 import {
@@ -63,7 +66,9 @@ vi.mock('./services/resumeService', () => ({
 }));
 
 vi.mock('./services/onboardingService', () => ({
+  generateCareerProfileAnalysis: vi.fn(),
   getCareerOnboardingProfile: vi.fn(),
+  getCareerProfileAnalysis: vi.fn(),
   saveCareerOnboardingProfile: vi.fn(),
 }));
 
@@ -106,6 +111,87 @@ const completedCareerOnboardingProfile: CareerOnboardingProfile = {
   updatedAt: '2026-09-07T00:00:00.000Z',
 };
 
+const completedCareerProfileAnalysis: CareerProfileAnalysis = {
+  id: 'cpa_1',
+  userId: 'usr_1',
+  onboardingProfileId: 'onb_1',
+  resumeId: 'res_imported',
+  profileCategory: 'Technical Career Builder',
+  resumeCategory: 'Technical and IT resume',
+  recommendedJobFamily: 'Software, IT, cloud, data, and systems roles',
+  skillFocus: 'System design',
+  createdAt: '2026-09-07T00:00:00.000Z',
+  updatedAt: '2026-09-07T00:00:00.000Z',
+  analysis: {
+    noLlmCalls: true,
+    privacyBadge: 'No LLM calls: deterministic local rules only',
+    profileCategory: {
+      label: 'Technical Career Builder',
+      level: 'Mid to senior specialist',
+      confidence: 88,
+      summary: 'You are best positioned as a technical career builder.',
+      evidence: ['Starting point: Experienced specialist', 'Primary strength: Leadership and coaching'],
+      nextMilestone: 'Show depth through outcomes, tools, and proof.',
+    },
+    resume: {
+      id: 'res_imported',
+      category: 'Technical and IT resume',
+      readinessScore: 78,
+      completenessScore: 88,
+      bulletQualityScore: 72,
+      riskScore: 90,
+      skillCoverageScore: 66,
+      strengths: ['Name', 'Email', 'Experience'],
+      improvements: ['Add proof for system design.'],
+      risks: [],
+      visibleSkills: ['AWS', 'Python', 'SQL'],
+    },
+    thingsNeeded: {
+      headline: 'What to build next to become an expert',
+      prioritySkills: [{
+        skill: 'System design',
+        why: 'This skill is a strong signal.',
+        currentSignal: 'Not yet visible enough.',
+        action: 'Build one project that proves system design.',
+        timeline: '2-4 weeks',
+      }],
+      expertPlan: ['Pick one target role family.', 'Rewrite the strongest three bullets.'],
+      supportNeed: 'Improve resume wording',
+    },
+    jobTargets: {
+      recommendedFamily: 'Software, IT, cloud, data, and systems roles',
+      recommendedTitles: [{
+        title: 'Software Engineer',
+        fitScore: 86,
+        why: 'Matches the selected target direction.',
+        keywords: ['software', 'cloud'],
+        applicationAngle: 'Lead with outcomes.',
+        autoAgentApply: {
+          status: 'ready_to_prepare',
+          nextAction: 'Prepare tailored resume.',
+          requiredBeforeApply: [],
+        },
+      }],
+      searchStrategy: {
+        preferredWorkStyle: 'Remote-first roles',
+        keywords: ['software', 'cloud'],
+        batchSize: 12,
+        reviewAfterApplications: 20,
+      },
+      autoAgentApplyFeature: {
+        enabled: true,
+        status: 'ready_to_configure',
+        details: 'The agent can prepare tailored packets and tracker entries.',
+      },
+    },
+    source: {
+      resumeId: 'res_imported',
+      onboardingProfileId: 'onb_1',
+      generatedAt: '2026-09-07T00:00:00.000Z',
+    },
+  },
+};
+
 describe('App import flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -116,6 +202,8 @@ describe('App import flow', () => {
     vi.mocked(authService.refreshMe).mockResolvedValue(testUser);
     vi.mocked(getCareerOnboardingProfile).mockResolvedValue(completedCareerOnboardingProfile);
     vi.mocked(saveCareerOnboardingProfile).mockResolvedValue(completedCareerOnboardingProfile);
+    vi.mocked(getCareerProfileAnalysis).mockResolvedValue(completedCareerProfileAnalysis);
+    vi.mocked(generateCareerProfileAnalysis).mockResolvedValue(completedCareerProfileAnalysis);
     vi.mocked(getLatestResume).mockResolvedValue(null);
     vi.mocked(getLatestDraft).mockResolvedValue(null);
     vi.mocked(listResumes).mockResolvedValue([]);
@@ -182,7 +270,7 @@ describe('App import flow', () => {
     expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
   });
 
-  it('saves completed onboarding answers to the database and opens the editor', async () => {
+  it('saves completed onboarding answers, analyzes the profile, and opens the analysis page', async () => {
     const user = userEvent.setup();
     vi.mocked(getCareerOnboardingProfile).mockResolvedValueOnce(null);
 
@@ -233,6 +321,9 @@ describe('App import flow', () => {
       expect(saveResume).toHaveBeenCalledTimes(1);
     });
     await waitFor(() => {
+      expect(generateCareerProfileAnalysis).toHaveBeenCalledWith({ resumeId: 'res_imported' });
+    });
+    await waitFor(() => {
       expect(saveCareerOnboardingProfile).toHaveBeenCalledWith(expect.objectContaining({
         currentExperience: 'Experienced specialist',
         strengths: 'Leadership and coaching',
@@ -245,7 +336,9 @@ describe('App import flow', () => {
       }));
     });
     expect(vi.mocked(saveCareerOnboardingProfile).mock.calls[0][0]).not.toHaveProperty('resumeFileData');
-    expect(await screen.findByPlaceholderText('First Name')).toBeInTheDocument();
+    expect(await screen.findAllByRole('heading', { name: /Technical Career Builder/i })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /User profile category/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Jobs to apply/i })).toBeInTheDocument();
   });
 
   it('shows user onboarding after a Google OAuth callback', async () => {

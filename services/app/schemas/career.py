@@ -73,6 +73,28 @@ class CareerOnboardingProfileEnvelope(StrictModel):
     profile: CareerOnboardingProfileOut | None
 
 
+class GenerateCareerProfileAnalysisIn(StrictModel):
+    resumeId: str | None = Field(default=None, max_length=64)
+
+
+class CareerProfileAnalysisOut(StrictModel):
+    id: str
+    userId: str
+    onboardingProfileId: str | None
+    resumeId: str | None
+    profileCategory: str
+    resumeCategory: str
+    recommendedJobFamily: str
+    skillFocus: str
+    analysis: dict[str, Any]
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class CareerProfileAnalysisEnvelope(StrictModel):
+    analysis: CareerProfileAnalysisOut | None
+
+
 class CreateJobApplicationIn(StrictModel):
     status: CareerStatus = "saved"
     title: str | None = Field(default=None, max_length=200)

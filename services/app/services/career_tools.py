@@ -59,6 +59,91 @@ SKILL_ALIASES = {
 SECTION_NAMES = ("summary", "skills", "experience", "education")
 JOB_STATUSES = ("saved", "applied", "interview", "offer", "rejected")
 
+PROFILE_GUIDES: dict[str, dict[str, Any]] = {
+    "Software and IT": {
+        "profileCategory": "Technical Career Builder",
+        "resumeCategory": "Technical and IT resume",
+        "jobFamily": "Software, IT, cloud, data, and systems roles",
+        "jobTitles": ["Software Engineer", "IT Support Specialist", "Cloud Support Associate", "Data Analyst", "QA Analyst"],
+        "expertSkills": ["APIs", "System design", "Cloud architecture", "SQL", "Testing", "Security fundamentals", "Automation"],
+        "searchKeywords": ["software", "IT", "cloud", "data", "systems", "automation"],
+    },
+    "Business operations": {
+        "profileCategory": "Operations Execution Builder",
+        "resumeCategory": "Operations and project resume",
+        "jobFamily": "Operations, project coordination, logistics, and business support roles",
+        "jobTitles": ["Operations Coordinator", "Project Coordinator", "Business Analyst", "Program Coordinator", "Process Improvement Specialist"],
+        "expertSkills": ["Process mapping", "Project management", "Stakeholder communication", "Excel", "Reporting", "Workflow improvement", "Risk tracking"],
+        "searchKeywords": ["operations", "project", "program", "process", "business analyst"],
+    },
+    "Customer success": {
+        "profileCategory": "Customer Growth Partner",
+        "resumeCategory": "Customer success and support resume",
+        "jobFamily": "Customer success, account support, onboarding, and service roles",
+        "jobTitles": ["Customer Success Associate", "Customer Success Manager", "Onboarding Specialist", "Account Coordinator", "Technical Support Specialist"],
+        "expertSkills": ["Customer onboarding", "Account management", "CRM hygiene", "Support metrics", "Product knowledge", "Retention strategy", "Communication"],
+        "searchKeywords": ["customer success", "support", "onboarding", "account", "retention"],
+    },
+    "Sales and growth": {
+        "profileCategory": "Revenue Growth Builder",
+        "resumeCategory": "Sales and revenue resume",
+        "jobFamily": "Sales, business development, partnerships, and growth roles",
+        "jobTitles": ["Sales Development Representative", "Account Executive", "Business Development Representative", "Partnerships Associate", "Growth Specialist"],
+        "expertSkills": ["Prospecting", "Pipeline management", "CRM discipline", "Negotiation", "Discovery calls", "Revenue metrics", "Relationship building"],
+        "searchKeywords": ["sales", "business development", "growth", "account executive", "partnerships"],
+    },
+    "Marketing and content": {
+        "profileCategory": "Creative Communication Builder",
+        "resumeCategory": "Marketing and content resume",
+        "jobFamily": "Marketing, content, brand, campaign, and communications roles",
+        "jobTitles": ["Marketing Coordinator", "Content Specialist", "Social Media Manager", "Brand Associate", "Communications Specialist"],
+        "expertSkills": ["Campaign planning", "Content strategy", "Analytics", "SEO", "Brand voice", "Copywriting", "Audience research"],
+        "searchKeywords": ["marketing", "content", "brand", "communications", "SEO"],
+    },
+    "Finance and administration": {
+        "profileCategory": "Business Control Builder",
+        "resumeCategory": "Finance and administration resume",
+        "jobFamily": "Finance, office administration, compliance, and coordination roles",
+        "jobTitles": ["Financial Analyst", "Administrative Coordinator", "Office Manager", "Accounting Associate", "Compliance Assistant"],
+        "expertSkills": ["Financial analysis", "Excel", "Reporting", "Compliance", "Documentation", "Budget tracking", "Process control"],
+        "searchKeywords": ["finance", "accounting", "administration", "compliance", "analyst"],
+    },
+    "Healthcare or education": {
+        "profileCategory": "Service Impact Professional",
+        "resumeCategory": "Healthcare and education resume",
+        "jobFamily": "Healthcare support, education, training, and care coordination roles",
+        "jobTitles": ["Care Coordinator", "Education Coordinator", "Training Specialist", "Healthcare Administrator", "Program Assistant"],
+        "expertSkills": ["Documentation", "Compliance", "Patient or learner support", "Scheduling", "Communication", "Case coordination", "Training delivery"],
+        "searchKeywords": ["healthcare", "education", "training", "coordinator", "support"],
+    },
+    "Skilled trades or service": {
+        "profileCategory": "Hands-On Service Specialist",
+        "resumeCategory": "Trades and service resume",
+        "jobFamily": "Skilled trades, field service, hospitality, and customer-facing service roles",
+        "jobTitles": ["Field Service Technician", "Maintenance Technician", "Service Lead", "Operations Associate", "Facilities Coordinator"],
+        "expertSkills": ["Safety practices", "Customer service", "Troubleshooting", "Scheduling", "Quality control", "Equipment knowledge", "Documentation"],
+        "searchKeywords": ["technician", "service", "maintenance", "facilities", "operations"],
+    },
+}
+
+DEFAULT_PROFILE_GUIDE = {
+    "profileCategory": "Career Direction Builder",
+    "resumeCategory": "General professional resume",
+    "jobFamily": "Focused roles that match the strongest resume evidence",
+    "jobTitles": ["Coordinator", "Specialist", "Analyst", "Associate", "Assistant Manager"],
+    "expertSkills": ["Communication", "Problem solving", "Project management", "Reporting", "Stakeholder communication", "Process improvement"],
+    "searchKeywords": ["coordinator", "specialist", "analyst", "associate"],
+}
+
+LEVEL_BY_EXPERIENCE = {
+    "Student or new graduate": "Entry level",
+    "Early career professional": "Early career",
+    "Experienced specialist": "Mid to senior specialist",
+    "Manager or team lead": "Leadership",
+    "Executive or founder": "Executive",
+    "Career changer": "Career transition",
+}
+
 
 def _clean(value: Any) -> str:
     if value is None:
@@ -352,6 +437,195 @@ def analyze_resume_against_job(resume: dict[str, Any], job_description: str, job
         "publicProfile": public_profile_plan(resume),
         "exportsPreview": {"atsText": resume_to_text(resume, redact_pii=False)[:5000]},
         "featureCoverage": feature_catalog(),
+    }
+
+
+def _guide_for_onboarding(onboarding: dict[str, Any]) -> dict[str, Any]:
+    target = _clean(onboarding.get("targetRoles"))
+    return PROFILE_GUIDES.get(target, DEFAULT_PROFILE_GUIDE)
+
+
+def _resume_skill_values(resume: dict[str, Any]) -> list[str]:
+    values: list[str] = []
+    for item in resume.get("skillItems") or []:
+        if isinstance(item, dict):
+            values.extend(re.split(r"[,;\n|]", str(item.get("items") or "")))
+    return values
+
+
+def _skill_present(skill: str, resume_text: str, normalized_skills: list[str]) -> bool:
+    key = re.sub(r"[^a-z0-9+#.]+", " ", skill.lower()).strip()
+    normalized_keys = {re.sub(r"[^a-z0-9+#.]+", " ", item.lower()).strip() for item in normalized_skills}
+    if key in normalized_keys:
+        return True
+    for word in key.split():
+        if len(word) >= 4 and _contains(resume_text, word):
+            return True
+    return _contains(resume_text, skill)
+
+
+def _career_pivot_note(onboarding: dict[str, Any]) -> str:
+    current = _clean(onboarding.get("currentExperience"))
+    market = _clean(onboarding.get("marketStatus"))
+    if current == "Career changer" or market == "Changing careers":
+        return "Frame transferable strengths clearly and keep the target role family visible in the top third of the resume."
+    if current in {"Student or new graduate", "Early career professional"}:
+        return "Use projects, internships, volunteer work, or measurable class/work outcomes to prove role readiness."
+    if current in {"Manager or team lead", "Executive or founder"}:
+        return "Lead with scope, decision ownership, team outcomes, and business metrics."
+    return "Show depth through outcomes, tools, and proof that your work changed a team, system, customer, or metric."
+
+
+def analyze_profile_from_onboarding(
+    resume: dict[str, Any],
+    onboarding: dict[str, Any],
+    *,
+    resume_id: str | None = None,
+    onboarding_profile_id: str | None = None,
+) -> dict[str, Any]:
+    resume_text = resume_to_text(resume)
+    guide = _guide_for_onboarding(onboarding)
+    normalized = normalize_skills(_resume_skill_values(resume))
+    normalized_skills = normalized["normalized"]
+    discovered_terms = _extract_terms(resume_text, HARD_SKILLS | TOOLS | SOFT_SKILLS | CERTIFICATIONS)
+    all_skill_signals = sorted(dict.fromkeys([*normalized_skills, *discovered_terms]), key=str.lower)
+    missing_expert_skills = [
+        skill for skill in guide["expertSkills"]
+        if not _skill_present(skill, resume_text, all_skill_signals)
+    ]
+    skill_coverage = round((len(guide["expertSkills"]) - len(missing_expert_skills)) / max(1, len(guide["expertSkills"])) * 100)
+    quality = bullet_quality(resume)
+    risks = risk_scan(resume)
+    completeness = completeness_score(resume)
+    readiness_score = max(0, min(100, round(
+        completeness["score"] * 0.3
+        + quality["averageScore"] * 0.25
+        + risks["score"] * 0.2
+        + skill_coverage * 0.25
+    )))
+
+    current_experience = _clean(onboarding.get("currentExperience"))
+    profile_label = guide["profileCategory"]
+    if current_experience == "Career changer" or _clean(onboarding.get("marketStatus")) == "Changing careers":
+        profile_label = "Career Pivot Builder"
+    elif current_experience in {"Manager or team lead", "Executive or founder"}:
+        profile_label = "Leadership Growth Track"
+
+    improvements = []
+    if completeness["score"] < 85:
+        improvements.append("Complete the missing resume basics before high-volume applications.")
+    if quality["averageScore"] < 70:
+        improvements.append("Rewrite experience bullets with an action, scope, and measurable result.")
+    if risks["risks"]:
+        improvements.extend(risk["fix"] for risk in risks["risks"][:3])
+    if missing_expert_skills:
+        improvements.append(f"Add proof for {', '.join(missing_expert_skills[:3])} where you genuinely have experience.")
+
+    priority_skills = [
+        {
+            "skill": skill,
+            "why": f"This skill is a strong signal for {guide['jobFamily'].lower()}.",
+            "currentSignal": "Not yet visible enough in the uploaded resume.",
+            "action": f"Build one project, work example, certification, or bullet that proves {skill.lower()}.",
+            "timeline": "2-4 weeks",
+        }
+        for skill in missing_expert_skills[:6]
+    ]
+    if not priority_skills:
+        priority_skills = [
+            {
+                "skill": skill,
+                "why": "This is already visible; deepen it to move from qualified to expert.",
+                "currentSignal": "Present in the resume.",
+                "action": f"Attach a metric, project scope, or leadership example to {skill.lower()}.",
+                "timeline": "1-2 weeks",
+            }
+            for skill in guide["expertSkills"][:3]
+        ]
+
+    recommended_jobs = []
+    for index, title in enumerate(guide["jobTitles"]):
+        fit = max(52, min(96, readiness_score + 12 - index * 5))
+        blockers = []
+        if readiness_score < 75:
+            blockers.append("Improve resume readiness to 75+ before letting the agent apply broadly.")
+        if missing_expert_skills:
+            blockers.append(f"Strengthen {missing_expert_skills[0]} evidence.")
+        recommended_jobs.append({
+            "title": title,
+            "fitScore": fit,
+            "why": f"Matches your {guide['jobFamily'].lower()} direction and your stated goal: {_clean(onboarding.get('shortTermGoal')) or 'career progress'}.",
+            "keywords": guide["searchKeywords"][:5],
+            "applicationAngle": _career_pivot_note(onboarding),
+            "autoAgentApply": {
+                "status": "ready_to_prepare" if readiness_score >= 75 else "needs_review",
+                "nextAction": "Prepare tailored resume, cover letter, and tracker entry before applying.",
+                "requiredBeforeApply": blockers,
+            },
+        })
+
+    return {
+        "noLlmCalls": True,
+        "privacyBadge": "No LLM calls: deterministic local rules only",
+        "profileCategory": {
+            "label": profile_label,
+            "level": LEVEL_BY_EXPERIENCE.get(current_experience, current_experience or "Career stage unknown"),
+            "confidence": max(60, min(96, round((completeness["score"] + skill_coverage + 80) / 3))),
+            "summary": f"You are best positioned as a {profile_label.lower()} for {guide['jobFamily'].lower()}.",
+            "evidence": [
+                f"Starting point: {current_experience or 'not specified'}",
+                f"Primary strength: {_clean(onboarding.get('strengths')) or 'not specified'}",
+                f"Target direction: {_clean(onboarding.get('targetRoles')) or 'not specified'}",
+                f"Visible skill signals: {', '.join(all_skill_signals[:8]) or 'needs stronger skill evidence'}",
+            ],
+            "nextMilestone": _career_pivot_note(onboarding),
+        },
+        "resume": {
+            "id": resume_id,
+            "category": guide["resumeCategory"],
+            "readinessScore": readiness_score,
+            "completenessScore": completeness["score"],
+            "bulletQualityScore": quality["averageScore"],
+            "riskScore": risks["score"],
+            "skillCoverageScore": skill_coverage,
+            "strengths": [
+                check["label"] for check in completeness["checks"] if check["passed"]
+            ][:6],
+            "improvements": improvements[:7],
+            "risks": risks["risks"],
+            "visibleSkills": all_skill_signals[:14],
+        },
+        "thingsNeeded": {
+            "headline": "What to build next to become an expert",
+            "prioritySkills": priority_skills,
+            "expertPlan": [
+                "Pick one target role family and keep every resume version aligned to it.",
+                "Create proof for the top missing skill with a measurable project or work example.",
+                "Rewrite the strongest three bullets with action, scope, and outcome.",
+                "Apply in controlled batches, then tune keywords based on response patterns.",
+            ],
+            "supportNeed": _clean(onboarding.get("supportNeeds")),
+        },
+        "jobTargets": {
+            "recommendedFamily": guide["jobFamily"],
+            "recommendedTitles": recommended_jobs,
+            "searchStrategy": {
+                "preferredWorkStyle": _clean(onboarding.get("jobPreferences")),
+                "keywords": guide["searchKeywords"],
+                "batchSize": 12 if readiness_score >= 75 else 5,
+                "reviewAfterApplications": 20,
+            },
+            "autoAgentApplyFeature": {
+                "enabled": readiness_score >= 75,
+                "status": "ready_to_configure" if readiness_score >= 75 else "waiting_for_resume_improvements",
+                "details": "The agent can prepare tailored packets and tracker entries. External job-board submission is not connected yet.",
+            },
+        },
+        "source": {
+            "resumeId": resume_id,
+            "onboardingProfileId": onboarding_profile_id,
+            "generatedAt": datetime.now(UTC).isoformat(),
+        },
     }
 
 
