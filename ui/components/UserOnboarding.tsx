@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { User } from '../types';
+import { IMPORT_DOCUMENT_ACCEPT, readImportDocumentFile, type ResumeImportFileData } from '../utils/resumeImport';
 
 export interface CareerOnboardingAnswers {
   currentExperience: string;
@@ -11,6 +12,10 @@ export interface CareerOnboardingAnswers {
   jobPreferences: string;
   supportNeeds: string;
 }
+
+export type CareerOnboardingSubmission = CareerOnboardingAnswers & {
+  resumeFileData: ResumeImportFileData;
+};
 
 export const careerOnboardingQuestions: Array<{
   key: keyof CareerOnboardingAnswers;
@@ -352,7 +357,7 @@ const emptyAnswers: CareerOnboardingAnswers = {
 
 interface UserOnboardingProps {
   user: User;
-  onComplete: (answers: CareerOnboardingAnswers) => void | Promise<void>;
+  onComplete: (answers: CareerOnboardingSubmission) => void | Promise<void>;
   onSkip: () => void;
   isSaving?: boolean;
   error?: string | null;
@@ -360,16 +365,21 @@ interface UserOnboardingProps {
 
 const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSkip, isSaving = false, error = null }) => {
   const [answers, setAnswers] = useState<CareerOnboardingAnswers>(emptyAnswers);
+  const [resumeFileData, setResumeFileData] = useState<ResumeImportFileData | null>(null);
+  const [resumeUploadError, setResumeUploadError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
 
-  const currentQuestion = careerOnboardingQuestions[step];
-  const selectedAnswer = answers[currentQuestion.key];
-  const progress = Math.round(((step + 1) / careerOnboardingQuestions.length) * 100);
-  const isLastStep = step === careerOnboardingQuestions.length - 1;
+  const totalSteps = careerOnboardingQuestions.length + 1;
+  const isUploadStep = step === careerOnboardingQuestions.length;
+  const currentQuestion = isUploadStep ? null : careerOnboardingQuestions[step];
+  const selectedAnswer = currentQuestion ? answers[currentQuestion.key] : '';
+  const progress = Math.round(((step + 1) / totalSteps) * 100);
   const answeredCount = useMemo(
     () => Object.values(answers).filter(Boolean).length,
     [answers],
   );
+  const canContinue = isUploadStep ? Boolean(resumeFileData) : Boolean(selectedAnswer);
 
   const updateAnswer = (key: keyof CareerOnboardingAnswers, value: string) => {
     setAnswers((current) => ({ ...current, [key]: value }));
@@ -380,12 +390,32 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
   };
 
   const continueOnboarding = () => {
-    if (!selectedAnswer || isSaving) return;
-    if (isLastStep) {
-      void onComplete(answers);
+    if (isSaving) return;
+    if (isUploadStep) {
+      if (!resumeFileData) {
+        setResumeUploadError('Upload your resume before completing your profile.');
+        return;
+      }
+      void onComplete({ ...answers, resumeFileData });
       return;
     }
-    setStep((current) => Math.min(current + 1, careerOnboardingQuestions.length - 1));
+    if (!currentQuestion || !selectedAnswer) return;
+    setStep((current) => Math.min(current + 1, totalSteps - 1));
+  };
+
+  const handleResumeFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setResumeUploadError(null);
+    try {
+      const documentData = await readImportDocumentFile(file);
+      setResumeFileData(documentData);
+    } catch (err: any) {
+      setResumeFileData(null);
+      setResumeUploadError(err?.message || 'Upload a PDF, DOC, or DOCX resume.');
+      if (resumeInputRef.current) resumeInputRef.current.value = '';
+    }
   };
 
   return (
@@ -432,10 +462,10 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-bold text-blue-700">
-                Question {step + 1} of {careerOnboardingQuestions.length}
+                {isUploadStep ? 'Resume upload' : `Question ${step + 1} of ${totalSteps}`}
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                {answeredCount} selected so far
+                {isUploadStep ? 'Final step before your workspace opens' : `${answeredCount} selected so far`}
               </p>
             </div>
             <div
@@ -444,7 +474,7 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={progress}
-              aria-valuetext={`${step + 1} of ${careerOnboardingQuestions.length} questions`}
+              aria-valuetext={`${step + 1} of ${totalSteps} onboarding steps`}
             >
               <div
                 className="h-full rounded bg-blue-700 transition-all duration-300"
@@ -453,59 +483,108 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
             </div>
           </div>
 
-          <div className="onboarding-step mt-7" key={currentQuestion.key}>
-            <span className="inline-flex rounded bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">
-              {currentQuestion.label}
-            </span>
-            <h2 className="mt-4 max-w-3xl text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-              {currentQuestion.prompt}
-            </h2>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-              {currentQuestion.helper}
-            </p>
+          {isUploadStep ? (
+            <div className="onboarding-step mt-7" key="resume-upload">
+              <span className="inline-flex rounded bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">
+                Resume upload
+              </span>
+              <h2 className="mt-4 max-w-3xl text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                Upload your resume to complete your profile.
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+                Samanta will use this document to open your workspace with your resume details already prepared.
+              </p>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {currentQuestion.options.map((option) => {
-                const isSelected = selectedAnswer === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => updateAnswer(currentQuestion.key, option.value)}
-                    className={[
-                      'group min-h-28 rounded-lg border p-4 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2',
-                      isSelected
-                        ? 'border-blue-700 bg-blue-50 shadow-md shadow-blue-950/10'
-                        : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-md hover:shadow-slate-900/5',
-                    ].join(' ')}
-                  >
-                    <span className="flex items-start gap-3">
-                      <span
-                        className={[
-                          'mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded border text-sm font-black transition',
-                          isSelected
-                            ? 'border-blue-700 bg-blue-700 text-white'
-                            : 'border-slate-300 bg-white text-transparent group-hover:border-blue-400',
-                        ].join(' ')}
-                        aria-hidden="true"
-                      >
-                        {isSelected ? '✓' : ''}
-                      </span>
-                      <span>
-                        <span className="block text-base font-black text-slate-950">
-                          {option.title}
-                        </span>
-                        <span className="mt-1 block text-sm leading-6 text-slate-600">
-                          {option.detail}
-                        </span>
-                      </span>
+              <div className="mt-6 overflow-hidden rounded-lg border border-dashed border-blue-300 bg-gradient-to-br from-blue-50 via-white to-slate-50">
+                <input
+                  ref={resumeInputRef}
+                  id="samanta-resume-upload"
+                  type="file"
+                  className="sr-only"
+                  accept={IMPORT_DOCUMENT_ACCEPT}
+                  aria-label="Upload resume"
+                  onChange={handleResumeFileUpload}
+                  disabled={isSaving}
+                />
+                <label
+                  htmlFor="samanta-resume-upload"
+                  className="flex min-h-56 cursor-pointer flex-col items-center justify-center gap-4 px-6 py-8 text-center transition hover:bg-blue-50/70"
+                >
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-700 text-2xl font-black text-white shadow-lg shadow-blue-950/20" aria-hidden="true">
+                    +
+                  </span>
+                  <span>
+                    <span className="block text-lg font-black text-slate-950">
+                      {resumeFileData?.name || 'Choose your resume file'}
                     </span>
-                  </button>
-                );
-              })}
+                    <span className="mt-2 block text-sm font-semibold leading-6 text-slate-600">
+                      PDF, DOC, or DOCX. Your file will be parsed into the resume editor.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {resumeUploadError && (
+                <p className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">
+                  {resumeUploadError}
+                </p>
+              )}
             </div>
-          </div>
+          ) : currentQuestion ? (
+            <div className="onboarding-step mt-7" key={currentQuestion.key}>
+              <span className="inline-flex rounded bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">
+                {currentQuestion.label}
+              </span>
+              <h2 className="mt-4 max-w-3xl text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                {currentQuestion.prompt}
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+                {currentQuestion.helper}
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {currentQuestion.options.map((option) => {
+                  const isSelected = selectedAnswer === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => updateAnswer(currentQuestion.key, option.value)}
+                      className={[
+                        'group min-h-28 rounded-lg border p-4 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2',
+                        isSelected
+                          ? 'border-blue-700 bg-blue-50 shadow-md shadow-blue-950/10'
+                          : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-blue-300 hover:bg-slate-50 hover:shadow-md hover:shadow-slate-900/5',
+                      ].join(' ')}
+                    >
+                      <span className="flex items-start gap-3">
+                        <span
+                          className={[
+                            'mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded border text-sm font-black transition',
+                            isSelected
+                              ? 'border-blue-700 bg-blue-700 text-white'
+                              : 'border-slate-300 bg-white text-transparent group-hover:border-blue-400',
+                          ].join(' ')}
+                          aria-hidden="true"
+                        >
+                          {isSelected ? '✓' : ''}
+                        </span>
+                        <span>
+                          <span className="block text-base font-black text-slate-950">
+                            {option.title}
+                          </span>
+                          <span className="mt-1 block text-sm leading-6 text-slate-600">
+                            {option.detail}
+                          </span>
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {error && (
             <p className="mt-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">
@@ -533,10 +612,10 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
               </button>
               <button
                 type="submit"
-                disabled={!selectedAnswer || isSaving}
+                disabled={!canContinue || isSaving}
                 className="rounded bg-blue-700 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {isLastStep ? isSaving ? 'Saving profile' : 'Complete profile' : 'Next'}
+                {isUploadStep ? isSaving ? 'Completing profile' : 'Complete profile' : 'Next'}
               </button>
             </div>
           </div>

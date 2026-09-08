@@ -14,7 +14,7 @@ import AuthScreen from './components/AuthScreen';
 import ContactPage from './components/ContactPage';
 import AccountSettings from './components/AccountSettings';
 import TemplateSelector from './components/TemplateSelector';
-import UserOnboarding, { CareerOnboardingAnswers } from './components/UserOnboarding';
+import UserOnboarding, { type CareerOnboardingSubmission } from './components/UserOnboarding';
 import CareerBlogPage from './components/CareerBlogPage';
 import ResumeGuidePage from './components/ResumeGuidePage';
 import ResumeExamplesPage from './components/ResumeExamplesPage';
@@ -965,19 +965,27 @@ const App: React.FC = () => {
     setWorkspaceResetKey((k) => k + 1);
   };
 
-  const finishUserOnboarding = async (answers: CareerOnboardingAnswers) => {
+  const finishUserOnboarding = async (submission: CareerOnboardingSubmission) => {
     if (!currentUser) return;
 
+    const { resumeFileData, ...answers } = submission;
     setIsSavingUserOnboarding(true);
     setUserOnboardingError(null);
+    setError(null);
     try {
+      await importResumeFileToWorkspace({
+        role: currentUser.role,
+        plan: currentUser.plan,
+        importFormat: 'ats',
+        fileData: resumeFileData,
+      }, 'Importing onboarding resume to Editor');
       await saveCareerOnboardingProfile(answers);
       setShowUserOnboarding(false);
       setShowCareerObjectiveReminder(false);
       setActiveTab('workspace');
       setGeneratorTab('create');
     } catch (err: any) {
-      setUserOnboardingError(err?.message || 'Could not save your career profile answers.');
+      setUserOnboardingError(err?.message || 'Could not complete your career profile setup.');
     } finally {
       setIsSavingUserOnboarding(false);
     }
@@ -1334,49 +1342,53 @@ const App: React.FC = () => {
       };
   };
 
+  const importResumeFileToWorkspace = async (data: UserInputData, activityDetails = 'Importing document to Editor') => {
+    if (!currentUser) return;
+
+    authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', activityDetails);
+    const parsedResults = await parseResumeUpload({
+      importFormat: data.importFormat || 'ats',
+      fileData: data.fileData!,
+    });
+
+    if (parsedResults.resume) {
+        const mappedData = mapJsonToState({ RESUME_JSON: parsedResults.resume });
+        const templateId = selectedTemplateId || data.templateId || DEFAULT_IMPORTED_TEMPLATE_ID;
+        const importedContent: UserInputData = {
+          role: data.role,
+          plan: data.plan,
+          jobDescription: data.jobDescription,
+          jobUrl: data.jobUrl,
+          ...mappedData,
+          templateId,
+        };
+        const importedTitle = computeImportedResumeTitle(importedContent);
+        const saved = await saveResume({
+          templateId,
+          title: importedTitle,
+          content: importedContent,
+        });
+        setSelectedTemplateId(templateId);
+        setEditorData(mappedData);
+        setLoadedResumeId(saved.id);
+        setLoadedResumeTitle(importedTitle);
+        setWorkspaceResetKey((k) => k + 1);
+        await saveDraft({
+          templateId,
+          content: importedContent,
+        });
+        setGeneratorTab('create');
+    } else {
+        throw new Error("Could not parse resume data structure.");
+    }
+  };
+
   const handleImport = async (data: UserInputData) => {
     if (!currentUser) return;
     setIsLoading(true);
     setError(null);
     try {
-        authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', 'Importing document to Editor');
-        const parsedResults = await parseResumeUpload({
-          importFormat: data.importFormat || 'ats',
-          fileData: data.fileData!,
-        });
-        
-        if (parsedResults.resume) {
-            const mappedData = mapJsonToState({ RESUME_JSON: parsedResults.resume });
-            const templateId = selectedTemplateId || data.templateId || DEFAULT_IMPORTED_TEMPLATE_ID;
-            const importedContent: UserInputData = {
-              role: data.role,
-              plan: data.plan,
-              jobDescription: data.jobDescription,
-              jobUrl: data.jobUrl,
-              ...mappedData,
-              templateId,
-            };
-            const importedTitle = computeImportedResumeTitle(importedContent);
-            const saved = await saveResume({
-              templateId,
-              title: importedTitle,
-              content: importedContent,
-            });
-            setSelectedTemplateId(templateId);
-            setEditorData(mappedData);
-            setLoadedResumeId(saved.id);
-            setLoadedResumeTitle(importedTitle);
-            setWorkspaceResetKey((k) => k + 1);
-            // Persist imported result as the latest draft (workspace state)
-            await saveDraft({
-              templateId,
-              content: importedContent,
-            });
-            // Switch to Create tab to show the editor
-            setGeneratorTab('create');
-        } else {
-            throw new Error("Could not parse resume data structure.");
-        }
+        await importResumeFileToWorkspace(data);
     } catch (err: any) {
         setError(err.message || "Failed to import resume.");
     } finally {

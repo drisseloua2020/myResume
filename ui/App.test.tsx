@@ -201,13 +201,37 @@ describe('App import flow', () => {
       'Improve resume wording',
     ];
 
-    for (const [index, selection] of selections.entries()) {
+    for (const selection of selections) {
       await user.click(screen.getByRole('button', { name: new RegExp(selection, 'i') }));
       await user.click(screen.getByRole('button', {
-        name: index === selections.length - 1 ? /^complete profile$/i : /^next$/i,
+        name: /^next$/i,
       }));
     }
 
+    expect(screen.getByRole('heading', { name: /Upload your resume to complete your profile/i })).toBeInTheDocument();
+    const completeButton = screen.getByRole('button', { name: /^complete profile$/i });
+    expect(completeButton).toBeDisabled();
+
+    await user.upload(
+      screen.getByLabelText(/upload resume/i),
+      new File(['resume'], 'alex-onboarding.pdf', { type: 'application/pdf' }),
+    );
+    expect(await screen.findByText('alex-onboarding.pdf')).toBeInTheDocument();
+    await user.click(completeButton);
+
+    await waitFor(() => {
+      expect(parseResumeUpload).toHaveBeenCalledWith(expect.objectContaining({
+        importFormat: 'ats',
+        fileData: expect.objectContaining({
+          mimeType: 'application/pdf',
+          data: expect.any(String),
+          name: 'alex-onboarding.pdf',
+        }),
+      }));
+    });
+    await waitFor(() => {
+      expect(saveResume).toHaveBeenCalledTimes(1);
+    });
     await waitFor(() => {
       expect(saveCareerOnboardingProfile).toHaveBeenCalledWith(expect.objectContaining({
         currentExperience: 'Experienced specialist',
@@ -220,6 +244,7 @@ describe('App import flow', () => {
         supportNeeds: 'Improve resume wording',
       }));
     });
+    expect(vi.mocked(saveCareerOnboardingProfile).mock.calls[0][0]).not.toHaveProperty('resumeFileData');
     expect(await screen.findByPlaceholderText('First Name')).toBeInTheDocument();
   });
 
