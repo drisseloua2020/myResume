@@ -58,12 +58,23 @@ describe('UserOnboarding', () => {
       'Improve resume wording',
     ];
 
-    for (const [index, selection] of selections.entries()) {
+    for (const selection of selections) {
       await user.click(screen.getByRole('button', { name: new RegExp(selection, 'i') }));
       await user.click(screen.getByRole('button', {
-        name: index === selections.length - 1 ? /^complete profile$/i : /^next$/i,
+        name: /^next$/i,
       }));
     }
+
+    expect(screen.getByRole('heading', { name: /Upload your resume to complete your profile/i })).toBeInTheDocument();
+    const completeButton = screen.getByRole('button', { name: /^complete profile$/i });
+    expect(completeButton).toBeDisabled();
+
+    await user.upload(
+      screen.getByLabelText(/upload resume/i),
+      new File(['resume'], 'samanta-resume.pdf', { type: 'application/pdf' }),
+    );
+    expect(await screen.findByText('samanta-resume.pdf')).toBeInTheDocument();
+    await user.click(completeButton);
 
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
       currentExperience: 'Experienced specialist',
@@ -74,6 +85,11 @@ describe('UserOnboarding', () => {
       futureGoal: 'Move into management',
       jobPreferences: 'Remote-first roles',
       supportNeeds: 'Improve resume wording',
+      resumeFileData: expect.objectContaining({
+        mimeType: 'application/pdf',
+        data: expect.any(String),
+        name: 'samanta-resume.pdf',
+      }),
     }));
   });
 

@@ -51,6 +51,50 @@ class LinkedInImportOut(StrictModel):
     warnings: list[str]
 
 
+class CareerOnboardingProfileIn(StrictModel):
+    currentExperience: str = Field(min_length=1, max_length=120)
+    strengths: str = Field(min_length=1, max_length=120)
+    targetRoles: str = Field(min_length=1, max_length=120)
+    marketStatus: str = Field(min_length=1, max_length=120)
+    shortTermGoal: str = Field(min_length=1, max_length=120)
+    futureGoal: str = Field(min_length=1, max_length=120)
+    jobPreferences: str = Field(min_length=1, max_length=120)
+    supportNeeds: str = Field(min_length=1, max_length=120)
+
+
+class CareerOnboardingProfileOut(CareerOnboardingProfileIn):
+    id: str
+    userId: str
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class CareerOnboardingProfileEnvelope(StrictModel):
+    profile: CareerOnboardingProfileOut | None
+
+
+class GenerateCareerProfileAnalysisIn(StrictModel):
+    resumeId: str | None = Field(default=None, max_length=64)
+
+
+class CareerProfileAnalysisOut(StrictModel):
+    id: str
+    userId: str
+    onboardingProfileId: str | None
+    resumeId: str | None
+    profileCategory: str
+    resumeCategory: str
+    recommendedJobFamily: str
+    skillFocus: str
+    analysis: dict[str, Any]
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class CareerProfileAnalysisEnvelope(StrictModel):
+    analysis: CareerProfileAnalysisOut | None
+
+
 class CreateJobApplicationIn(StrictModel):
     status: CareerStatus = "saved"
     title: str | None = Field(default=None, max_length=200)

@@ -9,6 +9,7 @@ import { fetchApiAssetDataUrl } from '../services/apiClient';
 import { uploadProfilePhoto } from '../services/uploadService';
 import { generateCoverLetter } from '../services/coverLetterService';
 import { analyzeCareer, CareerAnalysisReport } from '../services/careerService';
+import { IMPORT_DOCUMENT_ACCEPT, getImportDocumentMimeType, readImportDocumentFile } from '../utils/resumeImport';
 
 interface ResumeInputProps {
   onImport: (data: UserInputData) => void;
@@ -256,26 +257,6 @@ const EmptyResumePreview: React.FC = () => (
     className="resume-page bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto shadow-2xl print:shadow-none"
   />
 );
-
-const IMPORT_DOCUMENT_TYPES: Record<string, string> = {
-  'application/pdf': '.pdf',
-  'application/msword': '.doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-};
-
-const IMPORT_DOCUMENT_ACCEPT = [
-  ...Object.keys(IMPORT_DOCUMENT_TYPES),
-  ...Object.values(IMPORT_DOCUMENT_TYPES),
-].join(',');
-
-function getImportDocumentMimeType(file: File): string | null {
-  if (file.type && IMPORT_DOCUMENT_TYPES[file.type]) return file.type;
-  const lowerName = file.name.toLowerCase();
-  if (lowerName.endsWith('.pdf')) return 'application/pdf';
-  if (lowerName.endsWith('.doc')) return 'application/msword';
-  if (lowerName.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  return null;
-}
 
 function slugifyFilename(value: string): string {
   return value
@@ -904,22 +885,23 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   }, [personalDetails.country, personalDetails.state]);
 
   // Handlers
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const mimeType = getImportDocumentMimeType(file);
-      if (!mimeType) {
+      if (!getImportDocumentMimeType(file)) {
         alert("Supported ATS resume formats: PDF, DOC, DOCX.");
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFileData({ mimeType, data: (reader.result as string).split(',')[1], name: file.name });
+      try {
+        const documentData = await readImportDocumentFile(file);
+        setFileName(file.name);
+        setFileData(documentData);
         setCurrentResumeText('');
-      };
-      reader.readAsDataURL(file);
+      } catch (err: any) {
+        alert(err?.message || "Supported ATS resume formats: PDF, DOC, DOCX.");
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
     }
   };
 

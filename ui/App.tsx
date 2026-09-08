@@ -5,6 +5,7 @@ import ResumeInput from './components/ResumeInput';
 import ResumeLibraryPage from './components/ResumeLibraryPage';
 import CoverLettersPage from './components/CoverLettersPage';
 import ProfileSyncPage from './components/ProfileSyncPage';
+import CareerProfileAnalysisPage from './components/CareerProfileAnalysisPage';
 import AdminActivityLogsPage from './components/AdminActivityLogsPage';
 import AdminAgentUpdatesPage from './components/AdminAgentUpdatesPage';
 import AdminContactMessagesPage from './components/AdminContactMessagesPage';
@@ -14,7 +15,7 @@ import AuthScreen from './components/AuthScreen';
 import ContactPage from './components/ContactPage';
 import AccountSettings from './components/AccountSettings';
 import TemplateSelector from './components/TemplateSelector';
-import UserOnboarding, { CareerOnboardingAnswers } from './components/UserOnboarding';
+import UserOnboarding, { type CareerOnboardingSubmission } from './components/UserOnboarding';
 import CareerBlogPage from './components/CareerBlogPage';
 import ResumeGuidePage from './components/ResumeGuidePage';
 import ResumeExamplesPage from './components/ResumeExamplesPage';
@@ -27,38 +28,10 @@ import { getOAuthBackendCallbackRedirect, isOAuthCallbackPath } from './services
 import { agentService } from './services/agentService';
 import { saveDraft, getLatestResume, parseResumeUpload, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
+import { generateCareerProfileAnalysis, getCareerOnboardingProfile, saveCareerOnboardingProfile } from './services/onboardingService';
 import { UserInputData, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
 
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
-const CAREER_ONBOARDING_STORAGE_PREFIX = 'rf_career_onboarding';
-
-type CareerOnboardingRecord = {
-  status: 'completed';
-  answers?: CareerOnboardingAnswers;
-  completedAt?: string;
-};
-
-const saveCareerOnboardingRecord = (userId: string, record: CareerOnboardingRecord) => {
-  try {
-    localStorage.setItem(`${CAREER_ONBOARDING_STORAGE_PREFIX}:${userId}`, JSON.stringify(record));
-  } catch {
-    // Onboarding state should never block the resume editor.
-  }
-};
-
-const getCareerOnboardingRecord = (userId: string): CareerOnboardingRecord | null => {
-  try {
-    const raw = localStorage.getItem(`${CAREER_ONBOARDING_STORAGE_PREFIX}:${userId}`);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as Partial<CareerOnboardingRecord>;
-    return parsed.status === 'completed'
-      ? parsed as CareerOnboardingRecord
-      : null;
-  } catch {
-    return null;
-  }
-};
 
 const cleanImportedText = (value: unknown): string => {
   if (value === null || value === undefined) return '';
@@ -728,12 +701,16 @@ const App: React.FC = () => {
   const [generatorTab, setGeneratorTab] = useState<'create' | 'upload' | 'cover_letter'>('create');
   const [showUserOnboarding, setShowUserOnboarding] = useState(false);
   const [showCareerObjectiveReminder, setShowCareerObjectiveReminder] = useState(false);
+  const [isCheckingUserOnboarding, setIsCheckingUserOnboarding] = useState(false);
+  const [isSavingUserOnboarding, setIsSavingUserOnboarding] = useState(false);
+  const [userOnboardingError, setUserOnboardingError] = useState<string | null>(null);
 
   // State to hold imported data for the editor
   const [editorData, setEditorData] = useState<Partial<UserInputData> | null>(null);
   const [loadedResumeId, setLoadedResumeId] = useState<string | null>(null);
   const [loadedResumeTitle, setLoadedResumeTitle] = useState<string | null>(null);
   const initialResumeLoadUserRef = useRef<string | null>(null);
+  const onboardingStateRequestRef = useRef(0);
   const emptyVisibleEditorDataRef = useRef<Partial<UserInputData>>(emptyEditorData());
   const visibleEditorData = editorData ?? emptyVisibleEditorDataRef.current;
 
@@ -759,6 +736,10 @@ const App: React.FC = () => {
       setGeneratorTab('create');
       setShowUserOnboarding(false);
       setShowCareerObjectiveReminder(false);
+      setIsCheckingUserOnboarding(false);
+      setIsSavingUserOnboarding(false);
+      setUserOnboardingError(null);
+      onboardingStateRequestRef.current += 1;
       setActiveTab('workspace');
       // Force editor remount next time user logs in
       setWorkspaceResetKey((k) => k + 1);
@@ -872,9 +853,13 @@ const App: React.FC = () => {
           if (u) {
             setCurrentUser(u);
             if (u.role === 'admin') {
+              onboardingStateRequestRef.current += 1;
               setActiveTab('admin_logs');
               setShowUserOnboarding(false);
               setShowCareerObjectiveReminder(false);
+              setIsCheckingUserOnboarding(false);
+              setIsSavingUserOnboarding(false);
+              setUserOnboardingError(null);
               checkAgentUpdates();
               return;
             }
@@ -910,16 +895,29 @@ const App: React.FC = () => {
   };
 
   const applyCareerOnboardingState = (user: User) => {
-    const record = getCareerOnboardingRecord(user.id);
-
-    if (record?.status === 'completed') {
-      setShowUserOnboarding(false);
-      setShowCareerObjectiveReminder(false);
-      return;
-    }
-
-    setShowUserOnboarding(true);
+    const requestId = onboardingStateRequestRef.current + 1;
+    onboardingStateRequestRef.current = requestId;
+    setShowUserOnboarding(false);
     setShowCareerObjectiveReminder(false);
+    setUserOnboardingError(null);
+    setIsCheckingUserOnboarding(true);
+
+    void getCareerOnboardingProfile()
+      .then((profile) => {
+        if (onboardingStateRequestRef.current !== requestId) return;
+        setShowUserOnboarding(!profile);
+        setShowCareerObjectiveReminder(false);
+      })
+      .catch((err: any) => {
+        if (onboardingStateRequestRef.current !== requestId) return;
+        setUserOnboardingError(err?.message || 'Could not check your saved career profile.');
+        setShowUserOnboarding(true);
+        setShowCareerObjectiveReminder(false);
+      })
+      .finally(() => {
+        if (onboardingStateRequestRef.current !== requestId) return;
+        setIsCheckingUserOnboarding(false);
+      });
   };
 
   const handleLogin = (user: User, initialTemplateId?: string) => {
@@ -929,9 +927,13 @@ const App: React.FC = () => {
     setLoadedResumeTitle(null);
     initialResumeLoadUserRef.current = null;
     if (user.role === 'admin') {
+      onboardingStateRequestRef.current += 1;
       setActiveTab('admin_logs');
       setShowUserOnboarding(false);
       setShowCareerObjectiveReminder(false);
+      setIsCheckingUserOnboarding(false);
+      setIsSavingUserOnboarding(false);
+      setUserOnboardingError(null);
       return;
     }
     if (initialTemplateId) {
@@ -957,24 +959,42 @@ const App: React.FC = () => {
     setAgentUpdates([]);
     setShowUserOnboarding(false);
     setShowCareerObjectiveReminder(false);
+    setIsCheckingUserOnboarding(false);
+    setIsSavingUserOnboarding(false);
+    setUserOnboardingError(null);
+    onboardingStateRequestRef.current += 1;
     setWorkspaceResetKey((k) => k + 1);
   };
 
-  const finishUserOnboarding = (answers: CareerOnboardingAnswers) => {
-    if (currentUser) {
-      saveCareerOnboardingRecord(currentUser.id, {
-        status: 'completed',
-        answers,
-        completedAt: new Date().toISOString(),
-      });
+  const finishUserOnboarding = async (submission: CareerOnboardingSubmission) => {
+    if (!currentUser) return;
+
+    const { resumeFileData, ...answers } = submission;
+    setIsSavingUserOnboarding(true);
+    setUserOnboardingError(null);
+    setError(null);
+    try {
+      const importedResume = await importResumeFileToWorkspace({
+        role: currentUser.role,
+        plan: currentUser.plan,
+        importFormat: 'ats',
+        fileData: resumeFileData,
+      }, 'Importing onboarding resume to Editor');
+      await saveCareerOnboardingProfile(answers);
+      await generateCareerProfileAnalysis({ resumeId: importedResume?.id });
+      setShowUserOnboarding(false);
+      setShowCareerObjectiveReminder(false);
+      setActiveTab('profile_analysis');
+      setGeneratorTab('create');
+    } catch (err: any) {
+      setUserOnboardingError(err?.message || 'Could not complete your career profile setup.');
+    } finally {
+      setIsSavingUserOnboarding(false);
     }
-    setShowUserOnboarding(false);
-    setShowCareerObjectiveReminder(false);
-    setActiveTab('workspace');
-    setGeneratorTab('create');
   };
 
   const skipUserOnboarding = () => {
+    setUserOnboardingError(null);
     setShowUserOnboarding(false);
     setShowCareerObjectiveReminder(true);
     setActiveTab('workspace');
@@ -1324,49 +1344,59 @@ const App: React.FC = () => {
       };
   };
 
+  const importResumeFileToWorkspace = async (data: UserInputData, activityDetails = 'Importing document to Editor') => {
+    if (!currentUser) return;
+
+    authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', activityDetails);
+    const parsedResults = await parseResumeUpload({
+      importFormat: data.importFormat || 'ats',
+      fileData: data.fileData!,
+    });
+
+    if (parsedResults.resume) {
+        const mappedData = mapJsonToState({ RESUME_JSON: parsedResults.resume });
+        const templateId = selectedTemplateId || data.templateId || DEFAULT_IMPORTED_TEMPLATE_ID;
+        const importedContent: UserInputData = {
+          role: data.role,
+          plan: data.plan,
+          jobDescription: data.jobDescription,
+          jobUrl: data.jobUrl,
+          ...mappedData,
+          templateId,
+        };
+        const importedTitle = computeImportedResumeTitle(importedContent);
+        const saved = await saveResume({
+          templateId,
+          title: importedTitle,
+          content: importedContent,
+        });
+        setSelectedTemplateId(templateId);
+        setEditorData(mappedData);
+        setLoadedResumeId(saved.id);
+        setLoadedResumeTitle(importedTitle);
+        setWorkspaceResetKey((k) => k + 1);
+        await saveDraft({
+          templateId,
+          content: importedContent,
+        });
+        setGeneratorTab('create');
+        return {
+          id: saved.id,
+          templateId,
+          title: importedTitle,
+          content: importedContent,
+        };
+    } else {
+        throw new Error("Could not parse resume data structure.");
+    }
+  };
+
   const handleImport = async (data: UserInputData) => {
     if (!currentUser) return;
     setIsLoading(true);
     setError(null);
     try {
-        authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', 'Importing document to Editor');
-        const parsedResults = await parseResumeUpload({
-          importFormat: data.importFormat || 'ats',
-          fileData: data.fileData!,
-        });
-        
-        if (parsedResults.resume) {
-            const mappedData = mapJsonToState({ RESUME_JSON: parsedResults.resume });
-            const templateId = selectedTemplateId || data.templateId || DEFAULT_IMPORTED_TEMPLATE_ID;
-            const importedContent: UserInputData = {
-              role: data.role,
-              plan: data.plan,
-              jobDescription: data.jobDescription,
-              jobUrl: data.jobUrl,
-              ...mappedData,
-              templateId,
-            };
-            const importedTitle = computeImportedResumeTitle(importedContent);
-            const saved = await saveResume({
-              templateId,
-              title: importedTitle,
-              content: importedContent,
-            });
-            setSelectedTemplateId(templateId);
-            setEditorData(mappedData);
-            setLoadedResumeId(saved.id);
-            setLoadedResumeTitle(importedTitle);
-            setWorkspaceResetKey((k) => k + 1);
-            // Persist imported result as the latest draft (workspace state)
-            await saveDraft({
-              templateId,
-              content: importedContent,
-            });
-            // Switch to Create tab to show the editor
-            setGeneratorTab('create');
-        } else {
-            throw new Error("Could not parse resume data structure.");
-        }
+        await importResumeFileToWorkspace(data);
     } catch (err: any) {
         setError(err.message || "Failed to import resume.");
     } finally {
@@ -1448,6 +1478,10 @@ const App: React.FC = () => {
 
     if (activeTab === 'career_tools') {
       return <CareerToolkitPage currentResume={visibleEditorData as UserInputData} />;
+    }
+
+    if (activeTab === 'profile_analysis') {
+      return <CareerProfileAnalysisPage />;
     }
 
     if (activeTab === 'resumes') {
@@ -1550,11 +1584,20 @@ const App: React.FC = () => {
              {error}
           </div>
         )}
-        {showUserOnboarding ? (
+        {isCheckingUserOnboarding ? (
+          <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-white px-4">
+            <div className="rounded-lg border border-slate-200 bg-white px-6 py-5 text-center shadow-sm" role="status">
+              <p className="text-sm font-bold text-slate-900">Preparing Samanta...</p>
+              <p className="mt-1 text-sm text-slate-500">Checking your saved career profile.</p>
+            </div>
+          </div>
+        ) : showUserOnboarding ? (
           <UserOnboarding
             user={currentUser}
             onComplete={finishUserOnboarding}
             onSkip={skipUserOnboarding}
+            isSaving={isSavingUserOnboarding}
+            error={userOnboardingError}
           />
         ) : (
           <>

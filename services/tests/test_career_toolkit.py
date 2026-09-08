@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from sqlalchemy import select
+
+from app.models.entities import CareerOnboardingProfile, CareerProfileAnalysis
+
 
 def _signup(client, email: str = "career@example.com") -> str:
     response = client.post(
@@ -55,6 +59,121 @@ Responsibilities
 Requirements
 - Experience with AWS, Terraform, Python, security, and stakeholder communication.
 - Preferred AWS Certified background."""
+
+
+def _onboarding_answers(**overrides) -> dict:
+    answers = {
+        "currentExperience": "Early career professional",
+        "strengths": "Technical skills",
+        "targetRoles": "Software and IT",
+        "marketStatus": "Actively applying",
+        "shortTermGoal": "Build a resume from scratch",
+        "futureGoal": "Become a senior expert",
+        "jobPreferences": "Remote-first roles",
+        "supportNeeds": "Improve resume wording",
+    }
+    answers.update(overrides)
+    return answers
+
+
+def test_career_onboarding_profile_is_saved_one_to_one_per_user(client, db_session):
+    token = _signup(client, "career-onboarding@example.com")
+    headers = _headers(token)
+
+    empty = client.get("/career/onboarding-profile", headers=headers)
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["profile"] is None
+
+    saved = client.put("/career/onboarding-profile", headers=headers, json=_onboarding_answers())
+    assert saved.status_code == 200, saved.text
+    profile = saved.json()["profile"]
+    assert profile["userId"]
+    assert profile["targetRoles"] == "Software and IT"
+    first_profile_id = profile["id"]
+
+    updated = client.put(
+        "/career/onboarding-profile",
+        headers=headers,
+        json=_onboarding_answers(targetRoles="Customer success", supportNeeds="Match me to roles"),
+    )
+    assert updated.status_code == 200, updated.text
+    updated_profile = updated.json()["profile"]
+    assert updated_profile["id"] == first_profile_id
+    assert updated_profile["targetRoles"] == "Customer success"
+    assert updated_profile["supportNeeds"] == "Match me to roles"
+
+    db_session.expire_all()
+    rows = db_session.scalars(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == profile["userId"])).all()
+    assert len(rows) == 1
+
+    other_token = _signup(client, "career-onboarding-other@example.com")
+    other = client.get("/career/onboarding-profile", headers=_headers(other_token))
+    assert other.status_code == 200, other.text
+    assert other.json()["profile"] is None
+
+
+def test_profile_analysis_combines_resume_and_onboarding_profile(client, db_session):
+    token = _signup(client, "career-profile-analysis@example.com")
+    headers = _headers(token)
+
+    created_resume = client.post(
+        "/resumes",
+        headers=headers,
+        json={"templateId": "modern_tech", "title": "Jordan Resume", "content": _resume()},
+    )
+    assert created_resume.status_code == 201, created_resume.text
+    resume_id = created_resume.json()["id"]
+
+    saved_profile = client.put(
+        "/career/onboarding-profile",
+        headers=headers,
+        json=_onboarding_answers(targetRoles="Software and IT", futureGoal="Become a senior expert"),
+    )
+    assert saved_profile.status_code == 200, saved_profile.text
+
+    generated = client.post("/career/profile-analysis", headers=headers, json={"resumeId": resume_id})
+    assert generated.status_code == 200, generated.text
+    analysis = generated.json()["analysis"]
+    assert analysis["resumeId"] == resume_id
+    assert analysis["profileCategory"] == "Technical Career Builder"
+    assert analysis["resumeCategory"] == "Technical and IT resume"
+    assert analysis["recommendedJobFamily"] == "Software, IT, cloud, data, and systems roles"
+    assert analysis["skillFocus"]
+    assert analysis["analysis"]["profileCategory"]["label"] == analysis["profileCategory"]
+    assert analysis["analysis"]["resume"]["readinessScore"] >= 50
+    assert analysis["analysis"]["thingsNeeded"]["prioritySkills"]
+    assert analysis["analysis"]["jobTargets"]["recommendedTitles"][0]["autoAgentApply"]["status"]
+
+    fetched = client.get("/career/profile-analysis", headers=headers)
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["analysis"]["id"] == analysis["id"]
+
+    generated_again = client.post("/career/profile-analysis", headers=headers, json={})
+    assert generated_again.status_code == 200, generated_again.text
+    assert generated_again.json()["analysis"]["id"] == analysis["id"]
+
+    db_session.expire_all()
+    rows = db_session.scalars(select(CareerProfileAnalysis).where(CareerProfileAnalysis.user_id == analysis["userId"])).all()
+    assert len(rows) == 1
+
+    exported = client.get("/career/data-export", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert exported.json()["profileAnalysis"]["id"] == analysis["id"]
+
+
+def test_profile_analysis_requires_onboarding_and_resume(client):
+    token = _signup(client, "career-profile-analysis-missing@example.com")
+    headers = _headers(token)
+
+    missing_profile = client.post("/career/profile-analysis", headers=headers, json={})
+    assert missing_profile.status_code == 400, missing_profile.text
+
+    saved_profile = client.put("/career/onboarding-profile", headers=headers, json=_onboarding_answers())
+    assert saved_profile.status_code == 200, saved_profile.text
+
+    missing_resume = client.post("/career/profile-analysis", headers=headers, json={})
+    assert missing_resume.status_code == 400, missing_resume.text
+    assert "resume" in missing_resume.json()["detail"].lower()
 
 
 def test_career_analyze_scores_resume_and_reports_keywords(client):

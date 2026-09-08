@@ -14,6 +14,7 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
   const isAdmin = currentUser.role === 'admin';
 
   const userTabs: Tab[] = [
+    { key: 'profile_analysis', label: 'Profile Analysis' },
     { key: 'resumes', label: 'View Resume' },
     { key: 'career_tools', label: 'Career Toolkit' },
     { key: 'cover_letters', label: 'Cover Letters' },
