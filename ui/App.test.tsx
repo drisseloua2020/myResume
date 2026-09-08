@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { authService } from './services/authService';
 import {
+  getCareerOnboardingProfile,
+  saveCareerOnboardingProfile,
+  type CareerOnboardingProfile,
+} from './services/onboardingService';
+import {
   deleteResume,
   getLatestDraft,
   getLatestResume,
@@ -57,6 +62,11 @@ vi.mock('./services/resumeService', () => ({
   updateResume: vi.fn(),
 }));
 
+vi.mock('./services/onboardingService', () => ({
+  getCareerOnboardingProfile: vi.fn(),
+  saveCareerOnboardingProfile: vi.fn(),
+}));
+
 vi.mock('./services/locationService', () => ({
   locationService: {
     getCountries: vi.fn().mockResolvedValue(['United States']),
@@ -81,21 +91,31 @@ const parsedResumeResult = (resume: Record<string, unknown>) => ({
   atsReport: {},
 });
 
-const careerOnboardingStorageKey = 'rf_career_onboarding:usr_1';
-const completedCareerOnboardingRecord = JSON.stringify({
-  status: 'completed',
-  completedAt: '2026-09-07T00:00:00.000Z',
-});
+const completedCareerOnboardingProfile: CareerOnboardingProfile = {
+  id: 'onb_1',
+  userId: 'usr_1',
+  currentExperience: 'Early career professional',
+  strengths: 'Technical skills',
+  targetRoles: 'Software and IT',
+  marketStatus: 'Actively applying',
+  shortTermGoal: 'Build a resume from scratch',
+  futureGoal: 'Become a senior expert',
+  jobPreferences: 'Remote-first roles',
+  supportNeeds: 'Improve resume wording',
+  createdAt: '2026-09-07T00:00:00.000Z',
+  updatedAt: '2026-09-07T00:00:00.000Z',
+};
 
 describe('App import flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    localStorage.setItem(careerOnboardingStorageKey, completedCareerOnboardingRecord);
     window.history.replaceState({}, '', '/');
     vi.mocked(authService.getCurrentUser).mockReturnValue(testUser);
     vi.mocked(authService.login).mockResolvedValue(testUser);
     vi.mocked(authService.refreshMe).mockResolvedValue(testUser);
+    vi.mocked(getCareerOnboardingProfile).mockResolvedValue(completedCareerOnboardingProfile);
+    vi.mocked(saveCareerOnboardingProfile).mockResolvedValue(completedCareerOnboardingProfile);
     vi.mocked(getLatestResume).mockResolvedValue(null);
     vi.mocked(getLatestDraft).mockResolvedValue(null);
     vi.mocked(listResumes).mockResolvedValue([]);
@@ -129,7 +149,7 @@ describe('App import flow', () => {
 
   it('shows user onboarding after email login and opens the editor after skip', async () => {
     const user = userEvent.setup();
-    localStorage.removeItem(careerOnboardingStorageKey);
+    vi.mocked(getCareerOnboardingProfile).mockResolvedValueOnce(null);
     vi.mocked(authService.getCurrentUser).mockReturnValueOnce(null);
     vi.mocked(authService.login).mockResolvedValueOnce(testUser);
 
@@ -148,12 +168,12 @@ describe('App import flow', () => {
     await user.click(screen.getByRole('button', { name: /skip for now/i }));
 
     expect(await screen.findByText(/Clarify your career objectives later/i)).toBeInTheDocument();
-    expect(localStorage.getItem(careerOnboardingStorageKey)).toBeNull();
+    expect(saveCareerOnboardingProfile).not.toHaveBeenCalled();
     expect(screen.getByPlaceholderText('First Name')).toBeInTheDocument();
   });
 
   it('shows onboarding again for signed-in users until profile answers are completed', async () => {
-    localStorage.removeItem(careerOnboardingStorageKey);
+    vi.mocked(getCareerOnboardingProfile).mockResolvedValueOnce(null);
 
     render(<App />);
 
@@ -162,21 +182,49 @@ describe('App import flow', () => {
     expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
   });
 
-  it('ignores skipped onboarding records so the assistant returns on login', async () => {
-    localStorage.setItem(careerOnboardingStorageKey, JSON.stringify({
-      status: 'skipped',
-      skippedAt: '2026-09-07T00:00:00.000Z',
-    }));
+  it('saves completed onboarding answers to the database and opens the editor', async () => {
+    const user = userEvent.setup();
+    vi.mocked(getCareerOnboardingProfile).mockResolvedValueOnce(null);
 
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: /Where are you starting from today/i })).toBeInTheDocument();
-    expect(screen.getByText(/Hi, I am Samanta/i)).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('First Name')).not.toBeInTheDocument();
+
+    const selections = [
+      'Experienced specialist',
+      'Leadership and coaching',
+      'Customer success',
+      'Changing careers',
+      'Get ready to apply',
+      'Move into management',
+      'Remote-first roles',
+      'Improve resume wording',
+    ];
+
+    for (const [index, selection] of selections.entries()) {
+      await user.click(screen.getByRole('button', { name: new RegExp(selection, 'i') }));
+      await user.click(screen.getByRole('button', {
+        name: index === selections.length - 1 ? /^complete profile$/i : /^next$/i,
+      }));
+    }
+
+    await waitFor(() => {
+      expect(saveCareerOnboardingProfile).toHaveBeenCalledWith(expect.objectContaining({
+        currentExperience: 'Experienced specialist',
+        strengths: 'Leadership and coaching',
+        targetRoles: 'Customer success',
+        marketStatus: 'Changing careers',
+        shortTermGoal: 'Get ready to apply',
+        futureGoal: 'Move into management',
+        jobPreferences: 'Remote-first roles',
+        supportNeeds: 'Improve resume wording',
+      }));
+    });
+    expect(await screen.findByPlaceholderText('First Name')).toBeInTheDocument();
   });
 
   it('shows user onboarding after a Google OAuth callback', async () => {
-    localStorage.removeItem(careerOnboardingStorageKey);
+    vi.mocked(getCareerOnboardingProfile).mockResolvedValueOnce(null);
     window.history.replaceState({}, '', '/?token=oauth-token');
     vi.mocked(authService.refreshMe).mockResolvedValueOnce(testUser);
 

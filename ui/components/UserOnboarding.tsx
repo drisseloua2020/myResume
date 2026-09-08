@@ -352,11 +352,13 @@ const emptyAnswers: CareerOnboardingAnswers = {
 
 interface UserOnboardingProps {
   user: User;
-  onComplete: (answers: CareerOnboardingAnswers) => void;
+  onComplete: (answers: CareerOnboardingAnswers) => void | Promise<void>;
   onSkip: () => void;
+  isSaving?: boolean;
+  error?: string | null;
 }
 
-const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSkip }) => {
+const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSkip, isSaving = false, error = null }) => {
   const [answers, setAnswers] = useState<CareerOnboardingAnswers>(emptyAnswers);
   const [step, setStep] = useState(0);
 
@@ -378,9 +380,9 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
   };
 
   const continueOnboarding = () => {
-    if (!selectedAnswer) return;
+    if (!selectedAnswer || isSaving) return;
     if (isLastStep) {
-      onComplete(answers);
+      void onComplete(answers);
       return;
     }
     setStep((current) => Math.min(current + 1, careerOnboardingQuestions.length - 1));
@@ -505,11 +507,18 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
             </div>
           </div>
 
+          {error && (
+            <p className="mt-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">
+              {error}
+            </p>
+          )}
+
           <div className="mt-auto flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="button"
               onClick={onSkip}
-              className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2"
+              disabled={isSaving}
+              className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Skip for now
             </button>
@@ -517,17 +526,17 @@ const UserOnboarding: React.FC<UserOnboardingProps> = ({ user, onComplete, onSki
               <button
                 type="button"
                 onClick={goToPreviousStep}
-                disabled={step === 0}
+                disabled={step === 0 || isSaving}
                 className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Back
               </button>
               <button
                 type="submit"
-                disabled={!selectedAnswer}
+                disabled={!selectedAnswer || isSaving}
                 className="rounded bg-blue-700 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {isLastStep ? 'Complete profile' : 'Next'}
+                {isLastStep ? isSaving ? 'Saving profile' : 'Complete profile' : 'Next'}
               </button>
             </div>
           </div>

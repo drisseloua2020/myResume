@@ -74,6 +74,21 @@ class ResumeDraft(Base):
     content: Mapped[dict[str, Any] | list[Any] | str | int | float | bool | None] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+class CareerOnboardingProfile(Base):
+    __tablename__ = "career_onboarding_profiles"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_career_onboarding_profiles_user_id"),)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    current_experience: Mapped[str] = mapped_column(String(120), nullable=False)
+    strengths: Mapped[str] = mapped_column(String(120), nullable=False)
+    target_roles: Mapped[str] = mapped_column(String(120), nullable=False)
+    market_status: Mapped[str] = mapped_column(String(120), nullable=False)
+    short_term_goal: Mapped[str] = mapped_column(String(120), nullable=False)
+    future_goal: Mapped[str] = mapped_column(String(120), nullable=False)
+    job_preferences: Mapped[str] = mapped_column(String(120), nullable=False)
+    support_needs: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 class ResumeVersion(Base):
     __tablename__ = "resume_versions"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

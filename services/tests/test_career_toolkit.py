@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from sqlalchemy import select
+
+from app.models.entities import CareerOnboardingProfile
+
 
 def _signup(client, email: str = "career@example.com") -> str:
     response = client.post(
@@ -55,6 +59,57 @@ Responsibilities
 Requirements
 - Experience with AWS, Terraform, Python, security, and stakeholder communication.
 - Preferred AWS Certified background."""
+
+
+def _onboarding_answers(**overrides) -> dict:
+    answers = {
+        "currentExperience": "Early career professional",
+        "strengths": "Technical skills",
+        "targetRoles": "Software and IT",
+        "marketStatus": "Actively applying",
+        "shortTermGoal": "Build a resume from scratch",
+        "futureGoal": "Become a senior expert",
+        "jobPreferences": "Remote-first roles",
+        "supportNeeds": "Improve resume wording",
+    }
+    answers.update(overrides)
+    return answers
+
+
+def test_career_onboarding_profile_is_saved_one_to_one_per_user(client, db_session):
+    token = _signup(client, "career-onboarding@example.com")
+    headers = _headers(token)
+
+    empty = client.get("/career/onboarding-profile", headers=headers)
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["profile"] is None
+
+    saved = client.put("/career/onboarding-profile", headers=headers, json=_onboarding_answers())
+    assert saved.status_code == 200, saved.text
+    profile = saved.json()["profile"]
+    assert profile["userId"]
+    assert profile["targetRoles"] == "Software and IT"
+    first_profile_id = profile["id"]
+
+    updated = client.put(
+        "/career/onboarding-profile",
+        headers=headers,
+        json=_onboarding_answers(targetRoles="Customer success", supportNeeds="Match me to roles"),
+    )
+    assert updated.status_code == 200, updated.text
+    updated_profile = updated.json()["profile"]
+    assert updated_profile["id"] == first_profile_id
+    assert updated_profile["targetRoles"] == "Customer success"
+    assert updated_profile["supportNeeds"] == "Match me to roles"
+
+    db_session.expire_all()
+    rows = db_session.scalars(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == profile["userId"])).all()
+    assert len(rows) == 1
+
+    other_token = _signup(client, "career-onboarding-other@example.com")
+    other = client.get("/career/onboarding-profile", headers=_headers(other_token))
+    assert other.status_code == 200, other.text
+    assert other.json()["profile"] is None
 
 
 def test_career_analyze_scores_resume_and_reports_keywords(client):

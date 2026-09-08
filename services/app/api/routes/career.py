@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user, get_db
-from app.models.entities import Achievement, JobApplication, Resume, ResumeShare, ResumeVersion, User
+from app.models.entities import Achievement, CareerOnboardingProfile, JobApplication, Resume, ResumeShare, ResumeVersion, User
 from app.schemas.career import (
     AchievementOut,
     AchievementsEnvelope,
@@ -13,6 +13,9 @@ from app.schemas.career import (
     AnalyzeCareerOut,
     CareerAnalyticsOut,
     CareerFeatureCatalogOut,
+    CareerOnboardingProfileEnvelope,
+    CareerOnboardingProfileIn,
+    CareerOnboardingProfileOut,
     CreateAchievementIn,
     CreateJobApplicationIn,
     CreateResumeShareIn,
@@ -107,6 +110,63 @@ def _share_out(item: ResumeShare) -> ResumeShareOut:
         metadata=item.metadata_json,
         createdAt=item.created_at,
     )
+
+
+def _onboarding_profile_out(item: CareerOnboardingProfile) -> CareerOnboardingProfileOut:
+    return CareerOnboardingProfileOut(
+        id=item.id,
+        userId=item.user_id,
+        currentExperience=item.current_experience,
+        strengths=item.strengths,
+        targetRoles=item.target_roles,
+        marketStatus=item.market_status,
+        shortTermGoal=item.short_term_goal,
+        futureGoal=item.future_goal,
+        jobPreferences=item.job_preferences,
+        supportNeeds=item.support_needs,
+        createdAt=item.created_at,
+        updatedAt=item.updated_at,
+    )
+
+
+@router.get("/onboarding-profile", response_model=CareerOnboardingProfileEnvelope)
+def get_onboarding_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CareerOnboardingProfileEnvelope:
+    profile = db.scalar(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == current_user.id))
+    return CareerOnboardingProfileEnvelope(profile=_onboarding_profile_out(profile) if profile else None)
+
+
+@router.put("/onboarding-profile", response_model=CareerOnboardingProfileEnvelope)
+def save_onboarding_profile(payload: CareerOnboardingProfileIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CareerOnboardingProfileEnvelope:
+    profile = db.scalar(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == current_user.id))
+    if not profile:
+        profile = CareerOnboardingProfile(
+            id=new_prefixed_id("onb"),
+            user_id=current_user.id,
+            current_experience=payload.currentExperience,
+            strengths=payload.strengths,
+            target_roles=payload.targetRoles,
+            market_status=payload.marketStatus,
+            short_term_goal=payload.shortTermGoal,
+            future_goal=payload.futureGoal,
+            job_preferences=payload.jobPreferences,
+            support_needs=payload.supportNeeds,
+        )
+        db.add(profile)
+    else:
+        profile.current_experience = payload.currentExperience
+        profile.strengths = payload.strengths
+        profile.target_roles = payload.targetRoles
+        profile.market_status = payload.marketStatus
+        profile.short_term_goal = payload.shortTermGoal
+        profile.future_goal = payload.futureGoal
+        profile.job_preferences = payload.jobPreferences
+        profile.support_needs = payload.supportNeeds
+
+    db.flush()
+    log_activity(db, current_user.id, "CAREER_ONBOARDING_SAVE", details="Saved Samanta questionnaire answers", user_name=current_user.name)
+    db.commit()
+    db.refresh(profile)
+    return CareerOnboardingProfileEnvelope(profile=_onboarding_profile_out(profile))
 
 
 @router.post("/analyze", response_model=AnalyzeCareerOut)
@@ -325,10 +385,12 @@ def create_share(payload: CreateResumeShareIn, current_user: User = Depends(get_
 
 @router.get("/data-export", response_model=dict)
 def data_export(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict[str, object]:
+    onboarding_profile = db.scalar(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == current_user.id))
     jobs = db.scalars(select(JobApplication).where(JobApplication.user_id == current_user.id)).all()
     achievements = db.scalars(select(Achievement).where(Achievement.user_id == current_user.id)).all()
     versions = db.scalars(select(ResumeVersion).where(ResumeVersion.user_id == current_user.id)).all()
     return {
+        "onboardingProfile": _onboarding_profile_out(onboarding_profile).model_dump(mode="json") if onboarding_profile else None,
         "jobs": [_job_out(job).model_dump(mode="json") for job in jobs],
         "achievements": [_achievement_out(item).model_dump(mode="json") for item in achievements],
         "resumeVersions": [_version_out(item).model_dump(mode="json") for item in versions],
@@ -338,7 +400,7 @@ def data_export(current_user: User = Depends(get_current_user), db: Session = De
 
 @router.delete("/data", response_model=OkResponse)
 def delete_career_data(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> OkResponse:
-    for model in (JobApplication, Achievement, ResumeVersion, ResumeShare):
+    for model in (CareerOnboardingProfile, JobApplication, Achievement, ResumeVersion, ResumeShare):
         rows = db.scalars(select(model).where(model.user_id == current_user.id)).all()
         for row in rows:
             db.delete(row)
