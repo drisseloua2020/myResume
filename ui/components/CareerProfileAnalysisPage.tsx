@@ -25,9 +25,9 @@ const scoreColor = (score: number) => {
 const EmptyState: React.FC<{ onGenerate: () => void; isLoading: boolean }> = ({ onGenerate, isLoading }) => (
   <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
     <p className="text-sm font-bold uppercase text-blue-700">Profile analysis</p>
-    <h2 className="mt-3 text-2xl font-black text-slate-950">Run Samanta analysis</h2>
+    <h2 className="mt-3 text-2xl font-black text-slate-950">Run profile analysis</h2>
     <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-      Complete onboarding and save a resume first. Samanta will combine both sources and create your profile direction.
+      Complete onboarding and save a resume first. Your answers and resume will be combined to create your profile direction.
     </p>
     <button
       type="button"
@@ -149,7 +149,7 @@ const NeedsTab: React.FC<{ report: CareerProfileAnalysisReport }> = ({ report })
     <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <p className="text-sm font-bold uppercase text-blue-700">Expert path</p>
       <div className="mt-4">
-        <ListBlock items={report.thingsNeeded.expertPlan} empty="Samanta will add a plan after analysis." />
+        <ListBlock items={report.thingsNeeded.expertPlan} empty="A plan will appear after analysis." />
       </div>
       {report.thingsNeeded.supportNeed && (
         <p className="mt-5 rounded bg-blue-50 px-4 py-3 text-sm font-bold leading-6 text-blue-900">
@@ -206,7 +206,7 @@ const JobsTab: React.FC<{ report: CareerProfileAnalysisReport }> = ({ report }) 
         </div>
         <button
           type="button"
-          onClick={() => setAgentNotice('Samanta can prepare resume packets and tracker entries. Job-board submission needs a connected application source before it can run automatically.')}
+          onClick={() => setAgentNotice('The auto-apply agent can prepare resume packets and tracker entries. Job-board submission needs a connected application source before it can run automatically.')}
           className="mt-5 w-full rounded bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-800"
         >
           Prepare auto-apply agent
@@ -276,7 +276,7 @@ const CareerProfileAnalysisPage: React.FC = () => {
         <header className="rounded-lg bg-[#2e3d50] px-5 py-6 text-white shadow-lg shadow-slate-950/10 sm:px-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-sm font-black uppercase text-blue-200">Samanta profile analysis</p>
+              <p className="text-sm font-black uppercase text-blue-200">Profile analysis</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
                 {analysis?.profileCategory || 'Your career profile'}
               </h1>
@@ -307,7 +307,7 @@ const CareerProfileAnalysisPage: React.FC = () => {
         {isLoading && !analysis ? (
           <div className="mt-6 rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm" role="status">
             <p className="text-sm font-black text-slate-950">Loading profile analysis</p>
-            <p className="mt-2 text-sm text-slate-500">Samanta is preparing your next page.</p>
+            <p className="mt-2 text-sm text-slate-500">Preparing your next page.</p>
           </div>
         ) : !report ? (
           <div className="mt-6">
