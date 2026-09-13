@@ -196,7 +196,7 @@ def save_onboarding_profile(payload: CareerOnboardingProfileIn, current_user: Us
         profile.support_needs = payload.supportNeeds
 
     db.flush()
-    log_activity(db, current_user.id, "CAREER_ONBOARDING_SAVE", details="Saved Samanta questionnaire answers", user_name=current_user.name)
+    log_activity(db, current_user.id, "CAREER_ONBOARDING_SAVE", details="Saved onboarding questionnaire answers", user_name=current_user.name)
     db.commit()
     db.refresh(profile)
     return CareerOnboardingProfileEnvelope(profile=_onboarding_profile_out(profile))
@@ -212,7 +212,7 @@ def get_profile_analysis(current_user: User = Depends(get_current_user), db: Ses
 def generate_profile_analysis(payload: GenerateCareerProfileAnalysisIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CareerProfileAnalysisEnvelope:
     onboarding_profile = db.scalar(select(CareerOnboardingProfile).where(CareerOnboardingProfile.user_id == current_user.id))
     if not onboarding_profile:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Complete the Samanta onboarding questionnaire before profile analysis.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Complete the onboarding questionnaire before profile analysis.")
 
     resume_stmt = select(Resume).where(Resume.user_id == current_user.id)
     if payload.resumeId:

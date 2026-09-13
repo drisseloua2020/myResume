@@ -6,6 +6,11 @@ import ResumeLibraryPage from './components/ResumeLibraryPage';
 import CoverLettersPage from './components/CoverLettersPage';
 import ProfileSyncPage from './components/ProfileSyncPage';
 import CareerProfileAnalysisPage from './components/CareerProfileAnalysisPage';
+import ResumeImprovementWorkflowPage from './components/ResumeImprovementWorkflowPage';
+import JobsToApplyWorkflowPage from './components/JobsToApplyWorkflowPage';
+import AutoApplyPrepWorkflowPage from './components/AutoApplyPrepWorkflowPage';
+import HumanApprovalWorkflowPage from './components/HumanApprovalWorkflowPage';
+import AdminWorkflowConsolePage from './components/AdminWorkflowConsolePage';
 import AdminActivityLogsPage from './components/AdminActivityLogsPage';
 import AdminAgentUpdatesPage from './components/AdminAgentUpdatesPage';
 import AdminContactMessagesPage from './components/AdminContactMessagesPage';
@@ -854,7 +859,7 @@ const App: React.FC = () => {
             setCurrentUser(u);
             if (u.role === 'admin') {
               onboardingStateRequestRef.current += 1;
-              setActiveTab('admin_logs');
+              setActiveTab('admin_overview');
               setShowUserOnboarding(false);
               setShowCareerObjectiveReminder(false);
               setIsCheckingUserOnboarding(false);
@@ -882,6 +887,17 @@ const App: React.FC = () => {
     const user = authService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
+      if (user.role === 'admin') {
+        onboardingStateRequestRef.current += 1;
+        setActiveTab('admin_overview');
+        setShowUserOnboarding(false);
+        setShowCareerObjectiveReminder(false);
+        setIsCheckingUserOnboarding(false);
+        setIsSavingUserOnboarding(false);
+        setUserOnboardingError(null);
+        checkAgentUpdates();
+        return;
+      }
       applyCareerOnboardingState(user);
       // Simulate Agent checking for updates on load (simulate email link opening app)
       checkAgentUpdates();
@@ -928,7 +944,7 @@ const App: React.FC = () => {
     initialResumeLoadUserRef.current = null;
     if (user.role === 'admin') {
       onboardingStateRequestRef.current += 1;
-      setActiveTab('admin_logs');
+      setActiveTab('admin_overview');
       setShowUserOnboarding(false);
       setShowCareerObjectiveReminder(false);
       setIsCheckingUserOnboarding(false);
@@ -1480,8 +1496,30 @@ const App: React.FC = () => {
       return <CareerToolkitPage currentResume={visibleEditorData as UserInputData} />;
     }
 
+    if (activeTab === 'resume_improvements') {
+      return (
+        <ResumeImprovementWorkflowPage
+          currentResume={visibleEditorData as UserInputData}
+          onOpenEditor={() => setActiveTab('workspace')}
+          onOpenAnalysis={() => setActiveTab('profile_analysis')}
+        />
+      );
+    }
+
     if (activeTab === 'profile_analysis') {
       return <CareerProfileAnalysisPage />;
+    }
+
+    if (activeTab === 'jobs_to_apply') {
+      return <JobsToApplyWorkflowPage onPrepareAutoApply={() => setActiveTab('auto_apply_prep')} />;
+    }
+
+    if (activeTab === 'auto_apply_prep') {
+      return <AutoApplyPrepWorkflowPage onOpenApproval={() => setActiveTab('human_approval')} />;
+    }
+
+    if (activeTab === 'human_approval') {
+      return <HumanApprovalWorkflowPage />;
     }
 
     if (activeTab === 'resumes') {
@@ -1502,6 +1540,22 @@ const App: React.FC = () => {
           <ProfileSyncPage />
         </div>
       );
+    }
+
+    if (activeTab === 'admin_overview') {
+      return <AdminWorkflowConsolePage view="overview" />;
+    }
+    if (activeTab === 'admin_features') {
+      return <AdminWorkflowConsolePage view="features" />;
+    }
+    if (activeTab === 'admin_automation') {
+      return <AdminWorkflowConsolePage view="automation" />;
+    }
+    if (activeTab === 'admin_audit') {
+      return <AdminWorkflowConsolePage view="audit" />;
+    }
+    if (activeTab === 'admin_users') {
+      return <AdminWorkflowConsolePage view="users" />;
     }
 
     if (activeTab === 'admin_logs') {
@@ -1587,7 +1641,7 @@ const App: React.FC = () => {
         {isCheckingUserOnboarding ? (
           <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-white px-4">
             <div className="rounded-lg border border-slate-200 bg-white px-6 py-5 text-center shadow-sm" role="status">
-              <p className="text-sm font-bold text-slate-900">Preparing Samanta...</p>
+              <p className="text-sm font-bold text-slate-900">Preparing your workspace...</p>
               <p className="mt-1 text-sm text-slate-500">Checking your saved career profile.</p>
             </div>
           </div>

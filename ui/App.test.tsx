@@ -947,7 +947,7 @@ describe('App import flow', () => {
 
     await screen.findByDisplayValue('Tech Co');
 
-    await user.click(screen.getByRole('button', { name: /view resume/i }));
+    await user.click(screen.getByRole('button', { name: /all resumes/i }));
     expect(await screen.findByText('Existing Resume')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /delete/i }));
@@ -957,7 +957,7 @@ describe('App import flow', () => {
       expect(deleteResume).toHaveBeenCalledWith('res_existing');
     });
 
-    await user.click(screen.getByRole('button', { name: /^editor$/i }));
+    await user.click(screen.getByRole('button', { name: /resume editor/i }));
 
     await waitFor(() => {
       expect(screen.queryByDisplayValue('Tech Co')).not.toBeInTheDocument();
@@ -1005,9 +1005,9 @@ describe('App import flow', () => {
     });
 
     expect(getLatestDraft).not.toHaveBeenCalled();
+    expect(await screen.findByPlaceholderText('First Name')).toHaveValue('');
     expect(screen.queryByDisplayValue('Stale Co')).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('Stale Architect')).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText('First Name')).toHaveValue('');
     expect(screen.getByPlaceholderText('email@example.com')).toHaveValue('');
     expect(await screen.findAllByTestId('empty-live-preview')).not.toHaveLength(0);
   });
