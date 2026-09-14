@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResumeInput from './ResumeInput';
 import { saveResume } from '../services/resumeService';
 import { generateCoverLetter } from '../services/coverLetterService';
-import { analyzeCareer } from '../services/careerService';
 import { uploadProfilePhoto } from '../services/uploadService';
 import { SubscriptionPlan, UserRole } from '../types';
 
@@ -96,10 +95,6 @@ vi.mock('../services/coverLetterService', () => ({
   generateCoverLetter: vi.fn(),
 }));
 
-vi.mock('../services/careerService', () => ({
-  analyzeCareer: vi.fn(),
-}));
-
 describe('ResumeInput', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -125,34 +120,6 @@ describe('ResumeInput', () => {
         coldEmail: 'Hello',
       },
     });
-    vi.mocked(analyzeCareer).mockResolvedValue({
-      report: {
-        noLlmCalls: true,
-        privacyBadge: 'No LLM calls: deterministic local rules only',
-        atsScore: 82,
-        job: {
-          title: 'Cloud Platform Engineer',
-          company: 'Acme Systems',
-          location: 'Remote',
-          salary: '$140,000',
-          responsibilities: ['Build APIs'],
-          requirements: ['AWS'],
-          keywords: { hardSkills: ['Cloud'], softSkills: ['Communication'], tools: ['AWS'], certifications: [] },
-        },
-        missingKeywords: { all: ['Terraform'], hardSkills: [], softSkills: [], tools: ['Terraform'], certifications: [] },
-        includedKeywords: ['AWS', 'Cloud'],
-        sectionMatches: [{ section: 'experience', matched: ['AWS'], missing: ['Terraform'], score: 80 }],
-        bulletQuality: { averageScore: 75, bullets: [] },
-        riskScan: { score: 90, risks: [] },
-        completeness: { score: 88, checks: [] },
-        skillTaxonomy: { normalized: ['AWS'], duplicates: [] },
-        readyToApplyChecklist: [{ label: 'ATS score is 75 or higher', passed: true }],
-        linkedinChecklist: [],
-        templates: { followUpEmail: 'Hello follow up' },
-        featureCoverage: [],
-        exportsPreview: { atsText: 'Resume text' },
-      },
-    } as any);
   });
 
   it('restores and persists the include-photo status from a loaded resume record', async () => {
@@ -784,7 +751,7 @@ describe('ResumeInput', () => {
     });
   });
 
-  it('shows imported additional ATS sections as editable inputs and saves edits', async () => {
+  it('shows imported certifications as editable inputs and saves edits', async () => {
     const user = userEvent.setup();
 
     render(
@@ -839,6 +806,14 @@ describe('ResumeInput', () => {
             degree: 'BS Computer Science',
             dates: '',
           }],
+          certificationItems: [{
+            id: 'cert_1',
+            name: 'AWS Certified Developer',
+            issuer: 'Amazon Web Services',
+            date: 'May 2026',
+            credentialUrl: 'https://credentials.example.com/aws-dev',
+            details: 'Developer associate credential',
+          }],
           skillItems: [{
             id: 'skill_1',
             category: 'Core',
@@ -846,28 +821,39 @@ describe('ResumeInput', () => {
           }],
           additionalSections: [{
             id: 'section_1',
-            title: 'Certifications',
-            items: 'AWS Certified Developer',
+            title: 'Projects',
+            items: 'Internal API modernization',
           }],
         }}
       />
     );
 
     expect(screen.getByDisplayValue('LinkedIn: linkedin.com/in/jordan')).toBeInTheDocument();
-    expect(screen.getByText('Additional ATS Sections')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Certifications')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('AWS Certified Developer')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Amazon Web Services')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('May 2026')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Projects')).toBeInTheDocument();
 
-    const details = screen.getByDisplayValue('AWS Certified Developer');
-    fireEvent.change(details, { target: { value: 'AWS Certified Developer\nSecurity+' } });
+    const details = screen.getByDisplayValue('Developer associate credential');
+    fireEvent.change(details, { target: { value: 'Developer associate credential\nSecurity+' } });
 
     await user.click(screen.getByRole('button', { name: /save resume/i }));
 
     await waitFor(() => expect(saveResume).toHaveBeenCalledTimes(1));
     const savedContent = vi.mocked(saveResume).mock.calls[0][0].content;
+    expect(savedContent.certificationItems).toEqual([
+      expect.objectContaining({
+        name: 'AWS Certified Developer',
+        issuer: 'Amazon Web Services',
+        date: 'May 2026',
+        credentialUrl: 'https://credentials.example.com/aws-dev',
+        details: 'Developer associate credential\nSecurity+',
+      }),
+    ]);
     expect(savedContent.additionalSections).toEqual([
       expect.objectContaining({
-        title: 'Certifications',
-        items: 'AWS Certified Developer\nSecurity+',
+        title: 'Projects',
+        items: 'Internal API modernization',
       }),
     ]);
     expect(savedContent.personalDetails?.links).toBe('LinkedIn: linkedin.com/in/jordan');
@@ -1164,9 +1150,7 @@ describe('ResumeInput', () => {
     expect(drawImage.mock.calls[1][5]).toBe(320);
   });
 
-  it('runs ATS scoring against a pasted job description from the editor', async () => {
-    const user = userEvent.setup();
-
+  it('does not expose ATS scoring from the resume editor tabs', () => {
     render(
       <ResumeInput
         onGenerate={vi.fn()}
@@ -1189,28 +1173,8 @@ describe('ResumeInput', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /^ats score$/i }));
-    await user.type(
-      screen.getByLabelText(/pasted job description/i),
-      'Cloud Platform Engineer role requiring AWS, Terraform, APIs, and stakeholder communication.'
-    );
-    await user.click(screen.getByRole('button', { name: /run ats score/i }));
-
-    await waitFor(() => {
-      expect(analyzeCareer).toHaveBeenCalledWith(expect.objectContaining({
-        jobDescription: expect.stringContaining('Cloud Platform Engineer'),
-        resumeJson: expect.objectContaining({
-          personalDetails: expect.objectContaining({
-            firstName: 'Resume',
-            lastName: 'User',
-            email: 'resume@example.com',
-          }),
-        }),
-      }));
-    });
-    expect(await screen.findByText('82')).toBeInTheDocument();
-    expect(screen.getByText('Terraform')).toBeInTheDocument();
-    expect(screen.getByText(/without llm calls/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^ats score$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /run ats score/i })).not.toBeInTheDocument();
   });
 
   it('creates and saves a cover letter from a job URL', async () => {

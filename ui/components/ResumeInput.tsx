@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, User, PersonalDetails } from '../types';
+import { UserInputData, UserRole, SubscriptionPlan, ExperienceItem, EducationItem, CertificationItem, SkillItem, AdditionalSectionItem, User, PersonalDetails } from '../types';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
@@ -8,7 +8,6 @@ import { locationService } from '../services/locationService';
 import { fetchApiAssetDataUrl } from '../services/apiClient';
 import { uploadProfilePhoto } from '../services/uploadService';
 import { generateCoverLetter } from '../services/coverLetterService';
-import { analyzeCareer, CareerAnalysisReport } from '../services/careerService';
 import { IMPORT_DOCUMENT_ACCEPT, getImportDocumentMimeType, readImportDocumentFile } from '../utils/resumeImport';
 
 interface ResumeInputProps {
@@ -21,12 +20,12 @@ interface ResumeInputProps {
   userPlan: SubscriptionPlan;
   selectedTemplateId?: string;
   user: User; // Need user info for the preview
-  initialTab?: 'upload' | 'create' | 'cover_letter' | 'ats_score';
+  initialTab?: 'upload' | 'create' | 'cover_letter';
   prefilledData?: Partial<UserInputData> | null;
   loadedResumeId?: string | null;
 }
 
-type TabType = 'upload' | 'create' | 'cover_letter' | 'ats_score';
+type TabType = 'upload' | 'create' | 'cover_letter';
 type WorkspaceViewMode = 'split' | 'viewer' | 'editor';
 type JobSourceMode = 'url' | 'paste';
 
@@ -202,6 +201,15 @@ const emptyEducation = (): EducationItem => ({
   endYear: '',
 });
 
+const emptyCertification = (): CertificationItem => ({
+  id: Math.random().toString(),
+  name: '',
+  issuer: '',
+  date: '',
+  credentialUrl: '',
+  details: '',
+});
+
 const emptySkill = (): SkillItem => ({
   id: Math.random().toString(),
   category: '',
@@ -239,6 +247,16 @@ const hasEducationContent = (item: EducationItem): boolean => (
     item.startYear,
     item.endMonth,
     item.endYear,
+  ].some(hasTextValue)
+);
+
+const hasCertificationContent = (item: CertificationItem): boolean => (
+  [
+    item.name,
+    item.issuer,
+    item.date,
+    item.credentialUrl,
+    item.details,
   ].some(hasTextValue)
 );
 
@@ -671,9 +689,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const [pdfMsg, setPdfMsg] = useState<string | null>(null);
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
   const [coverLetterMsg, setCoverLetterMsg] = useState<string | null>(null);
-  const [atsReport, setAtsReport] = useState<CareerAnalysisReport | null>(null);
-  const [atsScoreMsg, setAtsScoreMsg] = useState<string | null>(null);
-  const [isScoringAts, setIsScoringAts] = useState(false);
   const [countries, setCountries] = useState<string[]>([]);
   const [states, setStates] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
@@ -711,6 +726,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       setJobUrl(prefilledData.jobUrl || '');
       setExperiences((prefilledData.experienceItems || []).map(hydrateExperienceItem));
       setEducations((prefilledData.educationItems || []).map(hydrateEducationItem));
+      setCertifications(prefilledData.certificationItems || []);
       setSkills(prefilledData.skillItems || []);
       setAdditionalSections(prefilledData.additionalSections || []);
       setPreferences({
@@ -788,6 +804,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     prefilledData
       ? (prefilledData.educationItems || []).map(hydrateEducationItem)
       : [{ ...emptyEducation(), id: '1' }]
+  ));
+  const [certifications, setCertifications] = useState<CertificationItem[]>(() => (
+    prefilledData
+      ? (prefilledData.certificationItems || [])
+      : []
   ));
   const [skills, setSkills] = useState<SkillItem[]>(() => (
     prefilledData
@@ -961,6 +982,12 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     setEducations(educations.map(i => i.id === id ? withEducationDateText({ ...i, [field]: value }) : i));
   };
 
+  const addCertification = () => setCertifications([...certifications, emptyCertification()]);
+  const removeCertification = (id: string) => setCertifications(certifications.filter(i => i.id !== id));
+  const updateCertification = (id: string, field: keyof CertificationItem, value: string) => {
+    setCertifications(certifications.map(i => i.id === id ? { ...i, [field]: value } : i));
+  };
+
   const addSkill = () => setSkills([...skills, { id: Math.random().toString(), category: '', items: '' }]);
   const removeSkill = (id: string) => setSkills(skills.filter(i => i.id !== id));
   const updateSkill = (id: string, field: keyof SkillItem, value: string) => setSkills(skills.map(i => i.id === id ? { ...i, [field]: value } : i));
@@ -1097,6 +1124,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     // Reset structured sections to blank starter items
     setExperiences([{ ...emptyExperience(), id: '1' }]);
     setEducations([{ ...emptyEducation(), id: '1' }]);
+    setCertifications([]);
     setSkills([{ id: '1', category: '', items: '' }]);
     setAdditionalSections([]);
 
@@ -1141,11 +1169,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       return missing;
     }
 
-    if (activeTab === 'ats_score') {
-      if (jobDescription.trim().length < 20) missing.push('Pasted job description');
-      return missing;
-    }
-
     if (!selectedTemplateId) missing.push('Template');
 
     if (hasText(personalDetails.postalCode) && !/^\d{5}$/.test(personalDetails.postalCode)) {
@@ -1184,6 +1207,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   };
 
   const educationItemsForOutput = educations.filter(hasEducationContent).map(withEducationDateText);
+  const certificationItemsForOutput = certifications.filter(hasCertificationContent);
   const skillItemsForOutput = skills.filter(hasSkillContent);
   const additionalSectionsForOutput = additionalSections.filter(hasAdditionalSectionContent);
 
@@ -1191,11 +1215,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     e.preventDefault();
 
     if (!validateRequiredFields()) {
-      return;
-    }
-
-    if (activeTab === 'ats_score') {
-      await runAtsScore();
       return;
     }
 
@@ -1226,6 +1245,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     // For Create & Cover Letter tabs, include structured blocks
     payload.experienceItems = experiences.map(withExperienceDateText);
     payload.educationItems = educationItemsForOutput;
+    payload.certificationItems = certificationItemsForOutput;
     payload.skillItems = skillItemsForOutput;
     payload.additionalSections = additionalSectionsForOutput;
 
@@ -1288,46 +1308,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     personalDetails,
     experienceItems: experiences.map(withExperienceDateText),
     educationItems: educationItemsForOutput,
+    certificationItems: certificationItemsForOutput,
     skillItems: skillItemsForOutput,
     additionalSections: additionalSectionsForOutput
   };
-
-  async function runAtsScore() {
-    const pastedJobDescription = jobDescription.trim();
-    setValidationMsg(null);
-    setAtsScoreMsg(null);
-
-    if (pastedJobDescription.length < 20) {
-      setValidationMsg('Paste a job description with at least 20 characters.');
-      return;
-    }
-
-    setIsScoringAts(true);
-    try {
-      const response = await analyzeCareer({
-        resumeJson: currentData,
-        jobDescription: pastedJobDescription,
-        targetCountry: preferences?.region || 'US',
-        targetLanguage: 'en',
-      });
-      setAtsReport(response.report);
-      setAtsScoreMsg('ATS score calculated without LLM calls.');
-    } catch (err: any) {
-      setValidationMsg(err?.message || 'Failed to calculate ATS score.');
-    } finally {
-      setIsScoringAts(false);
-    }
-  }
-
-  const atsMissingKeywords = atsReport?.missingKeywords?.all || [];
-  const atsIncludedKeywords = atsReport?.includedKeywords || [];
-  const atsScoreTone = atsReport
-    ? atsReport.atsScore >= 80
-      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-      : atsReport.atsScore >= 60
-        ? 'text-amber-700 bg-amber-50 border-amber-200'
-        : 'text-red-700 bg-red-50 border-red-200'
-    : 'text-slate-700 bg-slate-50 border-slate-200';
 
   const profilePhotoSrc = imageDataUrlFromProfileData(legacyProfileImageData);
   const isResumeViewerEmpty = ![
@@ -1351,6 +1335,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     && !legacyProfileImageData
     && !experiences.some(hasExperienceContent)
     && !educations.some(hasEducationContent)
+    && !certifications.some(hasCertificationContent)
     && !skills.some(hasSkillContent)
     && !additionalSections.some(hasAdditionalSectionContent);
 
@@ -1387,6 +1372,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     personalDetails,
     experiences,
     educations,
+    certifications,
     skills,
     additionalSections
   ]);
@@ -1439,13 +1425,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-center ${activeTab === 'upload' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
              >
               Import File
-             </button>
-             <button
-               type="button"
-               onClick={() => setActiveTab('ats_score')}
-               className={`flex-1 px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap text-center ${activeTab === 'ats_score' ? 'bg-[#1a91f0] text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-             >
-              ATS Score
              </button>
           </div>
 
@@ -1853,6 +1832,75 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                   </div>
                </div>
 
+               {/* Certifications */}
+               <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
+                  <div className="flex justify-between items-end mb-4">
+                      <div>
+                          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Certifications</h2>
+                          <p className="mt-1 text-xs text-slate-500">Licenses, professional certificates, training credentials, and credential links.</p>
+                      </div>
+                  </div>
+                  <div className="space-y-4">
+                     {certifications.map((cert) => (
+                        <div key={cert.id} className="bg-[#f7f9fa] p-4 rounded border border-slate-200 relative">
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Certification Name</label>
+                                  <input
+                                    value={cert.name}
+                                    onChange={e => updateCertification(cert.id, 'name', e.target.value)}
+                                    className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm font-medium"
+                                    placeholder="e.g. AWS Certified Solutions Architect"
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Issuing Organization</label>
+                                  <input
+                                    value={cert.issuer}
+                                    onChange={e => updateCertification(cert.id, 'issuer', e.target.value)}
+                                    className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm"
+                                    placeholder="e.g. Amazon Web Services"
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Date</label>
+                                  <input
+                                    value={cert.date}
+                                    onChange={e => updateCertification(cert.id, 'date', e.target.value)}
+                                    className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm"
+                                    placeholder="e.g. May 2026"
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Credential Link</label>
+                                  <input
+                                    value={cert.credentialUrl || ''}
+                                    onChange={e => updateCertification(cert.id, 'credentialUrl', e.target.value)}
+                                    className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm"
+                                    placeholder="https://credential.example.com"
+                                  />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">Details</label>
+                                  <textarea
+                                    value={cert.details}
+                                    onChange={e => updateCertification(cert.id, 'details', e.target.value)}
+                                    className="w-full h-20 bg-white p-2 border border-slate-300 rounded mt-1 text-sm"
+                                    placeholder="Optional scope, certificate ID, specialization, or renewal details..."
+                                  />
+                              </div>
+                           </div>
+                           <button type="button" onClick={() => removeCertification(cert.id)} className="text-red-400 text-xs mt-2 hover:text-red-600">
+                              Remove
+                           </button>
+                        </div>
+                     ))}
+                     <button type="button" onClick={addCertification} className="text-[#1a91f0] font-semibold text-sm flex items-center gap-2 hover:bg-blue-50 px-4 py-2 rounded transition-colors w-full justify-center">
+                        + Add Certification
+                     </button>
+                  </div>
+               </div>
+
                {/* Skills */}
                <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
                   <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide mb-4">Skills</h2>
@@ -1870,18 +1918,18 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                   </div>
                </div>
 
-               {/* Additional ATS Sections */}
+               {/* Additional Sections */}
                <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
                   <div className="mb-4">
-                      <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Additional ATS Sections</h2>
-                      <p className="mt-1 text-xs text-slate-500">Projects, certifications, awards, publications, languages, volunteer work, and other standard resume sections imported from your file.</p>
+                      <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Additional Sections</h2>
+                      <p className="mt-1 text-xs text-slate-500">Projects, awards, publications, languages, volunteer work, and other standard resume sections imported from your file.</p>
                   </div>
                   <div className="space-y-4">
                      {additionalSections.map((section) => (
                         <div key={section.id} className="bg-[#f7f9fa] p-4 rounded border border-slate-200">
                            <div className="mb-3">
                               <label className="text-[10px] font-bold text-slate-500 uppercase">Section Title</label>
-                              <input value={section.title} onChange={e => updateAdditionalSection(section.id, 'title', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm font-medium" placeholder="e.g. Projects, Certifications, Languages" />
+                              <input value={section.title} onChange={e => updateAdditionalSection(section.id, 'title', e.target.value)} className="w-full bg-white p-2 border border-slate-300 rounded mt-1 text-sm font-medium" placeholder="e.g. Projects, Awards, Languages" />
                            </div>
                            <div>
                               <label className="text-[10px] font-bold text-slate-500 uppercase">Details</label>
@@ -1893,136 +1941,11 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                         </div>
                      ))}
                      <button type="button" onClick={addAdditionalSection} className="text-[#1a91f0] font-semibold text-sm flex items-center gap-2 hover:bg-blue-50 px-4 py-2 rounded transition-colors w-full justify-center">
-                        + Add ATS Section
+                        + Add Section
                      </button>
                   </div>
                </div>
             </>
-          )}
-
-          {activeTab === 'ats_score' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">ATS Score</h2>
-                    <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">No LLM calls</div>
-                  </div>
-                  {atsReport && (
-                    <div className={`rounded border px-5 py-3 text-center ${atsScoreTone}`}>
-                      <div className="text-4xl font-black leading-none">{atsReport.atsScore}</div>
-                      <div className="mt-1 text-[10px] font-black uppercase tracking-wide">Score</div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-5">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Pasted Job Description</label>
-                  <textarea
-                    aria-label="Pasted Job Description"
-                    value={jobDescription}
-                    onChange={e => {
-                      setJobDescription(e.target.value);
-                      setAtsScoreMsg(null);
-                    }}
-                    className="mt-1 h-72 w-full rounded border border-slate-300 bg-slate-50 p-4 text-sm leading-relaxed outline-none focus:border-[#1a91f0]"
-                    placeholder="Paste the job description here..."
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={runAtsScore}
-                  disabled={isScoringAts || isLoading}
-                  className={`mt-4 w-full rounded-lg bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-sm transition ${isScoringAts || isLoading ? 'cursor-not-allowed opacity-70' : 'hover:bg-slate-700'}`}
-                >
-                  {isScoringAts ? 'Scoring...' : 'Run ATS Score'}
-                </button>
-              </div>
-
-              {atsScoreMsg && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  {atsScoreMsg}
-                </div>
-              )}
-
-              {atsReport && (
-                <div className="space-y-6">
-                  <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h3 className="text-xl font-black text-slate-900">{atsReport.job.title || 'Parsed Job'}</h3>
-                        <div className="mt-1 text-sm text-slate-500">
-                          {[atsReport.job.company, atsReport.job.location, atsReport.job.salary].filter(Boolean).join(' | ') || 'Job details parsed from pasted text'}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Completeness {atsReport.completeness.score}</span>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">Risk {atsReport.riskScan.score}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 grid gap-5 lg:grid-cols-2">
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Missing Keywords</h4>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {atsMissingKeywords.slice(0, 24).map(term => (
-                            <span key={term} className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">{term}</span>
-                          ))}
-                          {atsMissingKeywords.length === 0 && (
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">No major gaps</span>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Included Keywords</h4>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {atsIncludedKeywords.slice(0, 24).map(term => (
-                            <span key={term} className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{term}</span>
-                          ))}
-                          {atsIncludedKeywords.length === 0 && (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">None detected</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
-                      <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Section Match</h4>
-                      <div className="mt-4 space-y-3">
-                        {atsReport.sectionMatches.map(section => (
-                          <div key={section.section}>
-                            <div className="flex justify-between text-xs font-bold uppercase text-slate-500">
-                              <span>{section.section}</span>
-                              <span>{section.score}</span>
-                            </div>
-                            <div className="mt-1 h-2 rounded bg-slate-200">
-                              <div className="h-2 rounded bg-[#1a91f0]" style={{ width: `${Math.min(100, Math.max(0, section.score))}%` }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded border border-slate-200 p-6 shadow-sm">
-                      <h4 className="text-xs font-black uppercase tracking-wide text-slate-500">Checklist</h4>
-                      <div className="mt-4 space-y-3">
-                        {atsReport.readyToApplyChecklist.map(item => (
-                          <div key={item.label} className="flex items-center gap-3 text-sm">
-                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black ${item.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                              {item.passed ? 'OK' : '!'}
-                            </span>
-                            <span className="text-slate-700">{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
           )}
 
           {activeTab === 'cover_letter' && (
@@ -2089,7 +2012,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
           )}
 
           <div className="pt-4 pb-20 space-y-3">
-             {activeTab !== 'ats_score' && (
              <button
                type="submit"
                disabled={isLoading || isSavingResume}
@@ -2104,7 +2026,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                   )
                 )}
              </button>
-             )}
 
              {activeTab === 'create' && (
                <button
@@ -2124,7 +2045,6 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
              <p className="text-xs text-center text-slate-400 mt-2">
                {activeTab === 'upload' ? 'Parses an ATS PDF or Word resume and fills the editor so you can verify and customize.' :
-                 activeTab === 'ats_score' ? 'Scores the current resume against the pasted job description using deterministic local rules.' :
                  activeTab === 'cover_letter' ? 'Create a tailored cover letter and cold email based on your resume.' :
                  'Saves your resume JSON to your library. Click Save again to update the same record.'}
              </p>

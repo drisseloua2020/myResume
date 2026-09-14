@@ -65,6 +65,15 @@ export interface EducationItem {
   endYear?: string;
 }
 
+export interface CertificationItem {
+  id: string;
+  name: string;
+  issuer: string;
+  date: string;
+  credentialUrl?: string;
+  details: string;
+}
+
 export interface SkillItem {
   id: string;
   category: string; // e.g. "Languages", "Technical", "Soft Skills"
@@ -119,6 +128,7 @@ export interface UserInputData {
   // Structured Data for Mode B
   experienceItems?: ExperienceItem[];
   educationItems?: EducationItem[];
+  certificationItems?: CertificationItem[];
   skillItems?: SkillItem[];
   additionalSections?: AdditionalSectionItem[];
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserInputData, User, EducationItem } from '../types';
+import { UserInputData, User, EducationItem, CertificationItem } from '../types';
 import { apiAssetUrl } from '../services/apiClient';
 
 interface LivePreviewProps {
@@ -165,7 +165,7 @@ const CATEGORY_RESUME_TEMPLATES: Record<string, CategoryResumeTemplate> = {
 };
 
 const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'classic_pro' }) => {
-  const { experienceItems, educationItems, skillItems, additionalSections, targetRole, preferences, personalDetails } = data;
+  const { experienceItems, educationItems, certificationItems, skillItems, additionalSections, targetRole, preferences, personalDetails } = data;
 
   // Helper to format full address
   const fullAddress = [
@@ -199,8 +199,13 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
     .flatMap((skill) => skill.items.split(',').map((item) => item.trim()).filter(Boolean));
   const visibleAdditionalSections = (additionalSections || [])
     .filter((section) => section.title?.trim() || section.items?.trim());
+  const visibleCertificationItems = (certificationItems || [])
+    .filter((cert) => cert.name?.trim() || cert.issuer?.trim() || cert.date?.trim() || cert.credentialUrl?.trim() || cert.details?.trim());
   const educationSchoolLine = (edu: EducationItem): string => (
     [edu.school, edu.location].filter(Boolean).join(' - ')
+  );
+  const certificationMetaLine = (cert: CertificationItem): string => (
+    [cert.issuer, cert.date].filter(Boolean).join(' - ')
   );
 
   const SectionTitle: React.FC<{ children: React.ReactNode; subtle?: boolean }> = ({ children, subtle }) => (
@@ -278,6 +283,33 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
     );
   };
 
+  const CertificationList: React.FC<{ subtle?: boolean; compact?: boolean }> = ({ subtle = false, compact = false }) => {
+    if (visibleCertificationItems.length === 0) return null;
+
+    return (
+      <div className={compact ? 'space-y-3' : 'space-y-4'}>
+        {visibleCertificationItems.map((cert, i) => (
+          <div key={cert.id || i} data-pdf-block>
+            <div className={`${compact ? 'text-xs' : 'text-sm'} font-bold ${subtle ? 'text-white' : 'text-slate-900'}`}>
+              {cert.name || 'Certification'}
+            </div>
+            {certificationMetaLine(cert) && (
+              <div className={`text-xs ${subtle ? 'text-white/75' : 'text-slate-600'}`}>{certificationMetaLine(cert)}</div>
+            )}
+            {cert.credentialUrl && (
+              <div className={`break-words text-xs ${subtle ? 'text-white/60' : 'text-slate-500'}`}>{cert.credentialUrl}</div>
+            )}
+            {cert.details && (
+              <div className={`mt-1 whitespace-pre-wrap ${compact ? 'text-xs' : 'text-sm'} leading-relaxed ${subtle ? 'text-white/70' : 'text-slate-700'}`}>
+                {cert.details}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const AdditionalSectionsList: React.FC<{ subtle?: boolean; compact?: boolean }> = ({ subtle = false, compact = false }) => {
     if (visibleAdditionalSections.length === 0) return null;
 
@@ -338,6 +370,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
               <SectionTitle subtle>{config.educationLabel}</SectionTitle>
               <EducationList subtle />
             </section>
+            {visibleCertificationItems.length > 0 && (
+              <section>
+                <SectionTitle subtle>Certifications</SectionTitle>
+                <CertificationList subtle compact />
+              </section>
+            )}
           </aside>
           <main className="flex-1 p-9 space-y-8">
             <section>
@@ -397,6 +435,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                 <SectionTitle>{config.educationLabel}</SectionTitle>
                 <EducationList />
               </section>
+              {visibleCertificationItems.length > 0 && (
+                <section>
+                  <SectionTitle>Certifications</SectionTitle>
+                  <CertificationList compact />
+                </section>
+              )}
               {visibleAdditionalSections.length > 0 && (
                 <section>
                   <SectionTitle>Additional Sections</SectionTitle>
@@ -447,6 +491,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
               <EducationList />
             </section>
           </div>
+          {visibleCertificationItems.length > 0 && (
+            <section className="mt-7">
+              <SectionTitle>Certifications</SectionTitle>
+              <CertificationList compact />
+            </section>
+          )}
           {visibleAdditionalSections.length > 0 && (
             <section className="mt-7">
               <SectionTitle>Additional Sections</SectionTitle>
@@ -489,6 +539,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
             <SkillList />
           </section>
         </div>
+        {visibleCertificationItems.length > 0 && (
+          <section className="mt-7">
+            <SectionTitle>Certifications</SectionTitle>
+            <CertificationList compact />
+          </section>
+        )}
         {visibleAdditionalSections.length > 0 && (
           <section className="mt-7">
             <SectionTitle>Additional Sections</SectionTitle>
@@ -593,6 +649,13 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                         </div>
                     </section>
 
+                    {visibleCertificationItems.length > 0 && (
+                      <section className="bg-slate-50 p-6 rounded-lg border border-slate-100">
+                          <h3 className="text-md font-bold text-purple-700 uppercase mb-4">Certifications</h3>
+                          <CertificationList compact />
+                      </section>
+                    )}
+
                     {/* Skills */}
                     <section>
                         <h3 className="text-md font-bold text-purple-700 uppercase mb-4">Expertise</h3>
@@ -656,6 +719,13 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                             </div>
                         ))}
                     </div>
+                </section>
+             )}
+
+             {visibleCertificationItems.length > 0 && (
+                <section className="mb-8">
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest border-b border-slate-300 mb-4 pb-1">Certifications</h3>
+                    <CertificationList compact />
                 </section>
              )}
 
@@ -743,6 +813,14 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Certifications */}
+          {visibleCertificationItems.length > 0 && (
+            <div>
+              <h3 className="text-slate-400 uppercase tracking-widest text-xs font-bold mb-3 border-b border-slate-700 pb-1">Certifications</h3>
+              <CertificationList subtle compact />
             </div>
           )}
 
@@ -884,6 +962,12 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                </div>
             </section>
         </div>
+        {visibleCertificationItems.length > 0 && (
+          <section className="mt-8">
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Certifications</div>
+            <CertificationList compact />
+          </section>
+        )}
         {visibleAdditionalSections.length > 0 && (
           <section className="mt-8">
             <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Additional Sections</div>
@@ -982,6 +1066,13 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
                        ))}
                    </div>
                </section>
+
+               {visibleCertificationItems.length > 0 && (
+                  <section>
+                    <h3 className="text-sm font-black text-orange-600 uppercase mb-3">Certifications</h3>
+                    <CertificationList compact />
+                  </section>
+               )}
             </div>
         </div>
       </div>
@@ -1060,6 +1151,13 @@ const LivePreview: React.FC<LivePreviewProps> = ({ data, user, templateId = 'cla
           ))}
         </div>
       </section>
+
+      {visibleCertificationItems.length > 0 && (
+        <section className="mb-6">
+          <h3 className="text-sm font-bold uppercase border-b border-slate-300 mb-4 pb-1 tracking-wider">Certifications</h3>
+          <CertificationList compact />
+        </section>
+      )}
 
       {/* Skills */}
       <section>

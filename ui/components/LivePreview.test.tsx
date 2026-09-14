@@ -45,6 +45,14 @@ const previewData: UserInputData = {
     degree: 'BS Business',
     dates: '2015 - 2019',
   }],
+  certificationItems: [{
+    id: 'cert_1',
+    name: 'Certified Scrum Product Owner',
+    issuer: 'Scrum Alliance',
+    date: '2024',
+    credentialUrl: 'https://credentials.example.com/cspo',
+    details: 'Product discovery and delivery practices.',
+  }],
   skillItems: [{
     id: 'skill_1',
     category: 'Core',
@@ -79,6 +87,7 @@ describe('LivePreview category templates', () => {
       expect(screen.getByText('Jordan Preview')).toBeInTheDocument();
       expect(screen.getAllByText('Product Manager').length).toBeGreaterThan(0);
       expect(screen.getByText('State University - Austin, TX')).toBeInTheDocument();
+      expect(screen.getByText('Certified Scrum Product Owner')).toBeInTheDocument();
     },
   );
 
