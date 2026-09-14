@@ -814,8 +814,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
             <button
               type="button"
               onClick={() => handleOAuthLogin('google')}
-              disabled={loading}
-              className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
+              // Re-enable Google auth by changing this back to disabled={loading}.
+              disabled
+              className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-3"
             >
               <span className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-[#4285f4]">G</span>
               Continue with Google
@@ -892,7 +893,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
                 setError(null);
                 onSwitchMode(isLogin ? 'signup' : 'login');
               }}
-              className="text-[#1a91f0] font-semibold hover:underline"
+              // Re-enable account creation by removing this disabled prop.
+              disabled={isLogin}
+              className="text-[#1a91f0] font-semibold hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
             >
               {isLogin ? "Sign up" : "Log in"}
             </button>
