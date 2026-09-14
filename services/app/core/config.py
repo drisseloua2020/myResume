@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me"
     jwt_expires_in: str = "15m"
     port: int = 3000
-    cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000,https://myresume-rrcy.onrender.com,https://www.myresumes.net,https://myresumes.net")
+    cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000,https://myresume-rrcy.onrender.com,https://myresumes.net")
     smtp_host: str = ""
     smtp_port: int | None = None
     smtp_secure: bool = False
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
         return path if path.is_absolute() else Path.cwd() / path
     @property
     def allowed_origins(self) -> list[str]:
-        defaults = ["http://localhost:4000", "http://127.0.0.1:4000", "https://myresume-rrcy.onrender.com", "https://www.myresumes.net", "https://myresumes.net"]
+        defaults = ["http://localhost:4000", "http://127.0.0.1:4000", "https://myresume-rrcy.onrender.com", "https://myresumes.net"]
         extras = [item.strip() for item in self.cors_origins.split(",") if item.strip()]
         seen: list[str] = []
         for origin in defaults + extras:
