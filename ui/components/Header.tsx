@@ -34,26 +34,21 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
   const tabs = isAdmin ? adminTabs : userTabs;
 
   return (
-    <nav className="sticky top-0 z-50 flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm lg:px-8">
-      <div className="flex min-w-0 flex-1 items-center gap-6">
-        <div onClick={() => setActiveTab(tabs[0].key)} className="flex shrink-0 cursor-pointer items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-sm font-black text-white">
-            RF
+    <nav className="bg-[#2e3d50] text-white h-16 flex items-center justify-between px-6 lg:px-12 shadow-md z-50 sticky top-0">
+      <div className="flex items-center gap-8">
+        <div onClick={() => setActiveTab(tabs[0].key)} className="flex items-center gap-2 cursor-pointer">
+          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center font-bold text-lg">
+            My
           </div>
-          <span className="font-black text-xl tracking-tight">{isAdmin ? 'Admin Console' : 'ResumeForge'}</span>
+          <span className="font-bold text-xl tracking-tight">Resumes</span>
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center justify-start gap-1 overflow-x-auto md:justify-center">
+        <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={[
-                'shrink-0 rounded px-3 py-2 text-sm font-black transition-colors',
-                activeTab === t.key
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950',
-              ].join(' ')}
+              className={`hover:text-white transition-colors ${activeTab === t.key ? 'text-white' : ''}`}
             >
               {t.label}
             </button>
@@ -66,19 +61,19 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
           type="button"
           className={`flex items-center gap-3 rounded-full border px-2 py-1.5 pr-4 transition-colors ${
             activeTab === 'account'
-              ? 'border-blue-200 bg-blue-50 text-blue-700'
-              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              ? 'border-blue-300 bg-white/15 text-white'
+              : 'border-white/10 bg-slate-700/60 text-slate-100 hover:bg-slate-700'
           }`}
           aria-label="User account menu"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-300 text-sm font-black text-slate-950 shadow-inner">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 text-sm font-black text-slate-900 shadow-inner">
             {currentUser.name?.charAt(0)?.toUpperCase() || 'U'}
           </span>
           <span className="hidden text-left leading-tight sm:block">
             <span className="block max-w-[130px] truncate text-sm font-semibold">{currentUser.name}</span>
-            <span className="block text-xs text-slate-500">{isAdmin ? 'Admin' : currentUser.plan}</span>
+            <span className="block text-xs text-slate-300">{isAdmin ? 'Admin' : currentUser.plan}</span>
           </span>
-          <svg className="h-4 w-4 text-slate-400 transition-transform group-hover:rotate-180 group-focus-within:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="h-4 w-4 text-slate-300 transition-transform group-hover:rotate-180 group-focus-within:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
