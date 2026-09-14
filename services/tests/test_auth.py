@@ -60,12 +60,25 @@ def test_oauth_start_signs_allowed_return_to_origin(client, monkeypatch):
     monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
     monkeypatch.setattr(settings, 'oauth_frontend_url', 'https://myresume-rrcy.onrender.com')
 
+    response = client.get('/auth/oauth/google/start?returnTo=https%3A%2F%2Fmyresumes.net', follow_redirects=False)
+
+    assert response.status_code == 302
+    state = parse_qs(urlparse(response.headers['location']).query)['state'][0]
+    payload = jwt.decode(state, settings.jwt_secret, algorithms=['HS256'])
+    assert payload['frontendOrigin'] == 'https://myresumes.net'
+
+
+def test_oauth_start_ignores_disabled_www_return_to_origin(client, monkeypatch):
+    monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
+    monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
+    monkeypatch.setattr(settings, 'oauth_frontend_url', 'https://myresume-rrcy.onrender.com')
+
     response = client.get('/auth/oauth/google/start?returnTo=https%3A%2F%2Fwww.myresumes.net', follow_redirects=False)
 
     assert response.status_code == 302
     state = parse_qs(urlparse(response.headers['location']).query)['state'][0]
     payload = jwt.decode(state, settings.jwt_secret, algorithms=['HS256'])
-    assert payload['frontendOrigin'] == 'https://www.myresumes.net'
+    assert 'frontendOrigin' not in payload
 
 
 def test_oauth_start_ignores_unapproved_return_to_origin(client, monkeypatch):
@@ -95,7 +108,7 @@ def test_oauth_diagnostics_reports_public_redirect_uri_without_secret(client, mo
     monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
     monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
     monkeypatch.setattr(settings, 'oauth_redirect_base_url', 'https://myresume-services-04rb.onrender.com')
-    monkeypatch.setattr(settings, 'oauth_frontend_url', 'https://www.myresumes.net')
+    monkeypatch.setattr(settings, 'oauth_frontend_url', 'https://myresumes.net')
     monkeypatch.setattr(settings, 'oauth_cookie_secure', True)
 
     response = client.get('/auth/oauth/google/diagnostics')
@@ -106,7 +119,7 @@ def test_oauth_diagnostics_reports_public_redirect_uri_without_secret(client, mo
     assert data['configured'] is True
     assert data['redirectUri'] == 'https://myresume-services-04rb.onrender.com/auth/oauth/google/callback'
     assert data['googleAuthorizedRedirectUri'] == data['redirectUri']
-    assert data['frontendRedirectBaseUrl'] == 'https://www.myresumes.net'
+    assert data['frontendRedirectBaseUrl'] == 'https://myresumes.net'
     assert data['stateCookieSecure'] is True
     assert 'google-secret' not in response.text
 
@@ -143,12 +156,12 @@ def test_oauth_callback_prefers_allowed_return_to_origin(client, monkeypatch):
     import app.services.oauth as oauth_service
     monkeypatch.setattr(oauth_service.httpx, 'AsyncClient', DummyAsyncClient)
 
-    start = client.get('/auth/oauth/google/start?returnTo=https%3A%2F%2Fwww.myresumes.net', follow_redirects=False)
+    start = client.get('/auth/oauth/google/start?returnTo=https%3A%2F%2Fmyresumes.net', follow_redirects=False)
     state = parse_qs(urlparse(start.headers['location']).query)['state'][0]
     callback = client.get(f'/auth/oauth/google/callback?code=provider-code&state={state}', follow_redirects=False)
 
     assert callback.status_code == 302
-    assert callback.headers['location'].startswith('https://www.myresumes.net/?')
+    assert callback.headers['location'].startswith('https://myresumes.net/?')
 
 
 def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_session, monkeypatch):

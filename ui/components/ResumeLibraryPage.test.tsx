@@ -41,7 +41,7 @@ describe('ResumeLibraryPage', () => {
 
     expect(await screen.findByText('Senior Developer Resume')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /load resume into editor/i }));
+    await user.click(screen.getByRole('button', { name: /edit resume/i }));
 
     await waitFor(() => {
       expect(onLoadResume).toHaveBeenCalledWith(expect.objectContaining({
