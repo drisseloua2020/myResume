@@ -40,3 +40,7 @@ dist-ssr
 .terraform/
 *.exe
 terraform.tfstate*
+
+# Generated browser profiles from local UX proposal screenshots
+ux_proposals/__pycache__/
+ux_proposals/chrome-*/
