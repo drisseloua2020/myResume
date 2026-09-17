@@ -41,18 +41,13 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, activeTab, setAc
           <button
             type="button"
             onClick={() => setActiveTab(tabs[0].key)}
-            className="flex shrink-0 items-center gap-2.5 rounded-md px-1 py-1 text-left transition hover:bg-white/5"
+            className="flex shrink-0 items-center gap-2 rounded-md px-1 py-1 text-left transition hover:bg-white/5"
             aria-label="Go to first workspace tab"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-white text-[13px] font-black text-[#2e3d50] shadow-sm">
+            <span className="flex h-8 w-8 items-center justify-center rounded bg-blue-500 text-lg font-bold text-white">
               My
             </span>
-            <span className="leading-tight">
-              <span className="block text-[15px] font-black tracking-normal">Resumes</span>
-              <span className="hidden text-[11px] font-bold text-slate-300 sm:block">
-                {isAdmin ? 'Admin CRM' : 'Career CRM'}
-              </span>
-            </span>
+            <span className="text-xl font-bold tracking-tight">Resumes</span>
           </button>
 
           <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex" aria-label="Primary navigation">
