@@ -1623,7 +1623,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f9fa] flex flex-col font-sans text-slate-900">
+    <div className="min-h-screen bg-[#f5f7fb] flex flex-col font-sans text-slate-900">
       <Header 
         currentUser={currentUser} 
         onLogout={handleLogout}

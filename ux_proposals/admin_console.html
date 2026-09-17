@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ResumeForge Admin Console Proposal</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ea;
+      --soft: #f5f7fa;
+      --panel: #ffffff;
+      --navy: #243449;
+      --blue: #2563eb;
+      --blue-soft: #eaf2ff;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --amber: #d97706;
+      --amber-soft: #fef3c7;
+      --rose: #e11d48;
+      --rose-soft: #ffe4e6;
+      --teal: #0f766e;
+      --teal-soft: #ccfbf1;
+      --violet: #6d28d9;
+      --violet-soft: #ede9fe;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 1440px;
+      height: 1000px;
+      overflow: hidden;
+      background: #e8edf3;
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .screen {
+      display: none;
+      width: 1440px;
+      height: 1000px;
+      overflow: hidden;
+      background: var(--soft);
+    }
+
+    body[data-view="overview"] .overview,
+    body[data-view="users"] .users,
+    body[data-view="features"] .features,
+    body[data-view="automation"] .automation,
+    body[data-view="audit"] .audit {
+      display: block;
+    }
+
+    .topbar {
+      height: 72px;
+      padding: 0 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 260px;
+      font-size: 20px;
+      font-weight: 950;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .tab {
+      padding: 10px 13px;
+      border-radius: 8px;
+      color: #536174;
+      font-size: 13px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .admin-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 250px 1fr 330px;
+      gap: 20px;
+      height: 928px;
+      padding: 24px 36px 30px;
+    }
+
+    .layout-wide {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      gap: 20px;
+      height: 928px;
+      padding: 24px 36px 30px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+    }
+
+    .rail {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .rail-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 42px;
+      padding: 0 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .rail-link.active {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .rail-link strong {
+      font-size: 12px;
+    }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .right {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .hero {
+      min-height: 110px;
+      padding: 20px 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: center;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.16);
+    }
+
+    .hero .copy {
+      color: #cbd5e1;
+      margin-top: 8px;
+    }
+
+    .button,
+    .button-secondary,
+    .button-green,
+    .button-danger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .button {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+    }
+
+    .button-secondary {
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--ink);
+    }
+
+    .button-green {
+      background: var(--green);
+      color: #fff;
+    }
+
+    .button-danger {
+      background: var(--rose-soft);
+      color: #be123c;
+      border: 1px solid #fecdd3;
+    }
+
+    .kicker {
+      margin: 0;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 32px;
+      line-height: 1.12;
+      font-weight: 950;
+    }
+
+    h2 {
+      font-size: 24px;
+      line-height: 1.16;
+      font-weight: 950;
+    }
+
+    h3 {
+      font-size: 17px;
+      line-height: 1.24;
+      font-weight: 950;
+    }
+
+    .copy {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 700;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.42;
+      font-weight: 800;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 7px;
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .chip.blue {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .chip.green {
+      background: var(--green-soft);
+      color: #15803d;
+    }
+
+    .chip.amber {
+      background: var(--amber-soft);
+      color: #b45309;
+    }
+
+    .chip.rose {
+      background: var(--rose-soft);
+      color: #be123c;
+    }
+
+    .chip.teal {
+      background: var(--teal-soft);
+      color: var(--teal);
+    }
+
+    .chip.violet {
+      background: var(--violet-soft);
+      color: var(--violet);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .metric-card {
+      min-height: 122px;
+      padding: 16px;
+    }
+
+    .metric-card strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 28px;
+      font-weight: 950;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--blue);
+    }
+
+    .table {
+      display: grid;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .table-row {
+      display: grid;
+      align-items: center;
+      gap: 14px;
+      min-height: 64px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .table-row:last-child {
+      border-bottom: 0;
+    }
+
+    .table-row.header {
+      min-height: 42px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .user-avatar {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #eaf2ff;
+      color: var(--blue);
+      font-weight: 950;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .function-card,
+    .policy-card,
+    .queue-card,
+    .log-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .function-card {
+      min-height: 155px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toggle-row:last-child {
+      border-bottom: 0;
+    }
+
+    .switch {
+      position: relative;
+      width: 46px;
+      height: 26px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      flex: 0 0 auto;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+    }
+
+    .switch.on {
+      background: var(--green);
+    }
+
+    .switch.on::after {
+      left: 24px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .num.green {
+      background: var(--green);
+    }
+
+    .num.amber {
+      background: var(--amber);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .status-dot.amber {
+      background: var(--amber);
+    }
+
+    .status-dot.rose {
+      background: var(--rose);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .footer-note {
+      margin-top: auto;
+      padding: 12px;
+      border-radius: 9px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body data-view="overview">
+  <template id="nav-template">
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark">RF</span>Admin Console</div>
+      <nav class="tabs">
+        <span class="tab tab-overview">Overview</span>
+        <span class="tab tab-users">Users</span>
+        <span class="tab tab-features">Features</span>
+        <span class="tab tab-automation">Automation</span>
+        <span class="tab tab-audit">Audit and privacy</span>
+      </nav>
+      <div style="display:flex;gap:10px;min-width:260px;justify-content:flex-end;">
+        <span class="admin-pill">Admin</span>
+        <span class="button">Invite user</span>
+      </div>
+    </div>
+  </template>
+
+  <section class="screen overview">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Admin</p><h3 style="margin-top:8px;">Command center</h3></div>
+        <div>
+          <div class="rail-link active"><span>Today</span><strong>Live</strong></div>
+          <div class="rail-link"><span>User growth</span><strong>+12</strong></div>
+          <div class="rail-link"><span>Resume activity</span><strong>84</strong></div>
+          <div class="rail-link"><span>Approval queue</span><strong>19</strong></div>
+          <div class="rail-link"><span>System health</span><strong>Good</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div class="timeline">
+          <div class="step"><span class="num green">1</span><div><h3>Observe</h3><p class="small">Usage, queues, risk, and revenue signals.</p></div></div>
+          <div class="step"><span class="num">2</span><div><h3>Manage</h3><p class="small">Users, plans, templates, sources, and workflows.</p></div></div>
+          <div class="step"><span class="num amber">3</span><div><h3>Intervene</h3><p class="small">Handle flagged automation and privacy requests.</p></div></div>
+        </div>
+      </aside>
+
+      <section class="main">
+        <div class="hero">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Admin overview</p>
+            <h1>Admin command center.</h1>
+            <p class="copy">Monitor usage, queues, risk, and feature access.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Open action queue</div>
+        </div>
+        <div class="metric-grid">
+          <div class="metric-card panel"><p class="kicker">Users</p><strong>2,184</strong><p class="copy">1,726 active this month</p></div>
+          <div class="metric-card panel"><p class="kicker">Resumes</p><strong>8,942</strong><p class="copy">612 edited this week</p></div>
+          <div class="metric-card panel"><p class="kicker">Approval queue</p><strong>19</strong><p class="copy">7 need human decision</p></div>
+          <div class="metric-card panel"><p class="kicker">Revenue</p><strong>$18.4k</strong><p class="copy">Monthly recurring estimate</p></div>
+        </div>
+        <div class="card-grid">
+          <div class="function-card">
+            <p class="kicker">Resume system</p>
+            <h3 style="margin-top:8px;">Editor and version library</h3>
+            <p class="copy" style="margin-top:8px;">Monitor creation, imports, exports, shared links, and template usage.</p>
+            <div class="chip-row" style="margin-top:12px;"><span class="chip green">Healthy</span><span class="chip">8 templates</span></div>
+          </div>
+          <div class="function-card">
+            <p class="kicker">Profile analysis</p>
+            <h3 style="margin-top:8px;">Guidance and readiness scoring</h3>
+            <p class="copy" style="margin-top:8px;">Track generated analyses, gaps, job target usage, and deterministic rules.</p>
+            <div class="chip-row" style="margin-top:12px;"><span class="chip teal">No LLM calls</span><span class="chip blue">Enabled</span></div>
+          </div>
+          <div class="function-card">
+            <p class="kicker">Auto-apply</p>
+            <h3 style="margin-top:8px;">Preparation with human approval</h3>
+            <p class="copy" style="margin-top:8px;">Admin controls policies, approval queues, and blocked submission rules.</p>
+            <div class="chip-row" style="margin-top:12px;"><span class="chip amber">19 queued</span><span class="chip green">Human gate on</span></div>
+          </div>
+        </div>
+        <section class="panel" style="padding:18px;flex:1;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div><p class="kicker">Attention feed</p><h2 style="margin-top:7px;">Needs admin review</h2></div>
+            <span class="button-secondary">View all</span>
+          </div>
+          <div class="table" style="margin-top:14px;">
+            <div class="table-row header" style="grid-template-columns:1.1fr 1fr .8fr .8fr;">Item <span>User</span><span>Severity</span><span>Action</span></div>
+            <div class="table-row" style="grid-template-columns:1.1fr 1fr .8fr .8fr;"><strong>Auto-apply packet uses salary answer</strong><span class="copy">Maya Chen</span><span class="chip amber">Review</span><span class="button-secondary">Open</span></div>
+            <div class="table-row" style="grid-template-columns:1.1fr 1fr .8fr .8fr;"><strong>Data delete request pending</strong><span class="copy">Jon Bell</span><span class="chip rose">Privacy</span><span class="button-secondary">Open</span></div>
+            <div class="table-row" style="grid-template-columns:1.1fr 1fr .8fr .8fr;"><strong>Template import failure spike</strong><span class="copy">System</span><span class="chip amber">Ops</span><span class="button-secondary">Inspect</span></div>
+          </div>
+        </section>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">System posture</p><h2 style="margin-top:8px;">Safe to operate</h2></div>
+        <div class="toggle-row"><div><h3>Human approval gate</h3><p class="small">Required before external submissions.</p></div><span class="switch on"></span></div>
+        <div class="toggle-row"><div><h3>Broad auto-apply</h3><p class="small">Disabled until job-board source exists.</p></div><span class="switch"></span></div>
+        <div class="toggle-row"><div><h3>Profile analysis</h3><p class="small">Enabled for active users.</p></div><span class="switch on"></span></div>
+        <div class="divider"></div>
+        <div class="policy-card"><h3>Admin principle</h3><p class="copy" style="margin-top:8px;">Admins control policy and recovery. Users keep control over personal submissions.</p></div>
+        <div class="policy-card"><h3>Next improvement</h3><p class="copy" style="margin-top:8px;">Add a dedicated review SLA: urgent privacy requests, automation risks, and failed exports.</p></div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen users">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Users</p><h3 style="margin-top:8px;">Account management</h3></div>
+        <div>
+          <div class="rail-link active"><span>All users</span><strong>2,184</strong></div>
+          <div class="rail-link"><span>Admins</span><strong>4</strong></div>
+          <div class="rail-link"><span>Paid users</span><strong>318</strong></div>
+          <div class="rail-link"><span>Trial users</span><strong>144</strong></div>
+          <div class="rail-link"><span>Suspended</span><strong>9</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div class="policy-card"><h3>Admin actions</h3><p class="small" style="margin-top:8px;">Change plan, reset status, view audit trail, export data, or delete career records with confirmation.</p></div>
+      </aside>
+
+      <section class="main">
+        <div class="hero">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">User management</p>
+            <h1>See each user's plan, activity, data, and risk status.</h1>
+            <p class="copy">This screen should answer: who is the user, what can they access, and what happened recently?</p>
+          </div>
+          <div style="display:flex;gap:10px;"><span class="button-secondary" style="background:#fff;">Export CSV</span><span class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Invite user</span></div>
+        </div>
+        <section class="panel" style="padding:18px;flex:1;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div><p class="kicker">Directory</p><h2 style="margin-top:7px;">Users</h2></div>
+            <div class="chip-row"><span class="chip blue">Search</span><span class="chip">Role</span><span class="chip">Plan</span><span class="chip">Status</span></div>
+          </div>
+          <div class="table" style="margin-top:14px;">
+            <div class="table-row header" style="grid-template-columns:1.2fr .7fr .7fr .7fr .8fr;">User <span>Role</span><span>Plan</span><span>Status</span><span>Action</span></div>
+            <div class="table-row" style="grid-template-columns:1.2fr .7fr .7fr .7fr .8fr;"><div style="display:flex;align-items:center;gap:12px;"><span class="user-avatar">MC</span><div><strong>Maya Chen</strong><p class="small">maya@example.com</p></div></div><span>user</span><span class="chip green">Pro</span><span class="chip green">Active</span><span class="button-secondary">Open</span></div>
+            <div class="table-row" style="grid-template-columns:1.2fr .7fr .7fr .7fr .8fr;"><div style="display:flex;align-items:center;gap:12px;"><span class="user-avatar">JB</span><div><strong>Jon Bell</strong><p class="small">jon@example.com</p></div></div><span>user</span><span class="chip">Free</span><span class="chip amber">Delete req</span><span class="button-secondary">Open</span></div>
+            <div class="table-row" style="grid-template-columns:1.2fr .7fr .7fr .7fr .8fr;"><div style="display:flex;align-items:center;gap:12px;"><span class="user-avatar">AR</span><div><strong>Ana Ruiz</strong><p class="small">ana@example.com</p></div></div><span>admin</span><span class="chip violet">Team</span><span class="chip green">Active</span><span class="button-secondary">Open</span></div>
+            <div class="table-row" style="grid-template-columns:1.2fr .7fr .7fr .7fr .8fr;"><div style="display:flex;align-items:center;gap:12px;"><span class="user-avatar">NP</span><div><strong>Noah Patel</strong><p class="small">noah@example.com</p></div></div><span>user</span><span class="chip blue">Trial</span><span class="chip rose">Flagged</span><span class="button-secondary">Open</span></div>
+            <div class="table-row" style="grid-template-columns:1.2fr .7fr .7fr .7fr .8fr;"><div style="display:flex;align-items:center;gap:12px;"><span class="user-avatar">SL</span><div><strong>Sofia Lee</strong><p class="small">sofia@example.com</p></div></div><span>user</span><span class="chip green">Pro</span><span class="chip green">Active</span><span class="button-secondary">Open</span></div>
+          </div>
+        </section>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Selected user</p><h2 style="margin-top:8px;">Maya Chen</h2><p class="copy" style="margin-top:6px;">Pro user. Active. 14 resumes, 5 job packets, 2 pending approvals.</p></div>
+        <div class="divider"></div>
+        <div class="metric-grid" style="grid-template-columns:1fr 1fr;">
+          <div class="metric-card panel" style="box-shadow:none;"><p class="kicker">Resumes</p><strong>14</strong></div>
+          <div class="metric-card panel" style="box-shadow:none;"><p class="kicker">Jobs</p><strong>9</strong></div>
+        </div>
+        <div class="policy-card"><h3>Entitlements</h3><div class="chip-row" style="margin-top:10px;"><span class="chip green">Resume editor</span><span class="chip green">Profile analysis</span><span class="chip amber">Auto-apply prep</span></div></div>
+        <div class="policy-card"><h3>Recent activity</h3><p class="small" style="margin-top:8px;">Generated profile analysis, saved tailored resume, prepared auto-apply packet.</p></div>
+        <div style="display:grid;gap:10px;margin-top:auto;"><span class="button">Manage plan</span><span class="button-secondary">View audit trail</span><span class="button-danger">Suspend account</span></div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen features">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Features</p><h3 style="margin-top:8px;">Product controls</h3></div>
+        <div>
+          <div class="rail-link active"><span>User workflow</span><strong>7</strong></div>
+          <div class="rail-link"><span>Plans</span><strong>3</strong></div>
+          <div class="rail-link"><span>Templates</span><strong>8</strong></div>
+          <div class="rail-link"><span>Sources</span><strong>5</strong></div>
+          <div class="rail-link"><span>Experiments</span><strong>2</strong></div>
+        </div>
+        <div class="footer-note"><p class="small">Feature controls should be reversible, auditable, and plan-aware.</p></div>
+      </aside>
+
+      <section class="main">
+        <div class="hero">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Workflow management</p>
+            <h1>Control every user-facing feature and who can access it.</h1>
+            <p class="copy">Admins can enable modules, set plan access, change templates, and enforce workflow policy.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Save policy changes</div>
+        </div>
+        <div class="card-grid">
+          <div class="function-card"><div style="display:flex;justify-content:space-between;gap:12px;"><div><p class="kicker">All resumes</p><h3 style="margin-top:8px;">Resume library</h3></div><span class="switch on"></span></div><p class="copy" style="margin-top:8px;">Manage master resumes, versions, shared links, and imports.</p><div class="chip-row" style="margin-top:12px;"><span class="chip green">Free+</span><span class="chip">Admin visible</span></div></div>
+          <div class="function-card"><div style="display:flex;justify-content:space-between;gap:12px;"><div><p class="kicker">Resume editor</p><h3 style="margin-top:8px;">Section editing</h3></div><span class="switch on"></span></div><p class="copy" style="margin-top:8px;">Edit sections, suggestions, ATS safety, version save, export.</p><div class="chip-row" style="margin-top:12px;"><span class="chip green">Free+</span><span class="chip blue">Core</span></div></div>
+          <div class="function-card"><div style="display:flex;justify-content:space-between;gap:12px;"><div><p class="kicker">Improvements</p><h3 style="margin-top:8px;">Guided coaching</h3></div><span class="switch on"></span></div><p class="copy" style="margin-top:8px;">Readiness score, next-best action, role-specific fixes.</p><div class="chip-row" style="margin-top:12px;"><span class="chip green">Pro</span><span class="chip">Rules</span></div></div>
+          <div class="function-card"><div style="display:flex;justify-content:space-between;gap:12px;"><div><p class="kicker">Profile analysis</p><h3 style="margin-top:8px;">Direction engine</h3></div><span class="switch on"></span></div><p class="copy" style="margin-top:8px;">Combines onboarding answers and resume to guide next steps.</p><div class="chip-row" style="margin-top:12px;"><span class="chip teal">No LLM</span><span class="chip green">Pro</span></div></div>
+          <div class="function-card"><div style="display:flex;justify-content:space-between;gap:12px;"><div><p class="kicker">Jobs</p><h3 style="margin-top:8px;">Apply targets</h3></div><span class="switch on"></span></div><p class="copy" style="margin-top:8px;">Job matching, batch builder, fit reasons, packet status.</p><div class="chip-row" style="margin-top:12px;"><span class="chip green">Pro</span><span class="chip amber">Review</span></div></div>
+          <div class="function-card"><div style="display:flex;justify-content:space-between;gap:12px;"><div><p class="kicker">Auto-apply</p><h3 style="margin-top:8px;">Preparation only</h3></div><span class="switch on"></span></div><p class="copy" style="margin-top:8px;">Prepares packets but cannot submit without human approval.</p><div class="chip-row" style="margin-top:12px;"><span class="chip amber">Beta</span><span class="chip green">Gate on</span></div></div>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Plan access</p><h2 style="margin-top:8px;">Entitlement matrix</h2></div>
+        <div class="toggle-row"><div><h3>Free</h3><p class="small">Library, editor, export basics.</p></div><span class="chip">Core</span></div>
+        <div class="toggle-row"><div><h3>Pro</h3><p class="small">Analysis, improvements, jobs, packets.</p></div><span class="chip green">Active</span></div>
+        <div class="toggle-row"><div><h3>Team</h3><p class="small">Admin reports, shared templates, review queues.</p></div><span class="chip violet">Pilot</span></div>
+        <div class="divider"></div>
+        <div><p class="kicker">Templates</p><h3 style="margin-top:8px;">Admin controls</h3><p class="copy" style="margin-top:8px;">Add, disable, or tag templates by role family. Track which templates produce better readiness.</p></div>
+        <div class="button">Open template manager</div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen automation">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Automation</p><h3 style="margin-top:8px;">Human-gated ops</h3></div>
+        <div>
+          <div class="rail-link active"><span>Approval queue</span><strong>19</strong></div>
+          <div class="rail-link"><span>Blocked actions</span><strong>7</strong></div>
+          <div class="rail-link"><span>Packet builder</span><strong>42</strong></div>
+          <div class="rail-link"><span>Question drafts</span><strong>11</strong></div>
+          <div class="rail-link"><span>Submissions</span><strong>0</strong></div>
+        </div>
+        <div class="footer-note"><p class="small">Admin sees automation state. Users approve personal submissions.</p></div>
+      </aside>
+
+      <section class="main">
+        <div class="hero">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Automation control</p>
+            <h1>Supervise auto-apply preparation without bypassing users.</h1>
+            <p class="copy">The admin console monitors risk, enforces blocked actions, and routes packets back to users for approval.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Review policy</div>
+        </div>
+        <div class="split">
+          <section class="panel" style="padding:16px;">
+            <div><p class="kicker">Queue</p><h2 style="margin-top:7px;">Packets needing attention</h2></div>
+            <div class="queue-card" style="margin-top:14px;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><h3>Salary answer requires review</h3><p class="small" style="margin-top:6px;">Maya Chen - Technical Support Specialist packet.</p></div><span class="chip amber">User approval</span></div></div>
+            <div class="queue-card" style="margin-top:12px;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><h3>Custom screening answer drafted</h3><p class="small" style="margin-top:6px;">Noah Patel - Customer Support Engineer.</p></div><span class="chip amber">Input needed</span></div></div>
+            <div class="queue-card" style="margin-top:12px;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><h3>Low-fit job held</h3><p class="small" style="margin-top:6px;">Junior QA role below configured threshold.</p></div><span class="chip rose">Blocked</span></div></div>
+            <div class="queue-card" style="margin-top:12px;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><h3>Job-board source missing</h3><p class="small" style="margin-top:6px;">External submission remains unavailable.</p></div><span class="chip teal">Policy OK</span></div></div>
+          </section>
+          <section class="panel" style="padding:16px;">
+            <div><p class="kicker">Policy rules</p><h2 style="margin-top:7px;">Submission safety</h2></div>
+            <div class="toggle-row" style="margin-top:10px;"><div><h3>Prepare packets automatically</h3><p class="small">Create resume version, cover note, tracker entry.</p></div><span class="switch on"></span></div>
+            <div class="toggle-row"><div><h3>Require user approval</h3><p class="small">Every packet must be explicitly approved.</p></div><span class="switch on"></span></div>
+            <div class="toggle-row"><div><h3>Allow external submission</h3><p class="small">Requires connected job source and user approval.</p></div><span class="switch"></span></div>
+            <div class="toggle-row"><div><h3>Use saved salary answers</h3><p class="small">Allowed only after first human confirmation.</p></div><span class="switch on"></span></div>
+            <div class="toggle-row"><div><h3>Apply below fit threshold</h3><p class="small">Blocked when fit is below 70.</p></div><span class="switch"></span></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Automation status</p><h2 style="margin-top:8px;">No silent submissions</h2></div>
+        <div class="timeline">
+          <div class="step"><span class="num green">1</span><div><h3>Prepare</h3><p class="small">Packets and answers can be drafted.</p></div></div>
+          <div class="step"><span class="num amber">2</span><div><h3>Approve</h3><p class="small">User must review every personal packet.</p></div></div>
+          <div class="step"><span class="num">3</span><div><h3>Submit</h3><p class="small">Only after approval and source connection.</p></div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="policy-card"><h3>Admin decision</h3><p class="copy" style="margin-top:8px;">Admins can change policy, not approve a user's personal application on their behalf.</p></div>
+        <div class="button">Send queue digest</div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen audit">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Audit</p><h3 style="margin-top:8px;">Privacy and logs</h3></div>
+        <div>
+          <div class="rail-link active"><span>Activity logs</span><strong>1,204</strong></div>
+          <div class="rail-link"><span>Data exports</span><strong>6</strong></div>
+          <div class="rail-link"><span>Delete requests</span><strong>2</strong></div>
+          <div class="rail-link"><span>Source catalog</span><strong>5</strong></div>
+          <div class="rail-link"><span>Incidents</span><strong>0</strong></div>
+        </div>
+        <div class="footer-note"><p class="small">Every admin action should be logged with who, what, when, and why.</p></div>
+      </aside>
+
+      <section class="main">
+        <div class="hero">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Audit and privacy</p>
+            <h1>Make sensitive actions visible, searchable, and reversible where possible.</h1>
+            <p class="copy">This screen centralizes logs, privacy requests, source controls, and operational health.</p>
+          </div>
+          <div style="display:flex;gap:10px;"><span class="button-secondary" style="background:#fff;">Export logs</span><span class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Open privacy queue</span></div>
+        </div>
+        <div class="split">
+          <section class="panel" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div><p class="kicker">Activity log</p><h2 style="margin-top:7px;">Recent events</h2></div>
+              <div class="chip-row"><span class="chip">Filter</span><span class="chip blue">Search</span></div>
+            </div>
+            <div class="table" style="margin-top:14px;">
+              <div class="table-row header" style="grid-template-columns:.75fr 1fr .9fr;">Time <span>Action</span><span>User</span></div>
+              <div class="table-row" style="grid-template-columns:.75fr 1fr .9fr;"><span class="small">10:42</span><strong>CAREER_PROFILE_ANALYSIS</strong><span>Maya Chen</span></div>
+              <div class="table-row" style="grid-template-columns:.75fr 1fr .9fr;"><span class="small">10:38</span><strong>ADMIN_PLAN_UPDATE</strong><span>Ana Ruiz</span></div>
+              <div class="table-row" style="grid-template-columns:.75fr 1fr .9fr;"><span class="small">10:31</span><strong>CAREER_DATA_DELETE</strong><span>Jon Bell</span></div>
+              <div class="table-row" style="grid-template-columns:.75fr 1fr .9fr;"><span class="small">10:22</span><strong>RESUME_EXPORT</strong><span>Sofia Lee</span></div>
+            </div>
+          </section>
+          <section class="panel" style="padding:16px;">
+            <div><p class="kicker">Privacy queue</p><h2 style="margin-top:7px;">Requests</h2></div>
+            <div class="log-card" style="margin-top:14px;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><h3>Data export request</h3><p class="small" style="margin-top:6px;">User requested full career toolkit export.</p></div><span class="chip blue">Ready</span></div><div class="button-secondary" style="margin-top:12px;">Review export</div></div>
+            <div class="log-card" style="margin-top:12px;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><h3>Delete career data</h3><p class="small" style="margin-top:6px;">Delete resumes, analyses, job tracker, shares, and achievements.</p></div><span class="chip rose">Confirm</span></div><div class="button-danger" style="margin-top:12px;">Confirm delete</div></div>
+            <div class="log-card" style="margin-top:12px;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><h3>Source disable request</h3><p class="small" style="margin-top:6px;">Disable custom profile source from onboarding options.</p></div><span class="chip amber">Admin</span></div><div class="button-secondary" style="margin-top:12px;">Open source</div></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Controls</p><h2 style="margin-top:8px;">Governance</h2></div>
+        <div class="toggle-row"><div><h3>Audit admin actions</h3><p class="small">Required for every privileged action.</p></div><span class="switch on"></span></div>
+        <div class="toggle-row"><div><h3>Export includes analysis</h3><p class="small">Include onboarding and profile analysis.</p></div><span class="switch on"></span></div>
+        <div class="toggle-row"><div><h3>Delete shared links</h3><p class="small">Include public resume shares in delete flow.</p></div><span class="switch on"></span></div>
+        <div class="divider"></div>
+        <div class="policy-card"><h3>Source catalog</h3><p class="copy" style="margin-top:8px;">Admins can enable LinkedIn, GitHub, custom profile sources, and future job-board connectors.</p></div>
+        <div class="policy-card"><h3>Operational health</h3><p class="copy" style="margin-top:8px;">Parser, export, email, and database checks should be visible here.</p></div>
+      </aside>
+    </main>
+  </section>
+
+  <script>
+    const view = new URLSearchParams(window.location.search).get("view") || "overview";
+    document.body.dataset.view = view;
+
+    const labels = ["overview", "users", "features", "automation", "audit"];
+    for (const slot of document.querySelectorAll("[data-nav]")) {
+      const nav = document.getElementById("nav-template").content.cloneNode(true);
+      slot.appendChild(nav);
+    }
+    for (const label of labels) {
+      for (const el of document.querySelectorAll(".tab-" + label)) {
+        if (label === view) el.classList.add("active");
+      }
+    }
+  </script>
+</body>
+</html>

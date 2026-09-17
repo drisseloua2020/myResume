@@ -1,0 +1,1367 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Proposal B Expanded Tabs</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ea;
+      --soft: #f5f7fa;
+      --panel: #ffffff;
+      --navy: #243449;
+      --blue: #2563eb;
+      --blue-soft: #eaf2ff;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --amber: #d97706;
+      --amber-soft: #fef3c7;
+      --rose: #e11d48;
+      --rose-soft: #ffe4e6;
+      --teal: #0f766e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 1440px;
+      height: 1000px;
+      overflow: hidden;
+      background: #e8edf3;
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .screen {
+      display: none;
+      width: 1440px;
+      height: 1000px;
+      overflow: hidden;
+      background: var(--soft);
+    }
+
+    body[data-view="resumes"] .resumes,
+    body[data-view="editor"] .editor,
+    body[data-view="improve"] .improve,
+    body[data-view="analysis"] .analysis,
+    body[data-view="jobs"] .jobs,
+    body[data-view="auto"] .auto,
+    body[data-view="approval"] .approval {
+      display: block;
+    }
+
+    .topbar {
+      height: 72px;
+      padding: 0 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 950;
+      min-width: 230px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .tab {
+      padding: 10px 13px;
+      border-radius: 8px;
+      color: #536174;
+      font-size: 13px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .top-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      min-width: 230px;
+    }
+
+    .button,
+    .button-secondary,
+    .button-danger,
+    .button-green {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .button {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+    }
+
+    .button-secondary {
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--ink);
+    }
+
+    .button-danger {
+      background: var(--rose-soft);
+      color: #be123c;
+      border: 1px solid #fecdd3;
+    }
+
+    .button-green {
+      background: var(--green);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(22, 163, 74, 0.18);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 250px 1fr 330px;
+      gap: 20px;
+      height: 928px;
+      padding: 24px 36px 30px;
+    }
+
+    .layout-wide {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      gap: 20px;
+      height: 928px;
+      padding: 24px 36px 30px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+    }
+
+    .rail {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .rail-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 42px;
+      padding: 0 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .rail-link.active {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .rail-link strong {
+      font-size: 12px;
+    }
+
+    .kicker {
+      margin: 0;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 32px;
+      line-height: 1.12;
+      font-weight: 950;
+    }
+
+    h2 {
+      font-size: 24px;
+      line-height: 1.16;
+      font-weight: 950;
+    }
+
+    h3 {
+      font-size: 17px;
+      line-height: 1.24;
+      font-weight: 950;
+    }
+
+    .copy {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.52;
+      font-weight: 700;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.42;
+      font-weight: 800;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 7px;
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .chip.blue {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .chip.green {
+      background: var(--green-soft);
+      color: #15803d;
+    }
+
+    .chip.amber {
+      background: var(--amber-soft);
+      color: #b45309;
+    }
+
+    .chip.rose {
+      background: var(--rose-soft);
+      color: #be123c;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--blue);
+    }
+
+    .metric-stack {
+      display: grid;
+      gap: 13px;
+    }
+
+    .metric {
+      display: grid;
+      gap: 7px;
+    }
+
+    .metric-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .hero-strip {
+      min-height: 110px;
+      padding: 20px 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 22px;
+      align-items: center;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.16);
+    }
+
+    .hero-strip .copy {
+      color: #cbd5e1;
+      margin-top: 8px;
+    }
+
+    .right {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .table {
+      display: grid;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .table-row {
+      display: grid;
+      align-items: center;
+      gap: 14px;
+      min-height: 70px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .table-row:last-child {
+      border-bottom: 0;
+    }
+
+    .table-row.header {
+      min-height: 44px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .mini-card {
+      padding: 16px;
+      min-height: 124px;
+    }
+
+    .resume-card {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 62px 1fr auto;
+      gap: 14px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .doc-icon {
+      display: grid;
+      place-items: center;
+      width: 62px;
+      height: 76px;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: var(--blue);
+      font-weight: 950;
+      border: 1px solid #bfdbfe;
+    }
+
+    .score-ring {
+      display: grid;
+      place-items: center;
+      width: 116px;
+      height: 116px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, #fff 58%, transparent 60%),
+        conic-gradient(var(--green) 0 266deg, #e2e8f0 266deg 360deg);
+    }
+
+    .score-ring strong {
+      font-size: 30px;
+      font-weight: 950;
+    }
+
+    .resume-preview {
+      padding: 22px;
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 18px;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .editor-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 18px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .editor-surface {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-button {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .editor-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .edit-block {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .edit-block.full {
+      grid-column: 1 / -1;
+    }
+
+    .field-label {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .field-box {
+      margin-top: 8px;
+      min-height: 42px;
+      padding: 11px 12px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 750;
+    }
+
+    .field-box.large {
+      min-height: 92px;
+    }
+
+    .bullet-editor {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .bullet-edit-row {
+      display: grid;
+      grid-template-columns: 26px 1fr auto;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .drag {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 34px;
+      border-radius: 7px;
+      background: #f1f5f9;
+      color: var(--muted);
+      font-weight: 950;
+    }
+
+    .editor-side {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .change-card {
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+
+    .change-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .section-map {
+      display: grid;
+      gap: 8px;
+    }
+
+    .section-map .rail-link {
+      min-height: 38px;
+    }
+
+    .paper {
+      height: 540px;
+      padding: 30px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+    }
+
+    .line {
+      height: 10px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      margin-top: 12px;
+    }
+
+    .line.blue {
+      background: #bfdbfe;
+    }
+
+    .section-title {
+      margin-top: 24px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #cbd5e1;
+      color: #1e3a8a;
+      font-size: 12px;
+      font-weight: 950;
+      text-transform: uppercase;
+    }
+
+    .bullet {
+      display: grid;
+      grid-template-columns: 8px 1fr;
+      gap: 10px;
+      margin-top: 12px;
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.42;
+      font-weight: 750;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      margin-top: 5px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+
+    .suggestion {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f8fafc;
+    }
+
+    .job-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .job-card.selected {
+      border-color: #93c5fd;
+      background: #eff6ff;
+      box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.1);
+    }
+
+    .job-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .match {
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 44px;
+      border-radius: 8px;
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 16px;
+      font-weight: 950;
+    }
+
+    .kanban {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .lane {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .packet {
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .approval-card {
+      padding: 18px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .approval-card.focus {
+      border-color: #93c5fd;
+      box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.1);
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .preview-box {
+      min-height: 260px;
+      padding: 16px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .timeline-step {
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .num.done {
+      background: var(--green);
+    }
+
+    .num.warn {
+      background: var(--amber);
+    }
+
+    .footer-note {
+      margin-top: auto;
+      padding: 12px;
+      border-radius: 9px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body data-view="resumes">
+  <template id="nav-template">
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark">RF</span>ResumeForge</div>
+      <nav class="tabs">
+        <span class="tab tab-resumes">All resumes</span>
+        <span class="tab tab-editor">Resume editor</span>
+        <span class="tab tab-improve">Improvements</span>
+        <span class="tab tab-analysis">Analysis</span>
+        <span class="tab tab-jobs">Jobs</span>
+        <span class="tab tab-auto">Auto-apply</span>
+        <span class="tab tab-approval">Approval</span>
+      </nav>
+      <div class="top-actions"><span class="button-secondary">Import</span><span class="button">Export</span></div>
+    </div>
+  </template>
+
+  <section class="screen resumes">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div>
+          <p class="kicker">Library</p>
+          <h3 style="margin-top:8px;">Resume system</h3>
+        </div>
+        <div>
+          <div class="rail-link active"><span>All resumes</span><strong>8</strong></div>
+          <div class="rail-link"><span>Master resume</span><strong>1</strong></div>
+          <div class="rail-link"><span>Tailored versions</span><strong>5</strong></div>
+          <div class="rail-link"><span>Shared links</span><strong>2</strong></div>
+          <div class="rail-link"><span>Archived</span><strong>3</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div class="metric-stack">
+          <div class="metric"><div class="metric-head"><span>Profile</span><span>100%</span></div><div class="progress"><span style="width:100%;background:var(--teal);"></span></div></div>
+          <div class="metric"><div class="metric-head"><span>Best resume</span><span>74%</span></div><div class="progress"><span style="width:74%;background:var(--amber);"></span></div></div>
+          <div class="metric"><div class="metric-head"><span>Ready packets</span><span>2</span></div><div class="progress"><span style="width:40%;"></span></div></div>
+        </div>
+        <div class="footer-note">
+          <p class="small">Purpose: make resume inventory visible before the user edits, tailors, or applies.</p>
+        </div>
+      </aside>
+
+      <section class="main">
+        <div class="hero-strip">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Resume management</p>
+            <h1>Resume versions in one place.</h1>
+            <p class="copy">See master, tailored variants, scores, links, and next actions.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Create new version</div>
+        </div>
+
+        <div class="card-grid">
+          <div class="mini-card panel"><p class="kicker">Master resume</p><h2 style="margin-top:8px;">Backend Support</h2><p class="copy" style="margin-top:8px;">Base profile for technical support roles.</p></div>
+          <div class="mini-card panel"><p class="kicker">Best readiness</p><h2 style="margin-top:8px;">74%</h2><p class="copy" style="margin-top:8px;">Needs stronger outcome metrics.</p></div>
+          <div class="mini-card panel"><p class="kicker">Active targets</p><h2 style="margin-top:8px;">3 job families</h2><p class="copy" style="margin-top:8px;">Technical support, app support, junior QA.</p></div>
+        </div>
+
+        <section class="panel" style="padding:18px;display:flex;flex-direction:column;gap:14px;flex:1;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div><p class="kicker">Resume list</p><h2 style="margin-top:7px;">Current versions</h2></div>
+            <div class="chip-row"><span class="chip blue">Search</span><span class="chip">Filter by job</span><span class="chip">Sort by readiness</span></div>
+          </div>
+          <div class="resume-card">
+            <div class="doc-icon">CV</div>
+            <div><h3>Backend Support Resume</h3><p class="copy" style="margin-top:6px;">Master resume. Last edited today. Linked to profile analysis.</p><div class="chip-row" style="margin-top:10px;"><span class="chip green">Current</span><span class="chip amber">74 readiness</span></div></div>
+            <div class="button">Improve</div>
+          </div>
+          <div class="resume-card">
+            <div class="doc-icon">TS</div>
+            <div><h3>Technical Support Specialist</h3><p class="copy" style="margin-top:6px;">Tailored packet for technical support roles. 2 job matches attached.</p><div class="chip-row" style="margin-top:10px;"><span class="chip blue">Tailored</span><span class="chip green">Ready packet</span></div></div>
+            <div class="button-secondary">Open</div>
+          </div>
+          <div class="resume-card">
+            <div class="doc-icon">QA</div>
+            <div><h3>Junior QA Analyst</h3><p class="copy" style="margin-top:6px;">Needs testing examples before high-confidence applications.</p><div class="chip-row" style="margin-top:10px;"><span class="chip amber">Needs work</span><span class="chip">68 readiness</span></div></div>
+            <div class="button-secondary">Review</div>
+          </div>
+          <div class="resume-card">
+            <div class="doc-icon">AS</div>
+            <div><h3>Application Support Analyst</h3><p class="copy" style="margin-top:6px;">Good SQL and troubleshooting match. Needs support volume metric.</p><div class="chip-row" style="margin-top:10px;"><span class="chip blue">Job linked</span><span class="chip">76 readiness</span></div></div>
+            <div class="button-secondary">Review</div>
+          </div>
+        </section>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Version health</p><h2 style="margin-top:8px;">What needs attention</h2></div>
+        <div class="score-ring"><strong>74</strong></div>
+        <p class="copy">The library should tell the user where to spend energy before they enter the editor.</p>
+        <div class="divider"></div>
+        <div class="suggestion"><h3>Duplicate content</h3><p class="small" style="margin-top:6px;">Three versions share the same summary. Suggest differentiated headlines.</p></div>
+        <div class="suggestion"><h3>Outdated share link</h3><p class="small" style="margin-top:6px;">One public link points to an older resume version.</p></div>
+        <div class="suggestion"><h3>Next action</h3><p class="small" style="margin-top:6px;">Improve the master resume before creating more packets.</p></div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen editor">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div>
+          <p class="kicker">Editor</p>
+          <h3 style="margin-top:8px;">Backend Support Resume</h3>
+        </div>
+        <div>
+          <div class="rail-link"><span>Versions</span><strong>4</strong></div>
+          <div class="rail-link active"><span>Current draft</span><strong>74</strong></div>
+          <div class="rail-link"><span>Technical Support</span><strong>82</strong></div>
+          <div class="rail-link"><span>Application Support</span><strong>76</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <p class="kicker">Sections</p>
+          <div class="section-map" style="margin-top:10px;">
+            <div class="rail-link"><span>Contact</span><strong>✓</strong></div>
+            <div class="rail-link active"><span>Summary</span><strong>Edit</strong></div>
+            <div class="rail-link"><span>Experience</span><strong>3</strong></div>
+            <div class="rail-link"><span>Skills</span><strong>12</strong></div>
+            <div class="rail-link"><span>Projects</span><strong>2</strong></div>
+            <div class="rail-link"><span>Education</span><strong>✓</strong></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="metric-stack">
+          <div class="metric"><div class="metric-head"><span>Completeness</span><span>91%</span></div><div class="progress"><span style="width:91%;background:var(--green);"></span></div></div>
+          <div class="metric"><div class="metric-head"><span>Readiness</span><span>74%</span></div><div class="progress"><span style="width:74%;background:var(--amber);"></span></div></div>
+          <div class="metric"><div class="metric-head"><span>ATS safety</span><span>Good</span></div><div class="progress"><span style="width:86%;"></span></div></div>
+        </div>
+      </aside>
+
+      <section class="main">
+        <div class="hero-strip">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Resume editor</p>
+            <h1>Edit with guidance beside the work.</h1>
+            <p class="copy">Write, review suggestions, save versions, check ATS safety, and export from one workflow.</p>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <div class="button-secondary" style="background:#fff;">Preview</div>
+            <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Save version</div>
+          </div>
+        </div>
+
+        <div class="editor-shell">
+          <section class="editor-surface panel">
+            <div class="editor-toolbar">
+              <div>
+                <p class="kicker">Editing</p>
+                <h2 style="margin-top:6px;">Summary and experience</h2>
+              </div>
+              <div class="tool-group">
+                <div class="icon-button">B</div>
+                <div class="icon-button">I</div>
+                <div class="icon-button">↕</div>
+                <div class="icon-button">↶</div>
+                <div class="icon-button">↷</div>
+              </div>
+            </div>
+
+            <div class="editor-form">
+              <div class="edit-block">
+                <div class="field-label">Resume title</div>
+                <div class="field-box">Backend Support Resume</div>
+              </div>
+              <div class="edit-block">
+                <div class="field-label">Target role</div>
+                <div class="field-box">Technical Support Specialist</div>
+              </div>
+              <div class="edit-block full">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                  <div>
+                    <div class="field-label">Professional summary</div>
+                    <p class="small" style="margin-top:4px;">Active suggestion: make the target role visible.</p>
+                  </div>
+                  <span class="chip amber">Needs stronger positioning</span>
+                </div>
+                <div class="field-box large">
+                  Technical support candidate with experience resolving internal workflow issues, documenting repeat incidents, and partnering with engineering to validate fixes before release.
+                </div>
+              </div>
+              <div class="edit-block full">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                  <div>
+                    <div class="field-label">Experience bullets</div>
+                    <p class="small" style="margin-top:4px;">Drag to reorder. Accept only true claims.</p>
+                  </div>
+                  <span class="chip blue">1 active</span>
+                </div>
+                <div class="bullet-editor">
+                  <div class="bullet-edit-row">
+                    <span class="drag">⋮</span>
+                    <div class="field-box">Supported internal tools and resolved recurring workflow issues for customer-facing teams.</div>
+                    <span class="chip amber">Metric?</span>
+                  </div>
+                  <div class="suggestion" style="padding:10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                      <p class="small">Two more experience bullets are collapsed while this bullet is being edited.</p>
+                      <span class="chip">Expand</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="editor-side">
+            <section class="panel" style="padding:16px;">
+              <p class="kicker">Suggested edit</p>
+              <h3 style="margin-top:8px;">Tighten the summary</h3>
+              <p class="copy" style="margin-top:8px;">Lead with technical support, API troubleshooting, documentation, and collaboration with engineering.</p>
+              <div class="change-card" style="margin-top:12px;">
+                <p class="small">Suggested replacement</p>
+                <p class="copy" style="margin-top:6px;color:var(--ink);">Technical support specialist focused on API troubleshooting, internal tools, documentation, and engineering handoff quality.</p>
+                <div class="change-actions">
+                  <div class="button" style="min-height:34px;padding:0 12px;">Apply</div>
+                  <div class="button-secondary" style="min-height:34px;padding:0 12px;">Edit</div>
+                  <div class="button-secondary" style="min-height:34px;padding:0 12px;">Dismiss</div>
+                </div>
+              </div>
+            </section>
+            <section class="panel" style="padding:16px;">
+              <p class="kicker">Checks</p>
+              <div class="suggestion" style="margin-top:10px;"><h3>ATS-safe layout</h3><p class="small" style="margin-top:6px;">No tables, columns, or decorative elements detected.</p></div>
+              <div class="suggestion" style="margin-top:10px;"><h3>Missing proof</h3><p class="small" style="margin-top:6px;">Add support volume, ticket count, response time, or quality result.</p></div>
+              <div class="suggestion" style="margin-top:10px;"><h3>Version rule</h3><p class="small" style="margin-top:6px;">Save this as a new version before tailoring for a specific job.</p></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div>
+          <p class="kicker">Workflow</p>
+          <h2 style="margin-top:8px;">Editor steps</h2>
+        </div>
+        <div class="timeline">
+          <div class="timeline-step"><span class="num done">1</span><div><h3>Select version</h3><p class="small">Start from master or a tailored resume.</p></div></div>
+          <div class="timeline-step"><span class="num">2</span><div><h3>Edit sections</h3><p class="small">Change summary, experience, skills, projects, and education.</p></div></div>
+          <div class="timeline-step"><span class="num warn">3</span><div><h3>Review suggestions</h3><p class="small">Accept, edit, or dismiss every recommended change.</p></div></div>
+          <div class="timeline-step"><span class="num">4</span><div><h3>Save version</h3><p class="small">Create a clear version before export or job tailoring.</p></div></div>
+          <div class="timeline-step"><span class="num">5</span><div><h3>Export or tailor</h3><p class="small">Export now or continue to job-specific packets.</p></div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="suggestion"><h3>Why this layout works</h3><p class="small" style="margin-top:6px;">The editor keeps the resume itself central while guidance stays available without taking control away from the user.</p></div>
+        <div class="button">Create job-tailored version</div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen improve">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Journey</p><h3 style="margin-top:8px;">Resume improvement</h3></div>
+        <div>
+          <div class="rail-link"><span>All resumes</span><strong>8</strong></div>
+          <div class="rail-link active"><span>Guided fixes</span><strong>Now</strong></div>
+          <div class="rail-link"><span>Profile analysis</span><strong>Ready</strong></div>
+          <div class="rail-link"><span>Jobs</span><strong>12</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div class="metric-stack">
+          <div class="metric"><div class="metric-head"><span>Profile</span><span>100%</span></div><div class="progress"><span style="width:100%;background:var(--teal);"></span></div></div>
+          <div class="metric"><div class="metric-head"><span>Resume</span><span>74%</span></div><div class="progress"><span style="width:74%;background:var(--amber);"></span></div></div>
+          <div class="metric"><div class="metric-head"><span>Apply</span><span>0%</span></div><div class="progress"><span style="width:10%;background:var(--rose);"></span></div></div>
+        </div>
+      </aside>
+
+      <section class="main">
+        <div class="hero-strip">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Recommended action</p>
+            <h1>Add impact metrics to your strongest three bullets.</h1>
+            <p class="copy">This is the fastest way to improve readiness before applying to technical support roles.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Start guided fix</div>
+        </div>
+        <div class="resume-preview panel">
+          <div class="paper">
+            <h1 style="font-size:28px;">Alex Morgan</h1>
+            <div class="line blue" style="width:44%;"></div>
+            <div class="line" style="width:64%;"></div>
+            <div class="section-title">Experience</div>
+            <div class="bullet"><span class="dot"></span><span>Supported internal tools and resolved recurring workflow issues for customer-facing teams.</span></div>
+            <div class="bullet"><span class="dot"></span><span>Improved ticket handoff quality by documenting repeat incidents and known fixes.</span></div>
+            <div class="bullet"><span class="dot"></span><span>Partnered with engineering to reproduce bugs and validate fixes before release.</span></div>
+            <div class="section-title">Skills</div>
+            <div class="chip-row" style="margin-top:12px;"><span class="chip">SQL</span><span class="chip">Python</span><span class="chip">API troubleshooting</span><span class="chip">CRM</span><span class="chip">Documentation</span></div>
+            <div class="section-title">Projects</div>
+            <div class="line" style="width:88%;"></div>
+            <div class="line" style="width:76%;"></div>
+          </div>
+          <aside style="display:flex;flex-direction:column;gap:12px;">
+            <div><p class="kicker">Live guidance</p><h2 style="margin-top:7px;">Resume checks</h2></div>
+            <div class="suggestion"><h3>Missing outcome</h3><p class="small" style="margin-top:6px;">Add a number, time saved, volume handled, or quality improvement.</p></div>
+            <div class="suggestion"><h3>Good keyword fit</h3><p class="small" style="margin-top:6px;">SQL, API, troubleshooting, and documentation match your direction.</p></div>
+            <div class="suggestion"><h3>Next version</h3><p class="small" style="margin-top:6px;">Create one tailored resume for Technical Support Specialist.</p></div>
+            <div class="button" style="margin-top:auto;">Create tailored version</div>
+          </aside>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Application readiness</p><h2 style="margin-top:8px;">Almost ready</h2></div>
+        <div style="display:grid;grid-template-columns:116px 1fr;gap:16px;align-items:center;">
+          <div class="score-ring"><strong>74</strong></div>
+          <p class="copy">Raise this to 80 before applying broadly. Focus on measurable evidence and role keywords.</p>
+        </div>
+        <div class="divider"></div>
+        <div class="suggestion"><h3>Ready</h3><p class="small" style="margin-top:6px;">Basics complete. Role family selected. ATS-safe layout.</p></div>
+        <div class="suggestion"><h3>Needs work</h3><p class="small" style="margin-top:6px;">Outcome metrics, cloud example, support volume, and ticketing proof.</p></div>
+        <div class="divider"></div>
+        <div><h3>Suggested job targets</h3><div class="chip-row" style="margin-top:12px;"><span class="chip blue">Technical Support</span><span class="chip">Application Support</span><span class="chip">Junior QA</span></div></div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen analysis">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Analysis</p><h3 style="margin-top:8px;">Report sections</h3></div>
+        <div>
+          <div class="rail-link active"><span>Overview</span><strong>01</strong></div>
+          <div class="rail-link"><span>Resume evidence</span><strong>02</strong></div>
+          <div class="rail-link"><span>Skill gaps</span><strong>03</strong></div>
+          <div class="rail-link"><span>Job direction</span><strong>04</strong></div>
+        </div>
+        <div class="divider"></div>
+        <p class="copy">The analysis should tell the user why the system recommends a direction, not only show scores.</p>
+      </aside>
+
+      <section class="main">
+        <div class="hero-strip">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Profile analysis</p>
+            <h1>Technical Support Growth Track</h1>
+            <p class="copy">Summary, score, plan, and job targets appear in one scan.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Refresh analysis</div>
+        </div>
+        <div class="card-grid">
+          <div class="mini-card panel"><p class="kicker">Resume category</p><h2 style="margin-top:8px;">Support Tech</h2><p class="copy" style="margin-top:8px;">Best current fit.</p></div>
+          <div class="mini-card panel"><p class="kicker">Readiness</p><h2 style="margin-top:8px;">74%</h2><p class="copy" style="margin-top:8px;">Improve before broad apply.</p></div>
+          <div class="mini-card panel"><p class="kicker">Skill focus</p><h2 style="margin-top:8px;">Cloud basics</h2><p class="copy" style="margin-top:8px;">Most useful next proof.</p></div>
+        </div>
+        <section class="panel" style="padding:22px;display:grid;grid-template-columns:1fr 180px;gap:22px;">
+          <div>
+            <p class="kicker">Profile category</p>
+            <h1 style="margin-top:8px;">Best positioned for customer-facing technical support roles.</h1>
+            <p class="copy" style="margin-top:12px;">The resume shows troubleshooting, documentation, and internal support. The main gap is stronger proof for tools, volume, cloud basics, and ticketing systems.</p>
+            <div class="chip-row" style="margin-top:18px;"><span class="chip blue">SQL</span><span class="chip blue">API troubleshooting</span><span class="chip green">Documentation</span><span class="chip amber">Needs metrics</span></div>
+          </div>
+          <div style="display:grid;place-items:center;"><div class="score-ring" style="background:radial-gradient(circle at center,#fff 58%,transparent 60%),conic-gradient(var(--blue) 0 310deg,#e2e8f0 310deg 360deg);"><strong>86</strong></div><p class="small">Category confidence</p></div>
+        </section>
+        <div class="card-grid">
+          <div class="mini-card panel"><p class="kicker">Build next</p><h3 style="margin-top:8px;">Cloud basics</h3><p class="small" style="margin-top:8px;">Add one proof point using AWS, Azure, monitoring, or access management.</p></div>
+          <div class="mini-card panel"><p class="kicker">Rewrite next</p><h3 style="margin-top:8px;">Three strongest bullets</h3><p class="small" style="margin-top:8px;">Add action, scope, and outcome to show impact.</p></div>
+          <div class="mini-card panel"><p class="kicker">Search terms</p><h3 style="margin-top:8px;">Support keywords</h3><p class="small" style="margin-top:8px;">Use technical support, SaaS, ticketing, SQL, API, and troubleshooting.</p></div>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Action plan</p><h2 style="margin-top:8px;">What to do this week</h2></div>
+        <div class="timeline">
+          <div class="timeline-step"><span class="num">1</span><div><h3>Improve resume evidence</h3><p class="small">Add support volume and ticketing metrics.</p></div></div>
+          <div class="timeline-step"><span class="num">2</span><div><h3>Create one tailored version</h3><p class="small">Target Technical Support Specialist first.</p></div></div>
+          <div class="timeline-step"><span class="num">3</span><div><h3>Apply to controlled batch</h3><p class="small">Use 5 roles, then review responses.</p></div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="job-card"><h3>Technical Support Specialist</h3><p class="small" style="margin-top:6px;">82% fit. Strongest immediate match.</p></div>
+        <div class="job-card"><h3>Application Support Analyst</h3><p class="small" style="margin-top:6px;">76% fit. Needs stronger SQL proof.</p></div>
+        <div class="button">Create resume packet</div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen jobs">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Jobs</p><h3 style="margin-top:8px;">Apply pipeline</h3></div>
+        <div>
+          <div class="rail-link active"><span>Recommended</span><strong>12</strong></div>
+          <div class="rail-link"><span>Selected</span><strong>5</strong></div>
+          <div class="rail-link"><span>Needs resume</span><strong>4</strong></div>
+          <div class="rail-link"><span>Rejected fit</span><strong>9</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div class="metric-stack">
+          <div class="metric"><div class="metric-head"><span>Avg fit</span><span>78%</span></div><div class="progress"><span style="width:78%;background:var(--green);"></span></div></div>
+          <div class="metric"><div class="metric-head"><span>Ready now</span><span>5</span></div><div class="progress"><span style="width:42%;"></span></div></div>
+        </div>
+      </aside>
+
+      <section class="main">
+        <div class="hero-strip">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Jobs to apply</p>
+            <h1>Choose jobs with a clear fit reason before automation starts.</h1>
+            <p class="copy">The system ranks jobs, explains why they fit, and lets the user select a controlled batch.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Build apply batch</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;min-height:0;">
+          <div class="job-card selected">
+            <div class="job-head"><div><p class="kicker">Selected</p><h2 style="margin-top:6px;">Technical Support Specialist</h2><p class="copy" style="margin-top:8px;">BrightLayer SaaS. Remote. Strong match for SQL, API troubleshooting, and documentation.</p></div><div class="match">82</div></div>
+            <div class="chip-row" style="margin-top:14px;"><span class="chip green">Ready packet</span><span class="chip blue">Remote</span><span class="chip">SQL</span><span class="chip">SaaS</span></div>
+          </div>
+          <div class="job-card selected">
+            <div class="job-head"><div><p class="kicker">Selected</p><h2 style="margin-top:6px;">Application Support Analyst</h2><p class="copy" style="margin-top:8px;">Northstar Health. Needs stronger SQL proof, but the role matches support operations.</p></div><div class="match">76</div></div>
+            <div class="chip-row" style="margin-top:14px;"><span class="chip amber">Tailor first</span><span class="chip">SQL</span><span class="chip">Ticketing</span></div>
+          </div>
+          <div class="job-card">
+            <div class="job-head"><div><p class="kicker">Review</p><h2 style="margin-top:6px;">Customer Support Engineer</h2><p class="copy" style="margin-top:8px;">Good customer-facing match. Needs stronger API example before applying.</p></div><div class="match" style="background:var(--amber-soft);color:#b45309;">72</div></div>
+            <div class="chip-row" style="margin-top:14px;"><span class="chip amber">Needs API proof</span><span class="chip">Customer support</span></div>
+          </div>
+          <div class="job-card">
+            <div class="job-head"><div><p class="kicker">Hold</p><h2 style="margin-top:6px;">Junior QA Analyst</h2><p class="copy" style="margin-top:8px;">Interesting pivot, but testing proof is weak. Save for later after one QA project.</p></div><div class="match" style="background:#f1f5f9;color:#475569;">68</div></div>
+            <div class="chip-row" style="margin-top:14px;"><span class="chip rose">Hold</span><span class="chip">Testing gap</span></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Batch builder</p><h2 style="margin-top:8px;">5 roles selected</h2></div>
+        <p class="copy">Controlled batches reduce risk and make feedback useful. The system should not apply broadly until the user approves.</p>
+        <div class="divider"></div>
+        <div class="suggestion"><h3>Selection rule</h3><p class="small" style="margin-top:6px;">Only include roles above 75 fit or with clear resume edits available.</p></div>
+        <div class="suggestion"><h3>Packet status</h3><p class="small" style="margin-top:6px;">2 ready, 3 need tailoring, 0 submitted.</p></div>
+        <div class="suggestion"><h3>Next approval</h3><p class="small" style="margin-top:6px;">User reviews final packets before external submission.</p></div>
+        <div class="button">Prepare auto-apply batch</div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen auto">
+    <div data-nav></div>
+    <main class="layout">
+      <aside class="rail panel">
+        <div><p class="kicker">Automation</p><h3 style="margin-top:8px;">Preparation steps</h3></div>
+        <div>
+          <div class="rail-link active"><span>Packet builder</span><strong>Now</strong></div>
+          <div class="rail-link"><span>Rules</span><strong>Set</strong></div>
+          <div class="rail-link"><span>Questions</span><strong>3</strong></div>
+          <div class="rail-link"><span>Approval queue</span><strong>5</strong></div>
+        </div>
+        <div class="divider"></div>
+        <p class="copy">Automation prepares. The human approves. The boundary should be obvious on every screen.</p>
+      </aside>
+
+      <section class="main">
+        <div class="hero-strip">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Auto-apply preparation</p>
+            <h1>Prepare every packet, answer gaps, and stop before submission.</h1>
+            <p class="copy">This view turns selected jobs into reviewable packets without hiding what the automation changed.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Send to approval</div>
+        </div>
+        <div class="kanban">
+          <section class="lane panel">
+            <div><p class="kicker">Step 1</p><h3 style="margin-top:6px;">Prepare packet</h3></div>
+            <div class="packet"><h3>Technical Support Specialist</h3><p class="small" style="margin-top:6px;">Resume version, cover note, tracker entry, and answer draft ready.</p><div class="chip-row" style="margin-top:10px;"><span class="chip green">Ready</span><span class="chip">82 fit</span></div></div>
+            <div class="packet"><h3>Application Support Analyst</h3><p class="small" style="margin-top:6px;">Resume needs SQL proof added before final review.</p><div class="chip-row" style="margin-top:10px;"><span class="chip amber">Tailoring</span><span class="chip">76 fit</span></div></div>
+            <div class="packet"><h3>Customer Support Engineer</h3><p class="small" style="margin-top:6px;">API troubleshooting example required.</p><div class="chip-row" style="margin-top:10px;"><span class="chip amber">Needs input</span></div></div>
+          </section>
+          <section class="lane panel">
+            <div><p class="kicker">Step 2</p><h3 style="margin-top:6px;">Resolve questions</h3></div>
+            <div class="packet"><h3>Salary expectation</h3><p class="small" style="margin-top:6px;">Ask user once, save reusable answer with editable range.</p><div class="button-secondary" style="margin-top:12px;">Answer now</div></div>
+            <div class="packet"><h3>Work authorization</h3><p class="small" style="margin-top:6px;">Use profile default, but require confirmation before first use.</p><div class="button-secondary" style="margin-top:12px;">Confirm</div></div>
+            <div class="packet"><h3>Custom screening question</h3><p class="small" style="margin-top:6px;">Draft available. Needs human approval because it uses personal experience.</p><div class="button-secondary" style="margin-top:12px;">Review draft</div></div>
+          </section>
+          <section class="lane panel">
+            <div><p class="kicker">Step 3</p><h3 style="margin-top:6px;">Approval staging</h3></div>
+            <div class="packet"><h3>Batch 01</h3><p class="small" style="margin-top:6px;">5 jobs, 5 packets, 3 answer drafts, 0 submissions.</p><div class="chip-row" style="margin-top:10px;"><span class="chip blue">Awaiting approval</span></div></div>
+            <div class="packet"><h3>Safety rules</h3><p class="small" style="margin-top:6px;">No external application is submitted until the user presses approve.</p></div>
+            <div class="packet"><h3>Audit trail</h3><p class="small" style="margin-top:6px;">Show what changed, source resume, answers used, and submission target.</p></div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="right panel">
+        <div><p class="kicker">Automation rules</p><h2 style="margin-top:8px;">Human in the loop</h2></div>
+        <div class="timeline">
+          <div class="timeline-step"><span class="num done">1</span><div><h3>Prepare only</h3><p class="small">Generate packets and drafts without applying.</p></div></div>
+          <div class="timeline-step"><span class="num warn">2</span><div><h3>Require approval</h3><p class="small">Each packet needs explicit human review.</p></div></div>
+          <div class="timeline-step"><span class="num">3</span><div><h3>Submit after approval</h3><p class="small">Submission can run only for approved items.</p></div></div>
+        </div>
+        <div class="divider"></div>
+        <div class="suggestion"><h3>Blocked actions</h3><p class="small" style="margin-top:6px;">No salary guesses. No custom answers sent without review. No job-board submission without connection and approval.</p></div>
+        <div class="button">Open approval queue</div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="screen approval">
+    <div data-nav></div>
+    <main class="layout-wide">
+      <aside class="rail panel">
+        <div><p class="kicker">Approval</p><h3 style="margin-top:8px;">Human review queue</h3></div>
+        <div>
+          <div class="rail-link active"><span>Needs approval</span><strong>5</strong></div>
+          <div class="rail-link"><span>Needs edit</span><strong>2</strong></div>
+          <div class="rail-link"><span>Approved</span><strong>0</strong></div>
+          <div class="rail-link"><span>Submitted</span><strong>0</strong></div>
+        </div>
+        <div class="divider"></div>
+        <p class="copy">This is the trust screen. It should be boring, explicit, and hard to misunderstand.</p>
+        <div class="footer-note"><p class="small">Design rule: every automation output must show source, change summary, risk, and approve controls.</p></div>
+      </aside>
+
+      <section class="main">
+        <div class="hero-strip">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Human approval</p>
+            <h1>Review exactly what will be submitted before the system acts.</h1>
+            <p class="copy">The user can approve, edit, hold, or reject every prepared job packet.</p>
+          </div>
+          <div style="display:flex;gap:10px;"><div class="button-secondary" style="background:#fff;">Approve selected</div><div class="button-green">Approve all safe</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:390px 1fr;gap:18px;min-height:0;flex:1;">
+          <section class="panel" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div><p class="kicker">Queue</p><h2 style="margin-top:7px;">Packets awaiting review</h2></div>
+            <div class="approval-card focus"><div class="job-head"><div><h3>Technical Support Specialist</h3><p class="small" style="margin-top:5px;">BrightLayer SaaS. Packet ready.</p></div><span class="chip green">Safe</span></div></div>
+            <div class="approval-card"><div class="job-head"><div><h3>Application Support Analyst</h3><p class="small" style="margin-top:5px;">SQL proof added. Review edits.</p></div><span class="chip amber">Check</span></div></div>
+            <div class="approval-card"><div class="job-head"><div><h3>Customer Support Engineer</h3><p class="small" style="margin-top:5px;">Custom answer drafted.</p></div><span class="chip amber">Input</span></div></div>
+            <div class="approval-card"><div class="job-head"><div><h3>Implementation Specialist</h3><p class="small" style="margin-top:5px;">Cover note ready.</p></div><span class="chip green">Safe</span></div></div>
+            <div class="approval-card"><div class="job-head"><div><h3>Junior QA Analyst</h3><p class="small" style="margin-top:5px;">Low fit. Hold suggested.</p></div><span class="chip rose">Risk</span></div></div>
+          </section>
+
+          <section class="panel" style="padding:18px;display:flex;flex-direction:column;gap:14px;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;">
+              <div><p class="kicker">Selected packet</p><h2 style="margin-top:7px;">Technical Support Specialist at BrightLayer SaaS</h2><p class="copy" style="margin-top:8px;">Prepared from Backend Support Resume. No external submission yet.</p></div>
+              <div class="chip-row"><span class="chip green">82 fit</span><span class="chip blue">Remote</span><span class="chip">Ready</span></div>
+            </div>
+            <div class="compare">
+              <div class="preview-box">
+                <p class="kicker">Resume changes</p>
+                <h3 style="margin-top:8px;">Tailored summary and bullets</h3>
+                <p class="copy" style="margin-top:10px;">Added technical support headline, moved API troubleshooting higher, and inserted support volume metric placeholder.</p>
+                <div class="line blue" style="width:80%;"></div>
+                <div class="line" style="width:94%;"></div>
+                <div class="line" style="width:76%;"></div>
+                <div class="chip-row" style="margin-top:16px;"><span class="chip amber">One placeholder needs confirmation</span></div>
+              </div>
+              <div class="preview-box">
+                <p class="kicker">Application answers</p>
+                <h3 style="margin-top:8px;">Reusable answers detected</h3>
+                <p class="copy" style="margin-top:10px;">Work authorization confirmed. Salary expectation requires approval before reuse.</p>
+                <div class="suggestion" style="margin-top:14px;"><h3>Salary expectation</h3><p class="small" style="margin-top:6px;">Draft: Open to market range based on role scope and total compensation.</p></div>
+              </div>
+            </div>
+            <div class="approval-card">
+              <div class="job-head">
+                <div><p class="kicker">Risk check</p><h3 style="margin-top:6px;">Nothing will be submitted until approved</h3><p class="small" style="margin-top:6px;">External job board is not connected in this mockup. This approval screen still defines the interaction contract.</p></div>
+                <span class="chip green">Human gate active</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:auto;">
+              <div class="button-danger">Reject</div>
+              <div class="button-secondary">Edit packet</div>
+              <div class="button-secondary">Hold</div>
+              <div class="button-green">Approve this packet</div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <script>
+    const view = new URLSearchParams(window.location.search).get("view") || "resumes";
+    document.body.dataset.view = view;
+
+    const labels = ["resumes", "editor", "improve", "analysis", "jobs", "auto", "approval"];
+    for (const slot of document.querySelectorAll("[data-nav]")) {
+      const nav = document.getElementById("nav-template").content.cloneNode(true);
+      slot.appendChild(nav);
+    }
+    for (const label of labels) {
+      for (const el of document.querySelectorAll(".tab-" + label)) {
+        if (label === view) el.classList.add("active");
+      }
+    }
+  </script>
+</body>
+</html>

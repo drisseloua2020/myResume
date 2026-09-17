@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ResumeForge UX Proposals</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #dbe3ea;
+      --panel: #ffffff;
+      --soft: #f6f8fb;
+      --blue: #2563eb;
+      --blue-dark: #1e3a8a;
+      --teal: #0f766e;
+      --green: #16a34a;
+      --amber: #d97706;
+      --rose: #e11d48;
+      --navy: #243449;
+      --lavender: #eef2ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 1440px;
+      height: 1000px;
+      overflow: hidden;
+      background: #e8edf3;
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .canvas {
+      display: none;
+      position: relative;
+      width: 1440px;
+      height: 1000px;
+      overflow: hidden;
+      background: var(--soft);
+    }
+
+    body[data-view="onboarding"] .onboarding,
+    body[data-view="workspace"] .workspace,
+    body[data-view="analysis"] .analysis {
+      display: block;
+    }
+
+    .topbar {
+      height: 72px;
+      padding: 0 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      background: rgba(255, 255, 255, 0.94);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 15px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav span {
+      padding: 10px 14px;
+      border-radius: 9px;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .nav .active {
+      background: #eaf2ff;
+      color: var(--blue);
+    }
+
+    .button,
+    .button-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .button {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 8px 22px rgba(37, 99, 235, 0.22);
+    }
+
+    .button-secondary {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .proposal-tag {
+      position: absolute;
+      top: 90px;
+      left: 44px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
+    }
+
+    .subtle-panel {
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .kicker {
+      margin: 0;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 46px;
+      line-height: 1.05;
+      font-weight: 950;
+    }
+
+    h2 {
+      font-size: 28px;
+      line-height: 1.14;
+      font-weight: 950;
+    }
+
+    h3 {
+      font-size: 18px;
+      line-height: 1.25;
+      font-weight: 950;
+    }
+
+    .body-copy {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.55;
+      font-weight: 600;
+    }
+
+    .small-copy {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    .chip {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .chip.blue {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .chip.green {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .chip.amber {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .progress-line {
+      position: relative;
+      height: 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+
+    .progress-line span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--blue), var(--teal));
+    }
+
+    .score-ring {
+      display: grid;
+      place-items: center;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, #fff 58%, transparent 60%),
+        conic-gradient(var(--green) 0 268deg, #e2e8f0 268deg 360deg);
+    }
+
+    .score-ring strong {
+      font-size: 32px;
+      font-weight: 950;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+    }
+
+    /* Proposal 1: onboarding */
+    .onboarding {
+      background:
+        linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent 34%),
+        linear-gradient(315deg, rgba(15, 118, 110, 0.12), transparent 36%),
+        #f7f9fc;
+    }
+
+    .onboarding .content {
+      position: absolute;
+      left: 64px;
+      right: 64px;
+      top: 128px;
+      bottom: 48px;
+      display: grid;
+      grid-template-columns: 0.92fr 1.08fr;
+      gap: 34px;
+    }
+
+    .story {
+      padding: 42px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 14px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .story::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      bottom: -110px;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      border: 42px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .story .body-copy {
+      color: #dbeafe;
+      max-width: 450px;
+    }
+
+    .samanta-card {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 16px;
+      padding: 18px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      max-width: 500px;
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      background: #fff;
+      color: var(--blue-dark);
+      font-weight: 950;
+      font-size: 22px;
+    }
+
+    .steps {
+      display: grid;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .step-row {
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      color: #e2e8f0;
+      font-weight: 850;
+    }
+
+    .step-row .num {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.14);
+      font-size: 13px;
+    }
+
+    .question-panel {
+      padding: 34px;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .question-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .question-header h2 {
+      max-width: 560px;
+      margin-top: 8px;
+    }
+
+    .step-pill {
+      white-space: nowrap;
+      padding: 9px 11px;
+      border-radius: 8px;
+      background: #eef2ff;
+      color: #4338ca;
+      font-size: 12px;
+      font-weight: 950;
+    }
+
+    .option-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .option {
+      min-height: 96px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .option.active {
+      border-color: #93c5fd;
+      background: #eff6ff;
+      box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.12);
+    }
+
+    .option strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+      font-weight: 950;
+    }
+
+    .upload-strip {
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      border-radius: 10px;
+    }
+
+    .upload-icon {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      background: #e0f2fe;
+      color: #0369a1;
+      font-weight: 950;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 4px;
+    }
+
+    /* Proposal 2: workspace */
+    .workspace {
+      background: #f5f7fa;
+    }
+
+    .workspace-shell {
+      display: grid;
+      grid-template-columns: 260px 1fr 330px;
+      gap: 20px;
+      padding: 24px 36px 30px;
+      height: 928px;
+    }
+
+    .side-nav {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .side-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .side-link.active {
+      background: #eaf2ff;
+      color: var(--blue);
+    }
+
+    .journey {
+      display: grid;
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .journey-item {
+      display: grid;
+      gap: 7px;
+    }
+
+    .workspace-main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .action-banner {
+      min-height: 104px;
+      padding: 18px 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 24px;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 16px 38px rgba(15, 23, 42, 0.16);
+    }
+
+    .action-banner .body-copy {
+      color: #cbd5e1;
+      margin-top: 8px;
+    }
+
+    .editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 18px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .resume-editor {
+      padding: 22px;
+      min-height: 0;
+    }
+
+    .resume-page {
+      height: 554px;
+      padding: 30px;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+    }
+
+    .resume-name {
+      font-size: 28px;
+      font-weight: 950;
+    }
+
+    .resume-line {
+      height: 10px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      margin-top: 12px;
+    }
+
+    .resume-line.blue {
+      background: #bfdbfe;
+    }
+
+    .resume-section {
+      margin-top: 24px;
+    }
+
+    .resume-section h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      color: var(--blue-dark);
+      padding-bottom: 8px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+
+    .resume-bullet {
+      display: grid;
+      grid-template-columns: 8px 1fr;
+      gap: 10px;
+      align-items: start;
+      margin-top: 12px;
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #94a3b8;
+      margin-top: 6px;
+    }
+
+    .coach-panel {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .suggestion {
+      padding: 12px;
+      border-radius: 9px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .right-rail {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .readiness-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 10px;
+    }
+
+    .check-item {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 9px;
+      align-items: start;
+      font-size: 13px;
+      font-weight: 800;
+      color: #334155;
+      line-height: 1.4;
+    }
+
+    .check {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .check.warn {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    /* Proposal 3: analysis */
+    .analysis {
+      background: #f6f8fb;
+    }
+
+    .analysis-header {
+      height: 268px;
+      padding: 34px 46px;
+      background: var(--navy);
+      color: #fff;
+      position: relative;
+    }
+
+    .analysis-header .topbar-lite {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 36px;
+    }
+
+    .analysis-header h1 {
+      max-width: 760px;
+      font-size: 42px;
+    }
+
+    .analysis-header .body-copy {
+      color: #cbd5e1;
+      max-width: 760px;
+      margin-top: 10px;
+    }
+
+    .summary-strip {
+      position: absolute;
+      left: 46px;
+      right: 46px;
+      bottom: -54px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .summary-card {
+      padding: 18px;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+
+    .summary-card strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 22px;
+      font-weight: 950;
+      color: var(--ink);
+    }
+
+    .analysis-body {
+      display: grid;
+      grid-template-columns: 220px 1fr 360px;
+      gap: 20px;
+      padding: 86px 46px 28px;
+    }
+
+    .tab-rail {
+      padding: 16px;
+      height: 590px;
+    }
+
+    .tab-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+      padding: 0 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .tab-button.active {
+      background: #eaf2ff;
+      color: var(--blue);
+    }
+
+    .analysis-main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .profile-card {
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 190px;
+      gap: 24px;
+    }
+
+    .profile-card .score-ring {
+      width: 150px;
+      height: 150px;
+      background:
+        radial-gradient(circle at center, #fff 58%, transparent 60%),
+        conic-gradient(var(--blue) 0 310deg, #e2e8f0 310deg 360deg);
+    }
+
+    .profile-card .score-ring strong {
+      font-size: 34px;
+    }
+
+    .skill-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .skill-card {
+      padding: 18px;
+      min-height: 142px;
+    }
+
+    .skill-card .small-copy {
+      margin-top: 8px;
+    }
+
+    .plan-rail {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+      height: 590px;
+    }
+
+    .plan-step {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .plan-num {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: var(--ink);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .job-card {
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 9px;
+      background: #f8fafc;
+    }
+  </style>
+</head>
+<body data-view="onboarding">
+  <section class="canvas onboarding">
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark">RF</span>ResumeForge</div>
+      <div class="nav">
+        <span class="active">Onboarding</span>
+        <span>Workspace</span>
+        <span>Profile analysis</span>
+      </div>
+      <div class="button-secondary">Save and exit</div>
+    </div>
+    <div class="proposal-tag">Proposal A - Guided onboarding</div>
+    <main class="content">
+      <section class="story">
+        <div>
+          <p class="kicker" style="color:#93c5fd;">Career setup</p>
+          <h1 style="margin-top:12px;">Make the first session feel focused, short, and useful.</h1>
+          <p class="body-copy" style="margin-top:18px;">
+            The user sees why each answer matters, how much is left, and what will happen after upload.
+          </p>
+          <div class="steps">
+            <div class="step-row"><span class="num">1</span><span>Experience level</span><strong>Done</strong></div>
+            <div class="step-row"><span class="num">2</span><span>Target role family</span><strong>Now</strong></div>
+            <div class="step-row"><span class="num">3</span><span>Resume upload</span><strong>Next</strong></div>
+            <div class="step-row"><span class="num">4</span><span>Profile direction</span><strong>Final</strong></div>
+          </div>
+        </div>
+        <div class="samanta-card">
+          <div class="avatar">S</div>
+          <div>
+            <h3>Hi, I am Samanta.</h3>
+            <p class="small-copy" style="color:#dbeafe;margin-top:6px;">
+              I will ask only what helps tailor your resume and profile analysis. You can update these answers later.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="question-panel panel">
+        <div class="question-header">
+          <div>
+            <p class="kicker">Question 2 of 4</p>
+            <h2>Which role family should your profile be optimized toward?</h2>
+          </div>
+          <span class="step-pill">3 minutes left</span>
+        </div>
+        <div class="progress-line"><span style="width:50%"></span></div>
+        <div class="option-grid">
+          <div class="option active">
+            <strong>Software and IT</strong>
+            <p class="small-copy">Engineering, analytics, cloud, support, QA, product operations.</p>
+          </div>
+          <div class="option">
+            <strong>Customer success</strong>
+            <p class="small-copy">Onboarding, account support, service, retention, client operations.</p>
+          </div>
+          <div class="option">
+            <strong>Operations</strong>
+            <p class="small-copy">Coordination, process improvement, logistics, team support.</p>
+          </div>
+          <div class="option">
+            <strong>Business roles</strong>
+            <p class="small-copy">Sales, marketing, administration, finance, growth, partnerships.</p>
+          </div>
+        </div>
+        <div class="upload-strip">
+          <div class="upload-icon">CV</div>
+          <div>
+            <h3>Attach resume when ready</h3>
+            <p class="small-copy">Accepted: PDF, DOCX, or pasted text. The next page opens with your details prepared.</p>
+          </div>
+          <div class="button-secondary">Upload</div>
+        </div>
+        <div class="actions">
+          <div class="small-copy">Used for resume guidance, profile analysis, and job matching.</div>
+          <div style="display:flex;gap:10px;">
+            <div class="button-secondary">Back</div>
+            <div class="button">Continue</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <section class="canvas workspace">
+    <div class="topbar">
+      <div class="brand"><span class="brand-mark">RF</span>ResumeForge</div>
+      <div class="nav">
+        <span>Dashboard</span>
+        <span class="active">Resume workspace</span>
+        <span>Jobs</span>
+        <span>Profile analysis</span>
+      </div>
+      <div class="button">Export resume</div>
+    </div>
+    <main class="workspace-shell">
+      <aside class="side-nav panel">
+        <div>
+          <p class="kicker">Journey</p>
+          <h3 style="margin-top:8px;">Your next best step</h3>
+        </div>
+        <div>
+          <div class="side-link active"><span>Resume editor</span><strong>Now</strong></div>
+          <div class="side-link"><span>Profile analysis</span><strong>Ready</strong></div>
+          <div class="side-link"><span>Job tracker</span><strong>0</strong></div>
+          <div class="side-link"><span>Versions</span><strong>2</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div class="journey">
+          <div class="journey-item">
+            <div style="display:flex;justify-content:space-between;"><strong>Profile</strong><span class="small-copy">100%</span></div>
+            <div class="progress-line"><span style="width:100%"></span></div>
+          </div>
+          <div class="journey-item">
+            <div style="display:flex;justify-content:space-between;"><strong>Resume</strong><span class="small-copy">72%</span></div>
+            <div class="progress-line"><span style="width:72%;background:var(--amber);"></span></div>
+          </div>
+          <div class="journey-item">
+            <div style="display:flex;justify-content:space-between;"><strong>Apply</strong><span class="small-copy">0%</span></div>
+            <div class="progress-line"><span style="width:12%;background:var(--rose);"></span></div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="workspace-main">
+        <div class="action-banner">
+          <div>
+            <p class="kicker" style="color:#93c5fd;">Recommended action</p>
+            <h2 style="margin-top:8px;">Add impact metrics to your strongest three bullets.</h2>
+            <p class="body-copy">This is the fastest way to improve readiness before applying to software support roles.</p>
+          </div>
+          <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Start guided fix</div>
+        </div>
+
+        <div class="editor-grid">
+          <section class="resume-editor panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+              <div>
+                <p class="kicker">Current resume</p>
+                <h2 style="margin-top:6px;">Backend Support Resume</h2>
+              </div>
+              <div class="chip-row">
+                <span class="chip green">Saved</span>
+                <span class="chip blue">ATS safe</span>
+              </div>
+            </div>
+            <div class="resume-page">
+              <div class="resume-name">Alex Morgan</div>
+              <div class="resume-line blue" style="width:52%;"></div>
+              <div class="resume-line" style="width:74%;"></div>
+              <div class="resume-section">
+                <h3>Experience</h3>
+                <div class="resume-bullet"><span class="dot"></span><span>Supported internal tools and resolved recurring workflow issues for customer-facing teams.</span></div>
+                <div class="resume-bullet"><span class="dot"></span><span>Improved ticket handoff quality by documenting repeat incidents and known fixes.</span></div>
+                <div class="resume-bullet"><span class="dot"></span><span>Partnered with engineering to reproduce bugs and validate fixes before release.</span></div>
+              </div>
+              <div class="resume-section">
+                <h3>Skills</h3>
+                <div class="chip-row" style="margin-top:12px;">
+                  <span class="chip">SQL</span>
+                  <span class="chip">Python</span>
+                  <span class="chip">API troubleshooting</span>
+                  <span class="chip">CRM</span>
+                  <span class="chip">Documentation</span>
+                </div>
+              </div>
+              <div class="resume-section">
+                <h3>Projects</h3>
+                <div class="resume-line" style="width:88%;"></div>
+                <div class="resume-line" style="width:76%;"></div>
+                <div class="resume-line" style="width:69%;"></div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="coach-panel panel">
+            <div>
+              <p class="kicker">Live guidance</p>
+              <h3 style="margin-top:7px;">Resume checks</h3>
+            </div>
+            <div class="suggestion">
+              <strong>Missing outcome</strong>
+              <p class="small-copy" style="margin-top:6px;">Add a number, time saved, volume handled, or quality improvement.</p>
+            </div>
+            <div class="suggestion">
+              <strong>Good keyword fit</strong>
+              <p class="small-copy" style="margin-top:6px;">SQL, API, troubleshooting, and documentation match your direction.</p>
+            </div>
+            <div class="suggestion">
+              <strong>Next version</strong>
+              <p class="small-copy" style="margin-top:6px;">Create one tailored resume for Technical Support Specialist.</p>
+            </div>
+            <div class="button" style="margin-top:auto;">Create tailored version</div>
+          </aside>
+        </div>
+      </section>
+
+      <aside class="right-rail panel">
+        <div>
+          <p class="kicker">Application readiness</p>
+          <h2 style="margin-top:8px;">Almost ready</h2>
+        </div>
+        <div class="readiness-row">
+          <div class="score-ring"><strong>74</strong></div>
+          <p class="body-copy">Raise this to 80 before applying broadly. Focus on measurable evidence and role keywords.</p>
+        </div>
+        <div class="divider"></div>
+        <div class="checklist">
+          <div class="check-item"><span class="check">✓</span><span>Resume basics complete</span></div>
+          <div class="check-item"><span class="check">✓</span><span>Role family selected</span></div>
+          <div class="check-item"><span class="check warn">!</span><span>Needs stronger outcome metrics</span></div>
+          <div class="check-item"><span class="check warn">!</span><span>Missing cloud or ticketing examples</span></div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <h3>Suggested job targets</h3>
+          <div class="chip-row" style="margin-top:12px;">
+            <span class="chip blue">Technical Support</span>
+            <span class="chip">Application Support</span>
+            <span class="chip">Junior QA</span>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </section>
+
+  <section class="canvas analysis">
+    <header class="analysis-header">
+      <div class="topbar-lite">
+        <div class="brand"><span class="brand-mark" style="background:#fff;color:var(--navy);">RF</span>ResumeForge</div>
+        <div class="button" style="background:#fff;color:var(--navy);box-shadow:none;">Refresh analysis</div>
+      </div>
+      <p class="kicker" style="color:#93c5fd;">Profile analysis</p>
+      <h1 style="margin-top:8px;">Technical Support Growth Track</h1>
+      <p class="body-copy">
+        Summary, score, plan, and job targets appear in one scan.
+      </p>
+      <div class="summary-strip">
+        <div class="summary-card"><p class="small-copy">Resume category</p><strong>Support Tech</strong></div>
+        <div class="summary-card"><p class="small-copy">Readiness</p><strong>74%</strong></div>
+        <div class="summary-card"><p class="small-copy">Skill focus</p><strong>Cloud basics</strong></div>
+        <div class="summary-card"><p class="small-copy">Apply batch</p><strong>5 roles</strong></div>
+      </div>
+    </header>
+
+    <main class="analysis-body">
+      <aside class="tab-rail panel">
+        <div class="tab-button active"><span>Overview</span><strong>01</strong></div>
+        <div class="tab-button"><span>Resume evidence</span><strong>02</strong></div>
+        <div class="tab-button"><span>Skills needed</span><strong>03</strong></div>
+        <div class="tab-button"><span>Jobs to apply</span><strong>04</strong></div>
+        <div class="divider" style="margin:14px 0;"></div>
+        <p class="small-copy" style="padding:0 10px;">Tabs stay available, but the overview makes the next move obvious.</p>
+      </aside>
+
+      <section class="analysis-main">
+        <div class="profile-card panel">
+          <div>
+            <p class="kicker">Profile category</p>
+            <h2 style="margin-top:8px;">Best positioned for customer-facing technical support roles.</h2>
+            <p class="body-copy" style="margin-top:12px;">
+              Your resume already shows troubleshooting, documentation, and internal support. The main gap is stronger proof for tools, volume, and cloud or ticketing systems.
+            </p>
+            <div class="chip-row" style="margin-top:18px;">
+              <span class="chip blue">SQL</span>
+              <span class="chip blue">API troubleshooting</span>
+              <span class="chip green">Documentation</span>
+              <span class="chip amber">Needs metrics</span>
+            </div>
+          </div>
+          <div style="display:grid;place-items:center;">
+            <div class="score-ring"><strong>86</strong></div>
+            <p class="small-copy" style="margin-top:10px;text-align:center;">Category confidence</p>
+          </div>
+        </div>
+
+        <div class="skill-grid">
+          <div class="skill-card panel">
+            <p class="kicker">Build next</p>
+            <h3 style="margin-top:8px;">Cloud basics</h3>
+            <p class="small-copy">Add one proof point using AWS, Azure, deployment logs, monitoring, or access management.</p>
+          </div>
+          <div class="skill-card panel">
+            <p class="kicker">Rewrite next</p>
+            <h3 style="margin-top:8px;">Three strongest bullets</h3>
+            <p class="small-copy">Add action, scope, and outcome so employers see impact, not only responsibilities.</p>
+          </div>
+          <div class="skill-card panel">
+            <p class="kicker">Search terms</p>
+            <h3 style="margin-top:8px;">Support + technical keywords</h3>
+            <p class="small-copy">Use technical support, application support, SQL, API, SaaS, ticketing, and troubleshooting.</p>
+          </div>
+          <div class="skill-card panel">
+            <p class="kicker">Risk</p>
+            <h3 style="margin-top:8px;">Apply slowly until readiness improves</h3>
+            <p class="small-copy">Start with 5 roles, measure responses, then expand once the resume reaches 80+.</p>
+          </div>
+        </div>
+      </section>
+
+      <aside class="plan-rail panel">
+        <div>
+          <p class="kicker">Action plan</p>
+          <h2 style="margin-top:8px;">What to do this week</h2>
+        </div>
+        <div class="plan-step">
+          <span class="plan-num">1</span>
+          <div><h3>Improve resume evidence</h3><p class="small-copy">Add metrics to support and troubleshooting bullets.</p></div>
+        </div>
+        <div class="plan-step">
+          <span class="plan-num">2</span>
+          <div><h3>Create one role-specific version</h3><p class="small-copy">Target Technical Support Specialist first.</p></div>
+        </div>
+        <div class="plan-step">
+          <span class="plan-num">3</span>
+          <div><h3>Apply to a controlled batch</h3><p class="small-copy">Use 5 roles, then review response patterns.</p></div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <h3>Top job matches</h3>
+          <div class="job-card" style="margin-top:12px;"><strong>Technical Support Specialist</strong><p class="small-copy">82% fit - strongest immediate match.</p></div>
+          <div class="job-card" style="margin-top:10px;"><strong>Application Support Analyst</strong><p class="small-copy">76% fit - needs stronger SQL proof.</p></div>
+          <div class="chip-row" style="margin-top:10px;"><span class="chip">Junior QA Analyst</span><span class="chip amber">Needs testing proof</span></div>
+        </div>
+        <div class="button" style="margin-top:auto;min-height:38px;">Create resume packet</div>
+      </aside>
+    </main>
+  </section>
+
+  <script>
+    const view = new URLSearchParams(window.location.search).get("view") || "onboarding";
+    document.body.dataset.view = view;
+  </script>
+</body>
+</html>
