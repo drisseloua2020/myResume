@@ -45,6 +45,7 @@ export default function ResumeImprovementWorkflowPage({
       title="Improve the resume before broad applications."
       description="Focus the user on one next-best action, then move them back into the editor or forward into profile analysis."
       steps={steps}
+      showJourneyMenu={false}
       metrics={metrics}
       primaryAction={
         <button type="button" onClick={onOpenEditor} className="rounded bg-white px-5 py-3 text-sm font-black text-[#243449]">
