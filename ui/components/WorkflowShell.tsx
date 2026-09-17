@@ -18,6 +18,7 @@ type WorkflowShellProps = {
   description: string;
   primaryAction?: React.ReactNode;
   steps: WorkflowStep[];
+  showJourneyMenu?: boolean;
   metrics?: WorkflowMetric[];
   asideTitle?: string;
   asideDescription?: string;
@@ -51,6 +52,7 @@ export default function WorkflowShell({
   description,
   primaryAction,
   steps,
+  showJourneyMenu = true,
   metrics = [],
   asideTitle = 'Workflow',
   asideDescription,
@@ -61,24 +63,28 @@ export default function WorkflowShell({
     <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7fa] px-4 py-6 lg:px-8">
       <div className="mx-auto grid max-w-[96rem] gap-5 xl:grid-cols-[260px_minmax(0,1fr)_320px]">
         <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-black uppercase text-blue-700">Journey</p>
-          <h2 className="mt-2 text-lg font-black text-slate-950">Career workflow</h2>
-          <div className="mt-5 space-y-2">
-            {steps.map((step) => (
-              <div
-                key={step.label}
-                className={[
-                  'flex items-center justify-between rounded px-3 py-2 text-sm font-black',
-                  step.active ? 'bg-blue-50 text-blue-700' : 'text-slate-600',
-                ].join(' ')}
-              >
-                <span>{step.label}</span>
-                <span className="text-xs">{step.status}</span>
+          {showJourneyMenu && (
+            <>
+              <p className="text-xs font-black uppercase text-blue-700">Journey</p>
+              <h2 className="mt-2 text-lg font-black text-slate-950">Career workflow</h2>
+              <div className="mt-5 space-y-2">
+                {steps.map((step) => (
+                  <div
+                    key={step.label}
+                    className={[
+                      'flex items-center justify-between rounded px-3 py-2 text-sm font-black',
+                      step.active ? 'bg-blue-50 text-blue-700' : 'text-slate-600',
+                    ].join(' ')}
+                  >
+                    <span>{step.label}</span>
+                    <span className="text-xs">{step.status}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
           {metrics.length > 0 && (
-            <div className="mt-6 border-t border-slate-200 pt-5">
+            <div className={showJourneyMenu ? 'mt-6 border-t border-slate-200 pt-5' : ''}>
               <div className="space-y-4">
                 {metrics.map((metric) => (
                   <div key={metric.label}>
