@@ -85,9 +85,10 @@ export default function WorkflowShell({
           )}
           {metrics.length > 0 && (
             <div className={showJourneyMenu ? 'mt-6 border-t border-slate-200 pt-5' : ''}>
+              {!showJourneyMenu && <p className="text-xs font-black uppercase text-blue-700">Scores</p>}
               <div className="space-y-4">
                 {metrics.map((metric) => (
-                  <div key={metric.label}>
+                  <div key={metric.label} className={!showJourneyMenu ? 'mt-5' : ''}>
                     <div className="flex items-center justify-between text-sm font-black text-slate-900">
                       <span>{metric.label}</span>
                       <span>{metric.value}</span>
@@ -98,6 +99,15 @@ export default function WorkflowShell({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+          {!showJourneyMenu && (
+            <div className="mt-8 border-t border-slate-200 pt-5">
+              <p className="text-xs font-black uppercase text-blue-700">Review mode</p>
+              <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
+                The journey menu is removed. This rail keeps only the completion metrics for the current improvement review.
+              </p>
+              <WorkflowBadge tone="teal">Cleaner left rail</WorkflowBadge>
             </div>
           )}
         </aside>
