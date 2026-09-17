@@ -50,9 +50,9 @@ function Toggle({ on = true }: { on?: boolean }) {
 
 function AdminCard({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-black uppercase text-blue-700">{eyebrow}</p>
-      <h3 className="mt-2 text-xl font-black text-slate-950">{title}</h3>
+    <section className="rf-card p-4">
+      <p className="rf-eyebrow">{eyebrow}</p>
+      <h3 className="mt-1.5 text-lg font-black text-slate-950">{title}</h3>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -95,11 +95,11 @@ export default function AdminWorkflowConsolePage({ view }: { view: AdminView }) 
   const renderMain = () => {
     if (view === 'users') {
       return (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rf-card p-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase text-blue-700">Directory</p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950">Users</h2>
+              <p className="rf-eyebrow">Directory</p>
+              <h2 className="mt-1.5 text-xl font-black text-slate-950">Users</h2>
             </div>
             <div className="flex flex-wrap gap-2">
               <WorkflowBadge tone="blue">Search</WorkflowBadge>
@@ -297,46 +297,46 @@ export default function AdminWorkflowConsolePage({ view }: { view: AdminView }) 
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7fa] px-4 py-6 lg:px-8">
-      <div className="mx-auto grid max-w-[96rem] gap-5 xl:grid-cols-[260px_minmax(0,1fr)_320px]">
-        <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-black uppercase text-blue-700">Admin</p>
-          <h2 className="mt-2 text-lg font-black text-slate-950">Command center</h2>
-          <div className="mt-5 space-y-2">
+    <div className="min-h-[calc(100vh-62px)] bg-[#f5f7fb] px-4 py-5 lg:px-6">
+      <div className="mx-auto grid max-w-[100rem] gap-4 xl:grid-cols-[248px_minmax(0,1fr)_300px]">
+        <aside className="rf-card p-4">
+          <p className="rf-eyebrow">Admin</p>
+          <h2 className="mt-2 text-[17px] font-black text-slate-950">Command center</h2>
+          <div className="mt-4 space-y-1.5">
             {nav.map((item) => (
-              <div key={item.key} className={`flex items-center justify-between rounded px-3 py-2 text-sm font-black ${view === item.key ? 'bg-blue-50 text-blue-700' : 'text-slate-600'}`}>
+              <div key={item.key} className={`flex items-center justify-between rounded-md px-3 py-2 text-[13px] font-black ${view === item.key ? 'bg-[#2e3d50]/10 text-[#2e3d50]' : 'text-slate-600 hover:bg-slate-50'}`}>
                 <span>{item.label}</span>
-                <span className="text-xs">{item.value}</span>
+                <span className="text-[11px]">{item.value}</span>
               </div>
             ))}
           </div>
-          <div className="mt-6 border-t border-slate-200 pt-5">
-            <div className="space-y-4">
+          <div className="mt-5 border-t border-slate-200 pt-4">
+            <div className="space-y-3.5">
               <div className="flex gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded bg-emerald-600 text-sm font-black text-white">1</span>
-                <div><p className="font-black text-slate-950">Observe</p><p className="text-sm font-semibold text-slate-600">Usage, queues, risk, and revenue signals.</p></div>
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-600 text-[13px] font-black text-white">1</span>
+                <div><p className="text-[13px] font-black text-slate-950">Observe</p><p className="text-[13px] font-semibold text-slate-600">Usage, queues, risk, and revenue signals.</p></div>
               </div>
               <div className="flex gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-950 text-sm font-black text-white">2</span>
-                <div><p className="font-black text-slate-950">Manage</p><p className="text-sm font-semibold text-slate-600">Users, plans, templates, sources, workflows.</p></div>
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#2e3d50] text-[13px] font-black text-white">2</span>
+                <div><p className="text-[13px] font-black text-slate-950">Manage</p><p className="text-[13px] font-semibold text-slate-600">Users, plans, templates, sources, workflows.</p></div>
               </div>
               <div className="flex gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded bg-amber-500 text-sm font-black text-white">3</span>
-                <div><p className="font-black text-slate-950">Intervene</p><p className="text-sm font-semibold text-slate-600">Handle flagged automation and privacy requests.</p></div>
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500 text-[13px] font-black text-white">3</span>
+                <div><p className="text-[13px] font-black text-slate-950">Intervene</p><p className="text-[13px] font-semibold text-slate-600">Handle flagged automation and privacy requests.</p></div>
               </div>
             </div>
           </div>
         </aside>
 
-        <main className="min-w-0 space-y-5">
-          <header className="rounded-lg bg-[#243449] px-6 py-5 text-white shadow-lg shadow-slate-950/10">
+        <main className="min-w-0 space-y-4">
+          <header className="rounded-lg bg-[#243449] px-5 py-4 text-white shadow-[0_14px_30px_rgba(15,23,42,0.15)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs font-black uppercase text-blue-200">{meta.eyebrow}</p>
-                <h1 className="mt-2 text-3xl font-black tracking-tight">{meta.title}</h1>
-                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-200">{meta.description}</p>
+                <p className="text-[11px] font-black uppercase text-slate-300">{meta.eyebrow}</p>
+                <h1 className="mt-1.5 text-2xl font-black tracking-normal">{meta.title}</h1>
+                <p className="mt-2 max-w-3xl text-[13px] font-semibold leading-6 text-slate-200">{meta.description}</p>
               </div>
-              <button type="button" className="rounded bg-white px-5 py-3 text-sm font-black text-[#243449]">
+              <button type="button" className="rounded-md bg-white px-5 py-2.5 text-[13px] font-black text-[#243449] shadow-sm">
                 {view === 'overview' ? 'Open action queue' : 'Save policy'}
               </button>
             </div>
@@ -345,17 +345,17 @@ export default function AdminWorkflowConsolePage({ view }: { view: AdminView }) 
           {renderMain()}
         </main>
 
-        <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-black uppercase text-blue-700">System posture</p>
-          <h2 className="mt-2 text-2xl font-black text-slate-950">Safe to operate</h2>
+        <aside className="rf-card p-4">
+          <p className="rf-eyebrow">System posture</p>
+          <h2 className="mt-1.5 text-xl font-black text-slate-950">Safe to operate</h2>
           <div className="mt-5 divide-y divide-slate-200">
-            <div className="flex items-center justify-between gap-4 py-4"><div><p className="font-black text-slate-950">Human approval gate</p><p className="text-sm font-semibold text-slate-600">Required before external submissions.</p></div><Toggle on /></div>
-            <div className="flex items-center justify-between gap-4 py-4"><div><p className="font-black text-slate-950">Broad auto-apply</p><p className="text-sm font-semibold text-slate-600">Disabled until source exists.</p></div><Toggle on={false} /></div>
-            <div className="flex items-center justify-between gap-4 py-4"><div><p className="font-black text-slate-950">Profile analysis</p><p className="text-sm font-semibold text-slate-600">Enabled for active users.</p></div><Toggle on /></div>
+            <div className="flex items-center justify-between gap-4 py-4"><div><p className="text-[13px] font-black text-slate-950">Human approval gate</p><p className="text-[13px] font-semibold text-slate-600">Required before external submissions.</p></div><Toggle on /></div>
+            <div className="flex items-center justify-between gap-4 py-4"><div><p className="text-[13px] font-black text-slate-950">Broad auto-apply</p><p className="text-[13px] font-semibold text-slate-600">Disabled until source exists.</p></div><Toggle on={false} /></div>
+            <div className="flex items-center justify-between gap-4 py-4"><div><p className="text-[13px] font-black text-slate-950">Profile analysis</p><p className="text-[13px] font-semibold text-slate-600">Enabled for active users.</p></div><Toggle on /></div>
           </div>
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="font-black text-slate-950">Admin principle</p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Admins control policy and recovery. Users keep control over personal submissions.</p>
+          <div className="rf-card-soft mt-5 p-4">
+            <p className="text-[13px] font-black text-slate-950">Admin principle</p>
+            <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">Admins control policy and recovery. Users keep control over personal submissions.</p>
           </div>
         </aside>
       </div>

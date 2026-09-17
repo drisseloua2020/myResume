@@ -27,7 +27,7 @@ type WorkflowShellProps = {
 };
 
 const toneClasses: Record<NonNullable<WorkflowMetric['tone']>, string> = {
-  blue: 'bg-blue-600',
+  blue: 'bg-[#2e3d50]',
   green: 'bg-emerald-600',
   amber: 'bg-amber-500',
   red: 'bg-red-500',
@@ -37,13 +37,13 @@ const toneClasses: Record<NonNullable<WorkflowMetric['tone']>, string> = {
 export function WorkflowBadge({ children, tone = 'slate' }: { children: React.ReactNode; tone?: 'slate' | 'blue' | 'green' | 'amber' | 'red' | 'teal' }) {
   const classes = {
     slate: 'bg-slate-100 text-slate-700',
-    blue: 'bg-blue-50 text-blue-700',
+    blue: 'bg-[#2e3d50]/10 text-[#2e3d50]',
     green: 'bg-emerald-50 text-emerald-700',
     amber: 'bg-amber-50 text-amber-700',
     red: 'bg-red-50 text-red-700',
     teal: 'bg-teal-50 text-teal-700',
   };
-  return <span className={`inline-flex rounded px-2.5 py-1 text-xs font-black ${classes[tone]}`}>{children}</span>;
+  return <span className={`inline-flex rounded-md px-2 py-1 text-[11px] font-black leading-none ${classes[tone]}`}>{children}</span>;
 }
 
 export default function WorkflowShell({
@@ -60,40 +60,40 @@ export default function WorkflowShell({
   children,
 }: WorkflowShellProps) {
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#f5f7fa] px-4 py-6 lg:px-8">
-      <div className="mx-auto grid max-w-[96rem] gap-5 xl:grid-cols-[260px_minmax(0,1fr)_320px]">
-        <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="min-h-[calc(100vh-62px)] bg-[#f5f7fb] px-4 py-5 lg:px-6">
+      <div className="mx-auto grid max-w-[100rem] gap-4 xl:grid-cols-[248px_minmax(0,1fr)_300px]">
+        <aside className="rf-card p-4">
           {showJourneyMenu && (
             <>
-              <p className="text-xs font-black uppercase text-blue-700">Journey</p>
-              <h2 className="mt-2 text-lg font-black text-slate-950">Career workflow</h2>
-              <div className="mt-5 space-y-2">
+              <p className="rf-eyebrow">Journey</p>
+              <h2 className="mt-2 text-[17px] font-black text-slate-950">Career workflow</h2>
+              <div className="mt-4 space-y-1.5">
                 {steps.map((step) => (
                   <div
                     key={step.label}
                     className={[
-                      'flex items-center justify-between rounded px-3 py-2 text-sm font-black',
-                      step.active ? 'bg-blue-50 text-blue-700' : 'text-slate-600',
+                      'flex items-center justify-between rounded-md px-3 py-2 text-[13px] font-black',
+                      step.active ? 'bg-[#2e3d50]/10 text-[#2e3d50]' : 'text-slate-600 hover:bg-slate-50',
                     ].join(' ')}
                   >
                     <span>{step.label}</span>
-                    <span className="text-xs">{step.status}</span>
+                    <span className="text-[11px]">{step.status}</span>
                   </div>
                 ))}
               </div>
             </>
           )}
           {metrics.length > 0 && (
-            <div className={showJourneyMenu ? 'mt-6 border-t border-slate-200 pt-5' : ''}>
-              {!showJourneyMenu && <p className="text-xs font-black uppercase text-blue-700">Scores</p>}
-              <div className="space-y-4">
+            <div className={showJourneyMenu ? 'mt-5 border-t border-slate-200 pt-4' : ''}>
+              {!showJourneyMenu && <p className="rf-eyebrow">Scores</p>}
+              <div className="space-y-3.5">
                 {metrics.map((metric) => (
-                  <div key={metric.label} className={!showJourneyMenu ? 'mt-5' : ''}>
-                    <div className="flex items-center justify-between text-sm font-black text-slate-900">
+                  <div key={metric.label} className={!showJourneyMenu ? 'mt-4' : ''}>
+                    <div className="flex items-center justify-between text-[13px] font-black text-slate-900">
                       <span>{metric.label}</span>
                       <span>{metric.value}</span>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded bg-slate-100">
+                    <div className="mt-2 h-1.5 overflow-hidden rounded bg-slate-100">
                       <div className={`h-full rounded ${toneClasses[metric.tone || 'blue']}`} style={{ width: metric.value.includes('%') ? metric.value : '58%' }} />
                     </div>
                   </div>
@@ -102,23 +102,23 @@ export default function WorkflowShell({
             </div>
           )}
           {!showJourneyMenu && (
-            <div className="mt-8 border-t border-slate-200 pt-5">
-              <p className="text-xs font-black uppercase text-blue-700">Review mode</p>
-              <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
-                The journey menu is removed. This rail keeps only the completion metrics for the current improvement review.
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <p className="rf-eyebrow">Review mode</p>
+              <p className="mt-3 text-[13px] font-semibold leading-6 text-slate-600">
+                Completion metrics stay pinned while fixes, targets, and readiness update from the current resume.
               </p>
-              <WorkflowBadge tone="teal">Cleaner left rail</WorkflowBadge>
+              <WorkflowBadge tone="teal">Focused review</WorkflowBadge>
             </div>
           )}
         </aside>
 
-        <main className="min-w-0 space-y-5">
-          <header className="rounded-lg bg-[#243449] px-6 py-5 text-white shadow-lg shadow-slate-950/10">
+        <main className="min-w-0 space-y-4">
+          <header className="rounded-lg bg-[#243449] px-5 py-4 text-white shadow-[0_14px_30px_rgba(15,23,42,0.15)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs font-black uppercase text-blue-200">{eyebrow}</p>
-                <h1 className="mt-2 text-3xl font-black tracking-tight">{title}</h1>
-                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-200">{description}</p>
+                <p className="text-[11px] font-black uppercase text-slate-300">{eyebrow}</p>
+                <h1 className="mt-1.5 text-2xl font-black tracking-normal">{title}</h1>
+                <p className="mt-2 max-w-3xl text-[13px] font-semibold leading-6 text-slate-200">{description}</p>
               </div>
               {primaryAction}
             </div>
@@ -126,10 +126,10 @@ export default function WorkflowShell({
           {children}
         </main>
 
-        <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-black uppercase text-blue-700">{asideTitle}</p>
-          {asideDescription && <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{asideDescription}</p>}
-          <div className="mt-5">{aside}</div>
+        <aside className="rf-card p-4">
+          <p className="rf-eyebrow">{asideTitle}</p>
+          {asideDescription && <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">{asideDescription}</p>}
+          <div className="mt-4">{aside}</div>
         </aside>
       </div>
     </div>

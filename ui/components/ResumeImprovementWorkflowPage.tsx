@@ -49,7 +49,7 @@ type PreflightCheck = {
 };
 
 const scoreColors: Record<ScoreTone, string> = {
-  blue: '#2563eb',
+  blue: '#2e3d50',
   green: '#059669',
   amber: '#f59e0b',
   red: '#ef4444',
@@ -57,7 +57,7 @@ const scoreColors: Record<ScoreTone, string> = {
 };
 
 const scoreText: Record<ScoreTone, string> = {
-  blue: 'text-blue-700',
+  blue: 'text-[#2e3d50]',
   green: 'text-emerald-700',
   amber: 'text-amber-700',
   red: 'text-red-700',
@@ -458,17 +458,17 @@ function ScoreCard({
   tone: ScoreTone;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rf-card p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase text-blue-700">{label}</p>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{description}</p>
+          <p className="rf-eyebrow">{label}</p>
+          <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">{description}</p>
         </div>
         <div
-          className="grid h-24 w-24 shrink-0 place-items-center rounded-full"
-          style={{ background: `conic-gradient(${scoreColors[tone]} ${value * 3.6}deg, #e2e8f0 0deg)` }}
+          className="grid h-20 w-20 shrink-0 place-items-center rounded-full"
+          style={{ background: `conic-gradient(${scoreColors[tone]} ${value * 3.6}deg, #e5ebf2 0deg)` }}
         >
-          <div className="grid h-16 w-16 place-items-center rounded-full bg-white text-xl font-black text-slate-950">{value}%</div>
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-white text-lg font-black text-slate-950">{value}%</div>
         </div>
       </div>
     </section>
@@ -499,20 +499,20 @@ function ProgressChart({
   const polyline = coords.map((point) => `${point.x},${point.y}`).join(' ');
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rf-card p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase text-blue-700">{title}</p>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{description}</p>
+          <p className="rf-eyebrow">{title}</p>
+          <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">{description}</p>
         </div>
         <WorkflowBadge tone={tone}>{coords[coords.length - 1]?.value || 0}%</WorkflowBadge>
       </div>
-      <svg className="mt-5 h-44 w-full" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${title} chart`}>
+      <svg className="mt-4 h-40 w-full" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${title} chart`}>
         {[0, 25, 50, 75, 100].map((tick) => {
           const y = padding + (1 - tick / 100) * innerHeight;
-          return <line key={tick} x1={padding} x2={width - padding} y1={y} y2={y} stroke="#e2e8f0" strokeWidth="1" />;
+          return <line key={tick} x1={padding} x2={width - padding} y1={y} y2={y} stroke="#e5ebf2" strokeWidth="1" />;
         })}
-        <polyline fill="none" points={polyline} stroke={scoreColors[tone]} strokeLinecap="round" strokeLinejoin="round" strokeWidth="5" />
+        <polyline fill="none" points={polyline} stroke={scoreColors[tone]} strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
         {coords.map((point) => (
           <g key={point.label}>
             <circle cx={point.x} cy={point.y} r="6" fill="#ffffff" stroke={scoreColors[tone]} strokeWidth="4" />
@@ -548,12 +548,12 @@ function MeterRow({
     <div>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-black text-slate-950">{label}</p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">{detail}</p>
+          <p className="text-[13px] font-black text-slate-950">{label}</p>
+          <p className="mt-1 text-[13px] font-semibold leading-6 text-slate-600">{detail}</p>
         </div>
-        <span className={`text-sm font-black ${scoreText[tone]}`}>{value}%</span>
+        <span className={`text-[13px] font-black ${scoreText[tone]}`}>{value}%</span>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded bg-slate-100">
+      <div className="mt-2 h-1.5 overflow-hidden rounded bg-slate-100">
         <div className="h-full rounded" style={{ width: `${value}%`, backgroundColor: scoreColors[tone] }} />
       </div>
     </div>
@@ -580,21 +580,21 @@ function ImprovementWorkbench({
   const missingKeywords = model.keywordInsights.filter((item) => !item.present);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rf-card p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase text-blue-700">Improvement workbench</p>
-          <h2 className="mt-2 text-2xl font-black text-slate-950">Plan, tune, check, and batch.</h2>
+          <p className="rf-eyebrow">Improvement workbench</p>
+          <h2 className="mt-1.5 text-xl font-black text-slate-950">Plan, tune, check, and batch.</h2>
         </div>
-        <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1 sm:flex">
+        <div className="grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1 sm:flex">
           {workbenchTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => onTabChange(tab.key)}
               className={[
-                'rounded px-3 py-2 text-sm font-black transition',
-                activeTab === tab.key ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-950',
+                'rounded px-3 py-2 text-[13px] font-black transition',
+                activeTab === tab.key ? 'bg-white text-[#2e3d50] shadow-sm' : 'text-slate-600 hover:text-slate-950',
               ].join(' ')}
             >
               {tab.label}
@@ -606,11 +606,11 @@ function ImprovementWorkbench({
       {activeTab === 'fixes' && (
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {model.improvementActions.map((action) => (
-            <article key={action.title} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <article key={action.title} className="rf-card-soft p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-black text-slate-950">{action.title}</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{action.detail}</p>
+                  <p className="text-[13px] font-black text-slate-950">{action.title}</p>
+                  <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">{action.detail}</p>
                 </div>
                 <WorkflowBadge tone={action.tone}>{action.status}</WorkflowBadge>
               </div>
@@ -619,7 +619,7 @@ function ImprovementWorkbench({
                   <WorkflowBadge tone={action.impact === 'High' ? 'red' : action.impact === 'Medium' ? 'amber' : 'blue'}>{action.impact} impact</WorkflowBadge>
                   <WorkflowBadge>{action.effort}</WorkflowBadge>
                 </div>
-                <button type="button" onClick={onOpenEditor} className="rounded bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm ring-1 ring-slate-200">
+                <button type="button" onClick={onOpenEditor} className="rf-button-ghost px-4 py-2 text-[13px]">
                   Fix
                 </button>
               </div>
@@ -630,18 +630,18 @@ function ImprovementWorkbench({
 
       {activeTab === 'keywords' && (
         <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-            <p className="text-xs font-black uppercase text-blue-700">Keyword coverage</p>
+          <div className="rf-card-soft p-5">
+            <p className="rf-eyebrow">Keyword coverage</p>
             <div className="mt-4 text-4xl font-black text-slate-950">{keywordCoverage}%</div>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">
               {coveredKeywords.length} covered, {missingKeywords.length} missing from the current target set.
             </p>
             <div className="mt-4 h-2 overflow-hidden rounded bg-white">
-              <div className="h-full rounded bg-blue-600" style={{ width: `${keywordCoverage}%` }} />
+              <div className="h-full rounded bg-[#2e3d50]" style={{ width: `${keywordCoverage}%` }} />
             </div>
           </div>
           <div>
-            <p className="text-sm font-black text-slate-950">Target terms</p>
+            <p className="text-[13px] font-black text-slate-950">Target terms</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {model.keywordInsights.map((item) => (
                 <WorkflowBadge key={item.keyword} tone={item.present ? 'green' : item.priority === 'Core' ? 'amber' : 'slate'}>
@@ -649,9 +649,9 @@ function ImprovementWorkbench({
                 </WorkflowBadge>
               ))}
             </div>
-            <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm font-black text-slate-950">Best next keyword move</p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            <div className="mt-5 rounded-md border border-slate-200 bg-white p-4">
+              <p className="text-[13px] font-black text-slate-950">Best next keyword move</p>
+              <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">
                 {missingKeywords.length
                   ? `Add ${missingKeywords.slice(0, 3).map((item) => item.keyword).join(', ')} where it is true and supported by experience.`
                   : 'Coverage is strong. Spend the next pass improving proof and clarity instead of adding more keywords.'}
@@ -664,7 +664,7 @@ function ImprovementWorkbench({
       {activeTab === 'sections' && (
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {model.sectionHealth.map((section) => (
-            <div key={section.label} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div key={section.label} className="rf-card-soft p-4">
               <MeterRow
                 label={section.label}
                 value={section.score}
@@ -678,26 +678,26 @@ function ImprovementWorkbench({
 
       {activeTab === 'batch' && (
         <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-            <p className="text-xs font-black uppercase text-blue-700">Recommended batch</p>
+          <div className="rf-card-soft p-5">
+            <p className="rf-eyebrow">Recommended batch</p>
             <div className="mt-4 text-3xl font-black text-slate-950">{model.applicationBatch.size}</div>
             <p className="mt-2 font-black text-slate-950">{model.applicationBatch.mode}</p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{model.applicationBatch.detail}</p>
+            <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-600">{model.applicationBatch.detail}</p>
           </div>
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               {model.preflightChecks.map((check) => (
-                <div key={check.label} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
-                  <span className="text-sm font-black text-slate-950">{check.label}</span>
+                <div key={check.label} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white p-4">
+                  <span className="text-[13px] font-black text-slate-950">{check.label}</span>
                   <WorkflowBadge tone={check.ready ? 'green' : 'amber'}>{check.ready ? 'Ready' : 'Fix'}</WorkflowBadge>
                 </div>
               ))}
             </div>
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={onOpenEditor} className="rounded bg-blue-700 px-5 py-3 text-sm font-black text-white">
+              <button type="button" onClick={onOpenEditor} className="rf-button-brand px-5 py-3 text-[13px]">
                 Fix blockers
               </button>
-              <button type="button" onClick={onOpenAnalysis} className="rounded border border-slate-300 bg-white px-5 py-3 text-sm font-black text-slate-800">
+              <button type="button" onClick={onOpenAnalysis} className="rf-button-ghost px-5 py-3 text-[13px]">
                 Review analysis
               </button>
             </div>
@@ -751,7 +751,7 @@ export default function ResumeImprovementWorkflowPage({
       showJourneyMenu={false}
       metrics={metrics}
       primaryAction={
-        <button type="button" onClick={onOpenEditor} className="rounded bg-white px-5 py-3 text-sm font-black text-[#243449]">
+        <button type="button" onClick={onOpenEditor} className="rounded-md bg-white px-5 py-2.5 text-[13px] font-black text-[#243449] shadow-sm">
           Fix
         </button>
       }
@@ -761,19 +761,19 @@ export default function ResumeImprovementWorkflowPage({
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <div
-              className="grid h-24 w-24 shrink-0 place-items-center rounded-full"
-              style={{ background: `conic-gradient(${scoreColors[scoreTone(model.applicationReadiness)]} ${model.applicationReadiness * 3.6}deg, #e2e8f0 0deg)` }}
+              className="grid h-20 w-20 shrink-0 place-items-center rounded-full"
+              style={{ background: `conic-gradient(${scoreColors[scoreTone(model.applicationReadiness)]} ${model.applicationReadiness * 3.6}deg, #e5ebf2 0deg)` }}
             >
-              <div className="grid h-16 w-16 place-items-center rounded-full bg-white text-2xl font-black text-slate-950">{model.applicationReadiness}</div>
+              <div className="grid h-14 w-14 place-items-center rounded-full bg-white text-xl font-black text-slate-950">{model.applicationReadiness}</div>
             </div>
-            <p className="text-sm font-semibold leading-6 text-slate-600">
+            <p className="text-[13px] font-semibold leading-6 text-slate-600">
               {model.applicationReadiness >= 75
                 ? 'Ready for a controlled batch. Review the suggested targets before sending packets forward.'
                 : 'Needs a stronger resume signal before broad applications. Fix the highest-impact gaps first.'}
             </p>
           </div>
           <div className="border-t border-slate-200 pt-4">
-            <p className="text-sm font-black text-slate-950">Suggested job targets</p>
+            <p className="text-[13px] font-black text-slate-950">Suggested job targets</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {model.suggestedTargets.map((target, index) => (
                 <WorkflowBadge key={target} tone={index === 0 ? 'blue' : 'slate'}>{target}</WorkflowBadge>
@@ -781,17 +781,17 @@ export default function ResumeImprovementWorkflowPage({
             </div>
           </div>
           <div className="border-t border-slate-200 pt-4">
-            <p className="text-sm font-black text-slate-950">Top fix priorities</p>
+            <p className="text-[13px] font-black text-slate-950">Top fix priorities</p>
             <div className="mt-3 space-y-3">
               {model.priorities.map((priority, index) => (
-                <div key={priority} className="flex gap-3 text-sm font-semibold leading-6 text-slate-600">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded bg-blue-50 text-xs font-black text-blue-700">{index + 1}</span>
+                <div key={priority} className="flex gap-3 text-[13px] font-semibold leading-6 text-slate-600">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#2e3d50]/10 text-[11px] font-black text-[#2e3d50]">{index + 1}</span>
                   <span>{priority}</span>
                 </div>
               ))}
             </div>
           </div>
-          <button type="button" onClick={onOpenAnalysis} className="w-full rounded bg-blue-700 px-5 py-3 text-sm font-black text-white">
+          <button type="button" onClick={onOpenAnalysis} className="rf-button-brand w-full px-5 py-3 text-[13px]">
             Open profile analysis
           </button>
         </div>
@@ -819,12 +819,12 @@ export default function ResumeImprovementWorkflowPage({
           />
         </div>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rf-card p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-black uppercase text-blue-700">High-level profile overview</p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950">{resumeName(currentResume)}</h2>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+              <p className="rf-eyebrow">High-level profile overview</p>
+              <h2 className="mt-1.5 text-xl font-black text-slate-950">{resumeName(currentResume)}</h2>
+              <p className="mt-2 max-w-3xl text-[13px] font-semibold leading-6 text-slate-600">
                 {currentResume?.personalDetails?.summary?.trim() || 'Add a summary to give the improvement engine a clearer profile narrative.'}
               </p>
             </div>
@@ -833,16 +833,16 @@ export default function ResumeImprovementWorkflowPage({
               <WorkflowBadge tone={scoreTone(model.applicationReadiness)}>{model.applicationReadiness}% ready</WorkflowBadge>
             </div>
           </div>
-          <div className="mt-5 grid gap-0 overflow-hidden rounded-lg border border-slate-200 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 grid gap-0 overflow-hidden rounded-md border border-slate-200 md:grid-cols-2 xl:grid-cols-3">
             {model.overviewItems.map((item) => (
               <div key={item.label} className="border-b border-r border-slate-200 p-4 last:border-r-0">
                 <p className="text-xs font-black uppercase text-slate-500">{item.label}</p>
-                <p className="mt-2 text-sm font-black text-slate-950">{item.value}</p>
+                <p className="mt-2 text-[13px] font-black text-slate-950">{item.value}</p>
               </div>
             ))}
           </div>
           <div className="mt-5">
-            <p className="text-xs font-black uppercase text-blue-700">Visible skills</p>
+            <p className="rf-eyebrow">Visible skills</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {(visibleSkills.length ? visibleSkills : ['Add role-matched skills']).map((skill) => (
                 <WorkflowBadge key={skill}>{skill}</WorkflowBadge>
@@ -874,26 +874,26 @@ export default function ResumeImprovementWorkflowPage({
           onOpenAnalysis={onOpenAnalysis}
         />
 
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rf-card p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-black uppercase text-blue-700">Next fixes</p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950">Move the weakest signal first.</h2>
+              <p className="rf-eyebrow">Next fixes</p>
+              <h2 className="mt-1.5 text-xl font-black text-slate-950">Move the weakest signal first.</h2>
             </div>
-            <button type="button" onClick={onOpenEditor} className="rounded bg-blue-700 px-5 py-3 text-sm font-black text-white">
+            <button type="button" onClick={onOpenEditor} className="rf-button-brand px-5 py-3 text-[13px]">
               Fix
             </button>
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             {model.priorities.map((priority, index) => (
-              <div key={priority} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div key={priority} className="rf-card-soft p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-black uppercase text-blue-700">Priority {index + 1}</p>
-                  <span className={`text-sm font-black ${scoreText[scoreTone([model.profileCompletion, model.resumeCompletion, model.applicationReadiness][index] || 0)]}`}>
+                  <p className="rf-eyebrow">Priority {index + 1}</p>
+                  <span className={`text-[13px] font-black ${scoreText[scoreTone([model.profileCompletion, model.resumeCompletion, model.applicationReadiness][index] || 0)]}`}>
                     {[model.profileCompletion, model.resumeCompletion, model.applicationReadiness][index] || 0}%
                   </span>
                 </div>
-                <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">{priority}</p>
+                <p className="mt-3 text-[13px] font-semibold leading-6 text-slate-600">{priority}</p>
               </div>
             ))}
           </div>
