@@ -109,4 +109,52 @@ describe('LivePreview category templates', () => {
     expect(screen.queryByText(/Experienced professional with a proven track record/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Product leader focused on measurable customer outcomes.')).not.toBeInTheDocument();
   });
+
+  it.each(AVAILABLE_TEMPLATES.map((template) => [template.id, template.name]))(
+    'renders imported resume fields for %s',
+    (templateId, _templateName) => {
+      render(
+        <LivePreview
+          data={{
+            ...previewData,
+            personalDetails: {
+              ...previewData.personalDetails!,
+              links: 'LinkedIn: linkedin.com/in/jordan',
+            },
+            additionalSections: [
+              {
+                id: 'add_patents',
+                title: 'Patents',
+                items: 'US123456 Method for queue prioritization',
+              },
+              {
+                id: 'add_talks',
+                title: 'Selected Talks',
+                items: 'Scaling Workflow Automation, DevConf 2024',
+              },
+            ],
+          }}
+          user={previewUser}
+          templateId={templateId}
+        />,
+      );
+
+      expect(screen.getByText('Jordan Preview')).toBeInTheDocument();
+      expect(screen.getByText('jordan@example.com')).toBeInTheDocument();
+      expect(screen.getByText(/LinkedIn: linkedin\.com\/in\/jordan/)).toBeInTheDocument();
+      expect(screen.getByText('Product leader focused on measurable customer outcomes.')).toBeInTheDocument();
+      expect(screen.getAllByText('Product Manager').length).toBeGreaterThan(0);
+      expect(screen.getByText('Acme Products')).toBeInTheDocument();
+      expect(screen.getByText(/Improved activation by 18%/)).toBeInTheDocument();
+      expect(screen.getByText('State University - Austin, TX')).toBeInTheDocument();
+      expect(screen.getAllByText(/Roadmaps/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Analytics/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Stakeholder Management/).length).toBeGreaterThan(0);
+      expect(screen.getByText('Certified Scrum Product Owner')).toBeInTheDocument();
+      expect(screen.getByText('Patents')).toBeInTheDocument();
+      expect(screen.getByText('US123456 Method for queue prioritization')).toBeInTheDocument();
+      expect(screen.getByText('Selected Talks')).toBeInTheDocument();
+      expect(screen.getByText('Scaling Workflow Automation, DevConf 2024')).toBeInTheDocument();
+    },
+  );
 });
