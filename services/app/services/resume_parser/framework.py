@@ -314,6 +314,26 @@ SECTION_LABELS: dict[str, str] = {
     "coursework": "Coursework",
 }
 
+CUSTOM_SECTION_PREFIX = "additional:"
+
+ADDITIONAL_SECTION_ALIASES: dict[str, str] = {
+    "activities": "Activities",
+    "community leadership": "Community Leadership",
+    "conferences": "Conferences",
+    "leadership": "Leadership",
+    "military": "Military Service",
+    "military experience": "Military Experience",
+    "military service": "Military Service",
+    "open source": "Open Source",
+    "patents": "Patents",
+    "portfolio": "Portfolio",
+    "presentations": "Presentations",
+    "references": "References",
+    "research": "Research",
+    "selected talks": "Selected Talks",
+    "speaking": "Speaking",
+}
+
 ROLE_KEYWORDS = {
     "accountant",
     "administrator",
@@ -487,6 +507,61 @@ def _section_for_heading(line: str) -> str | None:
         if normalized in aliases:
             return section
     return None
+
+
+def _custom_additional_section_title(line: str) -> str | None:
+    if len(line) > 70:
+        return None
+
+    clean = line.strip(" :-|\t")
+    if (
+        not clean
+        or clean.endswith(".")
+        or _section_for_heading(clean)
+        or _looks_like_pdf_artifact(clean)
+        or _is_contact_line(clean)
+        or _looks_like_date_range(clean)
+        or _looks_like_skill_list_line(clean)
+        or _looks_like_role_title(clean)
+        or _looks_like_location_line(clean)
+        or _looks_like_degree_or_school(clean)
+        or _starts_with_action_verb(clean)
+    ):
+        return None
+
+    normalized = re.sub(r"[^A-Za-z& ]+", "", clean).replace("&", "and")
+    normalized = re.sub(r"\s+", " ", normalized).strip().lower()
+    if normalized in ADDITIONAL_SECTION_ALIASES:
+        return ADDITIONAL_SECTION_ALIASES[normalized]
+    if _looks_like_company_line(clean):
+        return None
+
+    words = re.findall(r"[A-Za-z][A-Za-z'-]*", clean)
+    if not words or len(words) > 6:
+        return None
+
+    lower_words = {word.lower() for word in words}
+    stop_words = {"and", "for", "in", "of", "on", "the", "to"}
+    signal_words = [word for word in words if word.lower() not in stop_words]
+    if not signal_words:
+        return None
+
+    if len(words) == 1 and normalized not in ADDITIONAL_SECTION_ALIASES:
+        return None
+
+    is_upper = any(char.isalpha() for char in clean) and clean.upper() == clean
+    is_title = all(
+        word[:1].isupper() or word.isupper() or word.lower() in stop_words
+        for word in words
+    )
+    if not (is_upper or is_title):
+        return None
+
+    return re.sub(r"\s+", " ", clean).strip()
+
+
+def _custom_section_key(title: str) -> str:
+    return f"{CUSTOM_SECTION_PREFIX}{title}"
 
 
 def _looks_like_pdf_artifact(line: str) -> bool:
@@ -766,7 +841,46 @@ def _additional_sections_from_sections(sections: dict[str, list[str]]) -> list[d
                 "items": values[:40],
             })
 
+    for section, lines in sections.items():
+        if not section.startswith(CUSTOM_SECTION_PREFIX):
+            continue
+        title = section.removeprefix(CUSTOM_SECTION_PREFIX).strip() or "Additional"
+        values = _clean_additional_section_lines(lines)
+        if values:
+            additional_sections.append({
+                "title": title,
+                "items": values[:40],
+            })
+
     return additional_sections
+
+
+def _merge_additional_sections(*groups: list[dict[str, object]]) -> list[dict[str, object]]:
+    merged: list[dict[str, object]] = []
+    for sections in groups:
+        for section in sections:
+            title = str(section.get("title") or "Additional").strip() or "Additional"
+            raw_items = section.get("items") if isinstance(section.get("items"), list) else []
+            values = [
+                _clean_resume_line(str(item))
+                for item in raw_items
+                if _clean_resume_line(str(item))
+            ]
+            if not values:
+                continue
+
+            existing = next((item for item in merged if item["title"].lower() == title.lower()), None)
+            if not existing:
+                merged.append({"title": title, "items": values[:40]})
+                continue
+
+            existing_items = existing["items"] if isinstance(existing.get("items"), list) else []
+            for value in values:
+                if value not in existing_items:
+                    existing_items.append(value)
+            existing["items"] = existing_items[:40]
+
+    return merged
 
 
 def _highlight_items(lines: list[str]) -> list[dict[str, object]]:
@@ -1633,16 +1747,29 @@ def _infer_sections_from_lines(lines: list[str], header: dict[str, object]) -> d
     current = ""
     inferred_experience_started = False
     inferred_education_started = False
+    has_standard_heading = any(_section_for_heading(line) for line in lines)
+    before_first_heading = True
+    header_title = str(header.get("title") or "")
 
     for index, line in enumerate(lines):
         if _is_header_line(line, header) or _looks_like_pdf_artifact(line):
             continue
+        if has_standard_heading and before_first_heading and header_title and line == header_title:
+            continue
 
         heading = _section_for_heading(line)
         if heading:
+            before_first_heading = False
             current = heading
             inferred_experience_started = inferred_experience_started or heading == "experience"
             inferred_education_started = inferred_education_started or heading == "education"
+            continue
+
+        custom_heading = _custom_additional_section_title(line)
+        if custom_heading:
+            before_first_heading = False
+            current = _custom_section_key(custom_heading)
+            sections.setdefault(current, [])
             continue
 
         if current == "summary":
@@ -1835,13 +1962,14 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
         summary = " ".join(inferred_sections.get("summary", [])[:3]).strip()
 
     header_name = str(header.get("name") or "")
-    experience = _parse_experience_entries([
-        line for line in sections.get("experience", [])
+    inferred_experience_lines = [
+        line for line in inferred_sections.get("experience", [])
         if not _is_contact_line(line) and line != header_name
-    ])
+    ]
+    experience = _parse_experience_entries(inferred_experience_lines)
     if not experience:
         experience = _parse_experience_entries([
-            line for line in inferred_sections.get("experience", [])
+            line for line in sections.get("experience", [])
             if not _is_contact_line(line) and line != header_name
         ])
     education_lines = [line for line in sections.get("education", []) if not _is_contact_line(line)]
@@ -1855,7 +1983,10 @@ def _local_resume_json_from_text(text: str) -> dict[str, object]:
     skill_groups = _merge_skill_groups(skill_groups, _skill_groups_from_skill_lines(inferred_sections.get("skills", [])))
     for category, values in _skill_groups_from_skill_lines(_education_section_skill_lines(inferred_education_lines)).items():
         _add_skill_group_values(skill_groups, category, values)
-    additional_sections = _additional_sections_from_sections(sections)
+    additional_sections = _merge_additional_sections(
+        _additional_sections_from_sections(sections),
+        _additional_sections_from_sections(inferred_sections),
+    )
 
     return {
         "header": header,

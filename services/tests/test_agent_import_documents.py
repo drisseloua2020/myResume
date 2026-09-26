@@ -1038,6 +1038,65 @@ def test_generate_resume_preserves_standard_ats_sections_as_additional_sections(
     assert additional["Affiliations"] == ["Project Management Institute"]
 
 
+def test_generate_resume_preserves_custom_sections_as_additional_sections(client, monkeypatch):
+    token = _signup(client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Morgan Complete",
+            "Program Manager",
+            "morgan@example.com",
+            "SUMMARY",
+            "Program manager with delivery experience.",
+            "SKILLS",
+            "Roadmapping, Jira",
+            "EXPERIENCE",
+            "Program Manager",
+            "Example Co",
+            "2021 - Present",
+            "Delivered cross-functional programs.",
+            "PATENTS",
+            "US123456 Method for queue prioritization",
+            "SELECTED TALKS",
+            "Scaling Workflow Automation, DevConf 2024",
+            "COMMUNITY LEADERSHIP",
+            "Mentor, Local STEM Program",
+            "EDUCATION",
+            "State University",
+            "BS Computer Science",
+        ])
+    )
+
+    response = client.post(
+        "/agent/generate-resume",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "mode": "MODE_A",
+            "input": {
+                "importFormat": "ats",
+                "fileData": {
+                    "mimeType": DOCX_MIME,
+                    "name": "morgan-custom-sections.docx",
+                    "data": base64.b64encode(resume_bytes).decode("ascii"),
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    text = response.json()["text"]
+    json_blob = text.split("RESUME_JSON:", 1)[1].split("GAP_AND_FIX_LIST:", 1)[0].strip()
+    resume_json = json.loads(json_blob)
+
+    additional = {section["title"]: section["items"] for section in resume_json["additionalSections"]}
+    assert additional["Patents"] == ["US123456 Method for queue prioritization"]
+    assert additional["Selected Talks"] == ["Scaling Workflow Automation, DevConf 2024"]
+    assert additional["Community Leadership"] == ["Mentor, Local STEM Program"]
+    assert [item["bullet"] for item in resume_json["experience"][0]["highlights"]] == [
+        "Delivered cross-functional programs."
+    ]
+
+
 def test_generate_resume_groups_labeled_skill_lines_under_skills(client, monkeypatch):
     token = _signup(client)
 
