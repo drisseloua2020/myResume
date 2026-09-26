@@ -15,6 +15,9 @@ It consists of:
 ##  Architecture
 
 [ React UI ]  --->  [ FastAPI Backend ]  --->  [ PostgreSQL ]
+
+- [ATS resume import data flow](docs/resume-import-data-flow.md): end-to-end mapping from uploaded resume document to parser JSON, editor fields, and database rows.
+
 ---
 
 ##  Project Structure
@@ -78,5 +81,3 @@ Backend entry points are under `/career/*`; the logged-in frontend tab is **Care
 
 ##  Summary
 Modern full-stack app ready for cloud deployment and scaling.
-
-
