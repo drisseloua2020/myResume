@@ -275,6 +275,58 @@ def test_generate_resume_rejects_readable_non_ats_import_before_parser(client, m
     assert "Detected sections: none." in response.json()["detail"]
 
 
+def test_parse_upload_normalizes_readable_resume_without_standard_headings(client):
+    token = _signup(client)
+
+    resume_bytes = _docx_bytes(
+        "\n".join([
+            "Morgan Brown",
+            "morgan@example.com | Denver, CO",
+            "Platform Engineer",
+            "Contoso Cloud",
+            "2021 - Present",
+            "Automated cloud deployments.",
+            "Python, AWS, Terraform",
+            "State University",
+            "BS Computer Science",
+            "2017 - 2021",
+        ])
+    )
+
+    response = client.post(
+        "/resumes/parse-upload",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "importFormat": "ats",
+            "fileData": {
+                "mimeType": DOCX_MIME,
+                "name": "morgan-freeform.docx",
+                "data": base64.b64encode(resume_bytes).decode("ascii"),
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["document"]["normalizedToAts"] is True
+    assert payload["atsReport"]["normalizedToAts"] is True
+    assert payload["atsReport"]["sourceSectionsDetected"] == []
+    assert "Resume was normalized into ATS-style sections before import." in payload["warnings"]
+
+    resume_json = payload["resume"]
+    assert resume_json["header"]["name"] == "Morgan Brown"
+    assert resume_json["header"]["email"] == "morgan@example.com"
+    assert resume_json["skills"]["Skills"] == ["Python", "AWS", "Terraform"]
+    assert resume_json["experience"][0]["role"] == "Platform Engineer"
+    assert resume_json["experience"][0]["company"] == "Contoso Cloud"
+    assert resume_json["experience"][0]["start"] == "2021"
+    assert resume_json["experience"][0]["end"] == "Present"
+    assert resume_json["education"][0]["school"] == "State University"
+    assert resume_json["education"][0]["degree"] == "BS Computer Science"
+    assert resume_json["education"][0]["start"] == "2017"
+    assert resume_json["education"][0]["end"] == "2021"
+
+
 def test_generate_resume_rejects_unsupported_import_file_type(client):
     token = _signup(client)
     response = client.post(

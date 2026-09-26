@@ -1571,24 +1571,289 @@ def _parse_project_entries(lines: list[str]) -> list[dict[str, object]]:
     return projects[:5]
 
 
+def _header_string_values(header: dict[str, object]) -> set[str]:
+    values: set[str] = set()
+    for value in header.values():
+        if isinstance(value, str) and value:
+            values.add(value)
+    return values
+
+
+def _is_header_line(line: str, header: dict[str, object]) -> bool:
+    if _is_contact_line(line):
+        return True
+    if line in {str(header.get("name") or ""), str(header.get("location") or "")}:
+        return True
+    return False
+
+
+def _has_nearby_experience_date(lines: list[str], index: int, lookahead: int = 3) -> bool:
+    window = lines[index:index + lookahead + 1]
+    return any(_looks_like_date_range(line) or _is_date_only_line(line) for line in window)
+
+
+def _looks_like_experience_context(lines: list[str], index: int) -> bool:
+    line = lines[index]
+    next_line = lines[index + 1] if index + 1 < len(lines) else ""
+    third_line = lines[index + 2] if index + 2 < len(lines) else ""
+
+    if _looks_like_date_range(line) and not _looks_like_degree_or_school(_strip_date_range(line)):
+        return True
+
+    parsed = _parse_role_company(line)
+    if parsed and (
+        parsed.get("start")
+        or parsed.get("end")
+        or (parsed.get("role") and parsed.get("company"))
+        or _has_nearby_experience_date(lines, index)
+    ):
+        return True
+
+    if _looks_like_role_title(line) and (
+        _looks_like_company_line(next_line)
+        or _looks_like_date_range(next_line)
+        or _looks_like_company_line(third_line)
+        or _looks_like_date_range(third_line)
+    ):
+        return True
+
+    if _looks_like_company_line(line) and (
+        _looks_like_role_title(next_line)
+        or _looks_like_date_range(next_line)
+        or _looks_like_role_title(third_line)
+        or _looks_like_date_range(third_line)
+    ):
+        return True
+
+    return False
+
+
+def _infer_sections_from_lines(lines: list[str], header: dict[str, object]) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {key: [] for key in SECTION_ALIASES}
+    current = ""
+    inferred_experience_started = False
+    inferred_education_started = False
+
+    for index, line in enumerate(lines):
+        if _is_header_line(line, header) or _looks_like_pdf_artifact(line):
+            continue
+
+        heading = _section_for_heading(line)
+        if heading:
+            current = heading
+            inferred_experience_started = inferred_experience_started or heading == "experience"
+            inferred_education_started = inferred_education_started or heading == "education"
+            continue
+
+        if current == "summary":
+            if _is_summary_line(line, _header_string_values(header)):
+                sections["summary"].append(line)
+            continue
+
+        if current and current != "summary":
+            sections.setdefault(current, []).append(line)
+            if current == "experience":
+                inferred_experience_started = True
+            if current == "education":
+                inferred_education_started = True
+            continue
+
+        clean_without_date = _strip_date_range(line) if _looks_like_date_range(line) else line
+        if inferred_education_started and (_is_date_only_line(line) or _looks_like_location_line(line)):
+            sections["education"].append(line)
+            continue
+
+        if _looks_like_degree_or_school(clean_without_date):
+            sections["education"].append(line)
+            inferred_education_started = True
+            continue
+
+        if _parse_skill_category_line(line) or _looks_like_skill_list_line(line):
+            sections["skills"].append(line)
+            continue
+
+        if _looks_like_experience_context(lines, index):
+            sections["experience"].append(line)
+            inferred_experience_started = True
+            continue
+
+        if inferred_experience_started and _is_experience_detail_line(line):
+            sections["experience"].append(line)
+            continue
+
+        if _is_summary_line(line, _header_string_values(header)):
+            sections["summary"].append(line)
+
+    return sections
+
+
+def _merge_skill_groups(base: dict[str, list[str]], extra: dict[str, list[str]]) -> dict[str, list[str]]:
+    merged = {category: list(values) for category, values in base.items()}
+    for category, values in extra.items():
+        _add_skill_group_values(merged, category, values)
+    return merged
+
+
+def _resume_skill_count(resume: dict[str, object]) -> int:
+    skills = resume.get("skills") if isinstance(resume.get("skills"), dict) else {}
+    return sum(len(values) for values in skills.values() if isinstance(values, list))
+
+
+def _resume_has_importable_content(resume: dict[str, object]) -> bool:
+    header = resume.get("header") if isinstance(resume.get("header"), dict) else {}
+    has_name = bool(header.get("name"))
+    has_contact = bool(header.get("email") or header.get("phone"))
+    has_experience = bool(resume.get("experience"))
+    has_education = bool(resume.get("education"))
+    skill_count = _resume_skill_count(resume)
+
+    if (has_name or has_contact) and (has_experience or has_education):
+        return True
+
+    if has_contact and (skill_count >= 2 or bool(resume.get("summary")) or bool(resume.get("additionalSections"))):
+        return True
+
+    return False
+
+
+def _format_ats_date_range(item: dict[str, object]) -> str:
+    start = str(item.get("start") or "").strip()
+    end = str(item.get("end") or "").strip()
+    if start and end:
+        return f"{start} - {end}"
+    return start or end
+
+
+def _ats_text_from_resume_json(resume: dict[str, object]) -> str:
+    lines: list[str] = []
+    header = resume.get("header") if isinstance(resume.get("header"), dict) else {}
+    name = str(header.get("name") or "").strip()
+    title = str(header.get("title") or "").strip()
+    contact_parts = [
+        str(header.get("email") or "").strip(),
+        str(header.get("phone") or "").strip(),
+        str(header.get("location") or "").strip(),
+    ]
+    links = header.get("links") if isinstance(header.get("links"), list) else []
+    for link in links:
+        if isinstance(link, dict) and link.get("url"):
+            contact_parts.append(str(link["url"]).strip())
+
+    if name:
+        lines.append(name)
+    if title:
+        lines.append(title)
+    contact_line = " | ".join(part for part in contact_parts if part)
+    if contact_line:
+        lines.append(contact_line)
+
+    summary = str(resume.get("summary") or "").strip()
+    if summary:
+        lines.extend(["", "SUMMARY", summary])
+
+    skills = resume.get("skills") if isinstance(resume.get("skills"), dict) else {}
+    skill_lines: list[str] = []
+    for category, values in skills.items():
+        if not isinstance(values, list) or not values:
+            continue
+        value_text = ", ".join(str(value) for value in values if str(value).strip())
+        if not value_text:
+            continue
+        clean_category = str(category or "Skills").strip()
+        if clean_category.lower() in {"skills", "core"}:
+            skill_lines.append(value_text)
+        else:
+            skill_lines.append(f"{clean_category}: {value_text}")
+    if skill_lines:
+        lines.extend(["", "SKILLS", *skill_lines])
+
+    experience = resume.get("experience") if isinstance(resume.get("experience"), list) else []
+    if experience:
+        lines.extend(["", "EXPERIENCE"])
+        for item in experience:
+            if not isinstance(item, dict):
+                continue
+            heading_parts = [
+                str(item.get("role") or "").strip(),
+                str(item.get("company") or "").strip(),
+                str(item.get("location") or "").strip(),
+                _format_ats_date_range(item),
+            ]
+            heading = " | ".join(part for part in heading_parts if part)
+            if heading:
+                lines.append(heading)
+            highlights = item.get("highlights") if isinstance(item.get("highlights"), list) else []
+            for highlight in highlights:
+                if isinstance(highlight, dict):
+                    bullet = str(highlight.get("bullet") or "").strip()
+                else:
+                    bullet = str(highlight).strip()
+                if bullet:
+                    lines.append(bullet)
+
+    education = resume.get("education") if isinstance(resume.get("education"), list) else []
+    if education:
+        lines.extend(["", "EDUCATION"])
+        for item in education:
+            if not isinstance(item, dict):
+                continue
+            entry_parts = [
+                str(item.get("school") or "").strip(),
+                str(item.get("degree") or "").strip(),
+                str(item.get("location") or "").strip(),
+                _format_ats_date_range(item),
+            ]
+            entry = " | ".join(part for part in entry_parts if part)
+            if entry:
+                lines.append(entry)
+            notes = item.get("notes") if isinstance(item.get("notes"), list) else []
+            lines.extend(str(note).strip() for note in notes if str(note).strip())
+
+    additional_sections = resume.get("additionalSections") if isinstance(resume.get("additionalSections"), list) else []
+    for section in additional_sections:
+        if not isinstance(section, dict):
+            continue
+        title = str(section.get("title") or "Additional").strip()
+        items = section.get("items") if isinstance(section.get("items"), list) else []
+        clean_items = [str(item).strip() for item in items if str(item).strip()]
+        if title and clean_items:
+            lines.extend(["", title.upper(), *clean_items])
+
+    return _limit_resume_text("\n".join(lines))
+
+
 def _local_resume_json_from_text(text: str) -> dict[str, object]:
     lines = _resume_lines(text)
     header = _extract_header(lines)
     sections = _sectionize_resume(lines)
-    header_values = {str(value) for value in header.values() if isinstance(value, str) and value}
+    inferred_sections = _infer_sections_from_lines(lines, header)
+    header_values = _header_string_values(header)
 
     summary_lines = [line for line in sections.get("summary", []) if _is_summary_line(line, header_values)]
     summary = " ".join(summary_lines[:3]).strip()
+    if not summary:
+        summary = " ".join(inferred_sections.get("summary", [])[:3]).strip()
 
     header_name = str(header.get("name") or "")
     experience = _parse_experience_entries([
         line for line in sections.get("experience", [])
         if not _is_contact_line(line) and line != header_name
     ])
+    if not experience:
+        experience = _parse_experience_entries([
+            line for line in inferred_sections.get("experience", [])
+            if not _is_contact_line(line) and line != header_name
+        ])
     education_lines = [line for line in sections.get("education", []) if not _is_contact_line(line)]
     education = _parse_education_entries(education_lines)
+    inferred_education_lines = [line for line in inferred_sections.get("education", []) if not _is_contact_line(line)]
+    if not education:
+        education = _parse_education_entries(inferred_education_lines)
     skill_groups = _skill_groups_from_sections(sections)
     for category, values in _skill_groups_from_skill_lines(_education_section_skill_lines(education_lines)).items():
+        _add_skill_group_values(skill_groups, category, values)
+    skill_groups = _merge_skill_groups(skill_groups, _skill_groups_from_skill_lines(inferred_sections.get("skills", [])))
+    for category, values in _skill_groups_from_skill_lines(_education_section_skill_lines(inferred_education_lines)).items():
         _add_skill_group_values(skill_groups, category, values)
     additional_sections = _additional_sections_from_sections(sections)
 
@@ -1724,18 +1989,46 @@ def parse_resume_text(text: str, *, require_ats: bool = True, document: dict[str
     if not resume_text:
         _raise_unreadable_import("ATS resume")
 
-    ats_report = _ats_resume_report(resume_text)
-    if require_ats and not ats_report["validated"]:
-        _raise_non_ats_import(ats_report)
-
     resume = _local_resume_json_from_text(resume_text)
+    source_ats_report = _ats_resume_report(resume_text)
+    ats_report = source_ats_report
+    output_text = resume_text
+    normalized_to_ats = False
+
+    if require_ats and not source_ats_report["validated"]:
+        if not _resume_has_importable_content(resume):
+            _raise_non_ats_import(source_ats_report)
+
+        output_text = _ats_text_from_resume_json(resume)
+        normalized_ats_report = _ats_resume_report(output_text)
+        ats_report = {
+            **normalized_ats_report,
+            "validated": bool(normalized_ats_report.get("validated")) or _resume_has_importable_content(resume),
+            "normalizedToAts": True,
+            "sourceValidated": False,
+            "sourceSectionsDetected": source_ats_report.get("sectionsDetected", []),
+        }
+        normalized_to_ats = True
+    elif require_ats:
+        ats_report = {
+            **source_ats_report,
+            "normalizedToAts": False,
+            "sourceValidated": True,
+            "sourceSectionsDetected": source_ats_report.get("sectionsDetected", []),
+        }
+
     warnings = _warnings_for_resume(resume, ats_report)
+    if normalized_to_ats:
+        warnings.insert(0, "Resume was normalized into ATS-style sections before import.")
+    output_document = dict(document or {"textExtracted": True})
+    output_document["normalizedToAts"] = normalized_to_ats
+
     return ParsedResumeUpload(
-        text=resume_text,
+        text=output_text,
         resume=resume,
         warnings=warnings,
         confidence=_confidence_for_resume(resume, ats_report),
-        document=document or {"textExtracted": True},
+        document=output_document,
         ats_report=ats_report,
     )
 
@@ -1788,4 +2081,3 @@ N/A - no job description provided
 
 COLD_EMAIL:
 N/A - no job description provided"""
-
