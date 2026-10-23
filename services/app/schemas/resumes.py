@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import Field
 from app.schemas.base import StrictModel
 class CreateResumeIn(StrictModel):
+    idempotencyKey: str | None = Field(default=None, min_length=16, max_length=64)
     templateId: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=200)
     content: dict[str, Any] | list[Any] | str | int | float | bool | None
@@ -12,11 +13,12 @@ class UpdateResumeIn(StrictModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     content: dict[str, Any] | list[Any] | str | int | float | bool | None = None
 class DraftIn(StrictModel):
+    resumeId: str | None = Field(default=None, max_length=64)
     templateId: str | None = Field(default=None, max_length=80)
     content: dict[str, Any] | list[Any] | str | int | float | bool | None
 class ResumeUploadFileData(StrictModel):
     mimeType: str = Field(min_length=1, max_length=200)
-    data: str = Field(min_length=1)
+    data: str = Field(min_length=1, max_length=14 * 1024 * 1024)
     name: str | None = Field(default=None, max_length=255)
 class ParseResumeUploadIn(StrictModel):
     importFormat: str | None = Field(default="ats", max_length=80)
@@ -50,6 +52,7 @@ class LatestResumeEnvelope(StrictModel):
 class ResumesEnvelope(StrictModel):
     resumes: list[ResumeSummaryOut]
 class ResumeDraftOut(StrictModel):
+    resumeId: str | None = None
     id: str
     templateId: str
     content: dict[str, Any] | list[Any] | str | int | float | bool | None

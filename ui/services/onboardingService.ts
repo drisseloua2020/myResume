@@ -76,6 +76,7 @@ export type CareerProfileAnalysisReport = {
 };
 
 export type CareerProfileAnalysis = {
+  stale?: boolean;
   id: string;
   userId: string;
   onboardingProfileId?: string | null;

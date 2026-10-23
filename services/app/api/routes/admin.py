@@ -1,6 +1,8 @@
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import desc, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import desc, select, func, or_
+from pydantic import BaseModel
+from typing import Literal
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.api.routes.common import to_agent_update_out, to_profile_source_out, to_resume_summary_out, to_activity_log_out, to_user_out
@@ -13,13 +15,53 @@ from app.schemas.common import OkResponse
 from app.services.activity import log_activity, new_prefixed_id
 from app.services.mailer import send_support_email
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_roles({RoleEnum.admin}))])
-TEMPLATE_CATALOG = [{"id": "classic_pro", "name": "Classic Professional", "tag": "Conservative"}, {"id": "modern_tech", "name": "Modern Tech", "tag": "Modern"}, {"id": "creative_bold", "name": "Creative Bold", "tag": "Creative"}, {"id": "executive_lead", "name": "Executive Lead", "tag": "Leadership"}, {"id": "minimalist_clean", "name": "Minimalist Clean", "tag": "Simple"}, {"id": "compact_grid", "name": "Compact Grid", "tag": "Technical"}]
+
+@router.get("/overview")
+def overview(db: Session = Depends(get_db)):
+    from app.models.entities import JobApplication, CoverLetter
+    return {"users": db.scalar(select(func.count()).select_from(User)),
+            "resumes": db.scalar(select(func.count()).select_from(Resume)),
+            "coverLetters": db.scalar(select(func.count()).select_from(CoverLetter)),
+            "jobs": db.scalar(select(func.count()).select_from(JobApplication)),
+            "openSupport": db.scalar(select(func.count()).select_from(ContactMessage).where(ContactMessage.status == "new")),
+            "externalSubmission": False, "profileSync": False, "billing": False}
+
+class UserStatusIn(BaseModel):
+    status: Literal["Active", "Canceled"]
+
+@router.patch("/users/{user_id}/status")
+def change_user_status(user_id: str, payload: UserStatusIn, admin: User = Depends(require_roles({RoleEnum.admin})), db: Session = Depends(get_db)):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    if user.id == admin.id or user.role == "admin":
+        raise HTTPException(409, "Admin accounts cannot be deactivated here")
+    user.status = payload.status
+    user.token_version += 1
+    log_activity(db, admin.id, "ADMIN_USER_STATUS", details=f"User: {user.id}; status: {payload.status}", user_name=admin.name)
+    db.commit()
+    return {"user": to_user_out(user)}
+import json
+from pathlib import Path
+TEMPLATE_CATALOG = json.loads((Path(__file__).resolve().parents[2] / "template_catalog.json").read_text(encoding="utf-8"))
 @router.get("/users", response_model=UsersEnvelope)
-def users(db: Session = Depends(get_db)):
-    rows = db.scalars(select(User).order_by(desc(User.created_at)).limit(1000)).all(); return UsersEnvelope(users=[to_user_out(item) for item in rows])
+def users(q: str = Query(default="", max_length=200), offset: int = Query(default=0, ge=0), limit: int = Query(default=1000, ge=1, le=1000), db: Session = Depends(get_db)):
+    query = select(User)
+    if q.strip():
+        query = query.where(or_(User.name.ilike(f"%{q.strip()}%"), User.email.ilike(f"%{q.strip()}%"), User.status.ilike(f"%{q.strip()}%")))
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(query.order_by(desc(User.created_at), User.id).offset(offset).limit(limit)).all()
+    return UsersEnvelope(users=[to_user_out(item) for item in rows], total=total)
 @router.get("/activity-logs", response_model=ActivityLogsEnvelope)
-def activity_logs(db: Session = Depends(get_db)):
-    rows = db.scalars(select(ActivityLog).order_by(desc(ActivityLog.timestamp)).limit(2000)).all(); return ActivityLogsEnvelope(logs=[to_activity_log_out(item) for item in rows])
+def activity_logs(q: str = Query(default="", max_length=200), userId: str | None = Query(default=None, max_length=100), offset: int = Query(default=0, ge=0), limit: int = Query(default=2000, ge=1, le=2000), db: Session = Depends(get_db)):
+    query = select(ActivityLog)
+    if userId:
+        query = query.where(ActivityLog.user_id == userId)
+    if q.strip():
+        query = query.where(or_(ActivityLog.user_name.ilike(f"%{q.strip()}%"), ActivityLog.action.ilike(f"%{q.strip()}%"), ActivityLog.details.ilike(f"%{q.strip()}%")))
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = db.scalars(query.order_by(desc(ActivityLog.timestamp), ActivityLog.id).offset(offset).limit(limit)).all()
+    return ActivityLogsEnvelope(logs=[to_activity_log_out(item) for item in rows], total=total)
 @router.get("/templates", response_model=TemplatesEnvelope)
 def templates() -> TemplatesEnvelope:
     return TemplatesEnvelope(templates=TEMPLATE_CATALOG)
@@ -46,7 +88,7 @@ def reply(message_id: str, payload: ReplyIn, admin: User = Depends(require_roles
     try:
         send_support_email(to=row.email, subject=payload.subject, text=payload.message); row.status = "replied"; log_activity(db, admin.id, "contact_reply", details=f"contactMessageId={message_id};to={row.email};subject={payload.subject}", user_name=admin.name); db.commit(); return OkResponse(ok=True)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to send email: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Support email delivery failed. Check SMTP configuration and retry.") from exc
 @router.get("/resumes", response_model=AdminResumesEnvelope)
 def resumes(db: Session = Depends(get_db)) -> AdminResumesEnvelope:
     rows = db.scalars(select(Resume).order_by(desc(Resume.created_at)).limit(500)).all(); users_by_id = {user.id: user for user in db.scalars(select(User)).all()}; return AdminResumesEnvelope(resumes=[to_resume_summary_out(item, user=users_by_id.get(item.user_id)) for item in rows])

@@ -6,7 +6,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///./test.db")
-os.environ.setdefault("JWT_SECRET", "test-secret")
+os.environ.setdefault("JWT_SECRET", "test-secret-for-local-regression-only-2026")
+os.environ.setdefault("AUTH_REQUESTS_PER_MINUTE", "10000")
+if os.environ["APP_ENV"] != "test" or os.environ["DATABASE_URL"] != "sqlite+pysqlite:///./test.db":
+    raise RuntimeError("Tests refuse inherited database targets. Use APP_ENV=test and DATABASE_URL=sqlite+pysqlite:///./test.db")
 from app.db.base import Base
 from app.db.session import configure_engine, dispose_engine, get_engine, get_session_factory
 from app.main import app

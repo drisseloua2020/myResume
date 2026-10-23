@@ -1,10 +1,12 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, func
+from datetime import datetime, timezone
+from app.core.config import settings
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db
 from app.api.routes.common import to_resume_draft_out, to_resume_out, to_resume_summary_out
-from app.models.entities import Resume, ResumeDraft, User
+from app.models.entities import ActivityLog, Resume, ResumeDraft, User
 from app.schemas.common import IdResponse, OkResponse
 from app.schemas.resumes import CreateResumeIn, DraftIn, LatestResumeEnvelope, ParseResumeUploadIn, ParseResumeUploadOut, ResumeDraftEnvelope, ResumeEnvelope, ResumesEnvelope, UpdateResumeIn
 from app.services.activity import log_activity, new_prefixed_id
@@ -12,7 +14,16 @@ from app.services.resume_parser import ResumeParseError, parse_resume_upload
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 @router.post("/", response_model=IdResponse, status_code=status.HTTP_201_CREATED)
 def create_resume(payload: CreateResumeIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> IdResponse:
-    resume = Resume(id=new_prefixed_id("res"), user_id=current_user.id, template_id=payload.templateId, title=payload.title, content=payload.content)
+    db.scalar(select(User).where(User.id == current_user.id).with_for_update())
+    if payload.idempotencyKey:
+        existing = db.scalar(select(Resume).where(Resume.user_id == current_user.id, Resume.creation_key == payload.idempotencyKey))
+        if existing:
+            return IdResponse(id=existing.id)
+    day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    created_today = db.scalar(select(func.count()).select_from(ActivityLog).where(ActivityLog.user_id == current_user.id, ActivityLog.action == 'RESUME_SAVE', ActivityLog.timestamp >= day_start))
+    if current_user.plan == 'free' and created_today >= settings.free_resumes_per_day:
+        raise HTTPException(429, "Daily new-resume limit reached. Edit existing resumes or retry after midnight UTC.")
+    resume = Resume(id=new_prefixed_id("res"), user_id=current_user.id, template_id=payload.templateId, creation_key=payload.idempotencyKey, title=payload.title, content=payload.content)
     db.add(resume); db.flush(); log_activity(db, current_user.id, "RESUME_SAVE", details=f"Template: {payload.templateId}", user_name=current_user.name); db.commit(); return IdResponse(id=resume.id)
 @router.get("/", response_model=ResumesEnvelope)
 def list_resumes(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ResumesEnvelope:
@@ -23,14 +34,20 @@ def latest_resume(current_user: User = Depends(get_current_user), db: Session = 
 @router.post("/draft", response_model=OkResponse)
 def save_draft(payload: DraftIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> OkResponse:
     template_id = payload.templateId or ""
-    draft = db.scalar(select(ResumeDraft).where(ResumeDraft.user_id == current_user.id, ResumeDraft.template_id == template_id))
-    if draft: draft.content = payload.content
-    else: db.add(ResumeDraft(id=new_prefixed_id("draft"), user_id=current_user.id, template_id=template_id, content=payload.content))
+    if payload.resumeId and not db.scalar(select(Resume.id).where(Resume.id == payload.resumeId, Resume.user_id == current_user.id)):
+        raise HTTPException(status_code=404, detail="Resume not found")
+    draft_key = payload.resumeId or f"new:{template_id}"
+    draft = db.scalar(select(ResumeDraft).where(ResumeDraft.user_id == current_user.id, ResumeDraft.draft_key == draft_key))
+    if draft:
+        draft.content = payload.content
+        draft.template_id = template_id
+    else: db.add(ResumeDraft(id=new_prefixed_id("draft"), user_id=current_user.id, template_id=template_id, draft_key=draft_key, resume_id=payload.resumeId, content=payload.content))
     db.flush(); log_activity(db, current_user.id, "RESUME_DRAFT_SAVE", details=f"Template: {template_id or 'default'}", user_name=current_user.name); db.commit(); return OkResponse(ok=True)
 @router.get("/latest-draft", response_model=ResumeDraftEnvelope)
-def latest_draft(templateId: str | None = Query(default=None), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ResumeDraftEnvelope:
+def latest_draft(templateId: str | None = Query(default=None), resumeId: str | None = Query(default=None), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ResumeDraftEnvelope:
     stmt = select(ResumeDraft).where(ResumeDraft.user_id == current_user.id)
     if templateId is not None: stmt = stmt.where(ResumeDraft.template_id == templateId)
+    if resumeId is not None: stmt = stmt.where(ResumeDraft.resume_id == resumeId)
     draft = db.scalar(stmt.order_by(desc(ResumeDraft.updated_at)).limit(1)); return ResumeDraftEnvelope(draft=to_resume_draft_out(draft) if draft else None)
 @router.post("/parse-upload", response_model=ParseResumeUploadOut)
 def parse_upload(payload: ParseResumeUploadIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ParseResumeUploadOut:

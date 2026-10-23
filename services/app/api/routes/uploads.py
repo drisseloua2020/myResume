@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import mimetypes
+from io import BytesIO
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pathlib import Path
 from uuid import uuid4
 
@@ -20,7 +22,6 @@ ALLOWED_PROFILE_PHOTO_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
     "image/webp": ".webp",
-    "image/heic": ".heic",
 }
 
 
@@ -66,7 +67,7 @@ async def upload_profile_photo(
     if not extension:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Supported profile photo formats: JPEG, PNG, WEBP, HEIC.",
+            detail="Supported profile photo formats: JPEG, PNG, WEBP.",
         )
 
     content = await file.read(settings.max_profile_photo_bytes + 1)
@@ -74,6 +75,20 @@ async def upload_profile_photo(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
     if len(content) > settings.max_profile_photo_bytes:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Profile photo is too large.")
+
+    try:
+        with Image.open(BytesIO(content)) as photo:
+            if photo.width * photo.height > 16000000 or photo.format not in {"JPEG", "PNG", "WEBP"}:
+                raise ValueError("Unsupported image")
+            photo.load()
+            cleaned = ImageOps.exif_transpose(photo).convert("RGB")
+            cleaned.thumbnail((1600, 1600))
+            output = BytesIO()
+            cleaned.save(output, format="JPEG", quality=88)
+            content = output.getvalue()
+            extension, content_type = ".jpg", "image/jpeg"
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
+        raise HTTPException(400, "Upload a valid JPEG, PNG or WEBP image up to 16 megapixels") from exc
 
     _ensure_private_dir(settings.upload_root)
     _ensure_private_dir(settings.upload_root / "profile-photos")

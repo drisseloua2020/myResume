@@ -1,4 +1,5 @@
-const RAW_API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:3000";
+const runtime = (globalThis as any).__MYRESUME_CONFIG__;
+const RAW_API_URL = runtime?.apiUrl || (import.meta as any).env?.VITE_API_URL || ((import.meta as any).env?.DEV ? "http://localhost:3000" : "/api");
 export const API_URL = RAW_API_URL.replace(/\/+$/, "");
 
 export const SESSION_EXPIRED_EVENT = "rf:session-expired";
@@ -7,7 +8,7 @@ const TOKEN_KEY = "rf_token";
 const SESSION_KEY = "rf_session";
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 export function apiAssetUrl(url?: string | null): string | undefined {
@@ -50,6 +51,12 @@ export async function fetchApiAssetDataUrl(url: string): Promise<string> {
   if (!assetUrl || !token) {
     throw new Error("Sign in again to load this protected asset.");
   }
+  const base = new URL(API_URL || '/', window.location.origin);
+  const target = new URL(assetUrl, window.location.origin);
+  const prefix = `${base.pathname.replace(/\/$/, '')}/uploads/`;
+  if (target.origin !== base.origin || !target.pathname.startsWith(prefix)) {
+    throw new Error('Protected assets must come from this application.');
+  }
 
   const res = await fetch(assetUrl, {
     headers: { Authorization: `Bearer ${token}` },
@@ -74,17 +81,21 @@ export async function fetchApiAssetDataUrl(url: string): Promise<string> {
 }
 
 export function setSession(token: string, user: any) {
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
 }
 
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }
 
 export function getCachedUser<T = any>(): T | null {
-  const raw = localStorage.getItem(SESSION_KEY);
+  const raw = sessionStorage.getItem(SESSION_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);

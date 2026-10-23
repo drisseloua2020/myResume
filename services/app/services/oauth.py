@@ -161,7 +161,8 @@ def _callback_url(request: Request, provider: str) -> str:
 def _frontend_redirect(params: dict[str, str], frontend_origin: str | None = None) -> str:
     base_url = (frontend_origin or settings.oauth_frontend_url).rstrip("/") or "http://localhost:4000"
     _validate_render_public_url("OAUTH_FRONTEND_URL", base_url)
-    return f"{base_url}/?{urlencode(params)}"
+    separator = "#" if "token" in params else "?"
+    return f"{base_url}/{separator}{urlencode(params)}"
 
 
 def _signed_state(
@@ -300,7 +301,7 @@ async def _fetch_userinfo(provider: OAuthProvider, access_token: str) -> dict[st
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="SSO profile is missing a subject")
     if not profile.get("email"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="SSO profile did not share an email address")
-    if str(profile.get("email_verified", "true")).lower() == "false":
+    if provider.key in {"google", "linkedin"} and str(profile.get("email_verified", "false")).lower() != "true":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="SSO email address is not verified")
     return profile
 
@@ -350,6 +351,8 @@ def _upsert_oauth_user(
 
     user = db.scalar(select(User).where(func.lower(User.email) == email))
     if user:
+        if str(profile.get('email_verified', 'false')).lower() != 'true':
+            raise HTTPException(409, "Sign in with your existing method. Verified email proof is required to link a provider.")
         user.auth_provider = provider.key
         log_activity(db, user.id, "USER_LOGIN", details=f"linked via {provider.key}", user_name=user.name)
     else:
@@ -359,7 +362,7 @@ def _upsert_oauth_user(
             email=email,
             password_hash=None,
             role=RoleEnum.user.value,
-            plan=plan.value,
+            plan=PlanEnum.free.value,
             status="Active",
             paid_amount=Decimal("0.00"),
             auth_provider=provider.key,
@@ -409,9 +412,11 @@ async def handle_oauth_callback(
         profile = await _fetch_userinfo(config, str(token_data["access_token"]))
         plan = PlanEnum(str(state_payload.get("plan") or PlanEnum.free.value))
         user = _upsert_oauth_user(db, provider=config, profile=profile, token_data=token_data, plan=plan)
+        if user.status != "Active":
+            raise HTTPException(403, "Account inactive")
         db.commit()
         db.refresh(user)
-        app_token = sign_token({"userId": user.id, "email": user.email, "role": user.role, "name": user.name})
+        app_token = sign_token({"userId": user.id, "email": user.email, "role": user.role, "name": user.name, "version": user.token_version})
         redirect_params = {"token": app_token}
         frontend_origin = _validated_frontend_origin(str(state_payload.get("frontendOrigin") or ""))
         template_id = str(state_payload.get("templateId") or "").strip()

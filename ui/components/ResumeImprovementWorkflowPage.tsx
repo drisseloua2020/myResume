@@ -107,7 +107,6 @@ function buildSuggestedTargets(data?: UserInputData | null) {
     skills.match(/sql|api|ticket|support|troubleshoot/) ? 'Application Support Analyst' : undefined,
     skills.match(/customer|support|documentation|help/) ? 'Technical Support Specialist' : undefined,
     skills.match(/qa|test|bug|automation/) ? 'Junior QA Analyst' : undefined,
-    'Customer Support Engineer',
   ].filter(Boolean) as string[];
 
   return Array.from(new Set(targets)).slice(0, 4);
@@ -116,7 +115,6 @@ function buildSuggestedTargets(data?: UserInputData | null) {
 function resumeSearchText(data?: UserInputData | null) {
   return [
     data?.targetRole,
-    data?.jobDescription,
     data?.personalDetails?.summary,
     ...(data?.skillItems || []).flatMap((item) => [item.category, item.items]),
     ...(data?.experienceItems || []).flatMap((item) => [item.role, item.company, item.description]),
@@ -128,8 +126,8 @@ function resumeSearchText(data?: UserInputData | null) {
 
 function buildKeywordInsights(data?: UserInputData | null, suggestedTargets: string[] = []) {
   const text = resumeSearchText(data);
-  const targetText = [data?.targetRole, ...suggestedTargets].join(' ').toLowerCase();
-  const roleKeywords = [
+  const targetText = (data?.targetRole || '').toLowerCase();
+  const roleKeywords = /support|helpdesk|service/.test(targetText) ? [
     'customer support',
     'technical support',
     'troubleshooting',
@@ -142,7 +140,7 @@ function buildKeywordInsights(data?: UserInputData | null, suggestedTargets: str
     'escalation',
     'quality',
     'remote collaboration',
-  ];
+  ] : [];
 
   const technicalKeywords = targetText.match(/software|engineer|developer|cloud|data/)
     ? ['python', 'javascript', 'react', 'cloud', 'testing', 'automation']
@@ -151,7 +149,9 @@ function buildKeywordInsights(data?: UserInputData | null, suggestedTargets: str
     ? ['test cases', 'bug reports', 'regression testing', 'automation']
     : [];
 
-  return Array.from(new Set([...roleKeywords, ...technicalKeywords, ...qaKeywords])).slice(0, 16).map((keyword, index) => ({
+  const jobTerms = (data?.jobDescription || '').toLowerCase().match(/\b[a-z][a-z+#.-]{3,}\b/g) || [];
+  const stopwords = new Set(['with', 'that', 'this', 'have', 'will', 'your', 'from', 'about', 'work', 'team', 'role', 'experience', 'required', 'requirements', 'company', 'responsibilities']);
+  return Array.from(new Set([...roleKeywords, ...technicalKeywords, ...qaKeywords, ...jobTerms.filter(term => !stopwords.has(term))])).slice(0, 16).map((keyword, index) => ({
     keyword,
     present: text.includes(keyword.toLowerCase()),
     priority: index < 8 ? 'Core' as const : 'Helpful' as const,
@@ -391,7 +391,7 @@ function buildImprovementModel(data?: UserInputData | null, savedResumes: Resume
     experiences,
     education,
     savedResumeCount: savedResumes.length,
-    latestResumeTitle: savedResumes[0]?.title || resumeName(data),
+    latestResumeTitle: resumeName(data),
     suggestedTargets,
     keywordInsights,
     missingKeywords,
@@ -418,7 +418,7 @@ function buildImprovementModel(data?: UserInputData | null, savedResumes: Resume
     },
     overviewItems: [
       { label: 'Target role', value: data?.targetRole?.trim() || 'Add a target role' },
-      { label: 'Saved resumes', value: String(savedResumes.length || (hasCurrentInput ? 1 : 0)) },
+      { label: 'Saved resumes', value: String(savedResumes.length) },
       { label: 'Experience entries', value: String(experiences.length) },
       { label: 'Visible skills', value: String(skills.length) },
       { label: 'Education', value: education.length ? education.map((item) => item.school).filter(Boolean).slice(0, 2).join(', ') : 'Add education' },
@@ -432,7 +432,6 @@ function buildImprovementModel(data?: UserInputData | null, savedResumes: Resume
       { label: 'Ready', value: resumeCompletion },
     ],
     improvementProgress: [
-      { label: 'Base', value: clampScore(Math.max(30, resumeCompletion - 24)) },
       { label: 'Profile', value: profileCompletion },
       { label: 'Resume', value: resumeCompletion },
       { label: 'Proof', value: outcomeSignal },
@@ -853,14 +852,14 @@ export default function ResumeImprovementWorkflowPage({
 
         <div className="grid gap-5 xl:grid-cols-2">
           <ProgressChart
-            title="Cumulative resume creation"
-            description="Tracks how the profile moves from identity details to a complete application-ready resume."
+            title="Current resume checks"
+            description="Current completeness by section."
             points={model.resumeCreationProgress}
             tone="blue"
           />
           <ProgressChart
-            title="Cumulative improvement"
-            description="Shows the lift from baseline content into proof, keywords, and application readiness."
+            title="Current readiness checks"
+            description="Current scores by dimension, not historical progress."
             points={model.improvementProgress}
             tone="teal"
           />

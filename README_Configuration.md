@@ -4,6 +4,8 @@ This document records the production domain, DNS, Render, and Google OAuth confi
 
 Do not commit OAuth client secrets, API keys, database URLs with credentials, JWT secrets, SMTP passwords, or private Render service identifiers.
 
+Read the [production runbook](docs/production-runbook.md) for secrets rotation, database roles, migrations, private storage, backup/restore and launch evidence. Live profile sync, billing, job discovery/submission and scheduled delivery remain disabled for the core release.
+
 ## Placeholders
 
 | Placeholder | Meaning |
@@ -76,19 +78,24 @@ Render must show the custom domains as verified/active before OAuth testing. A `
 Backend service:
 
 ```text
+APP_ENV=production
+DATABASE_URL=<POSTGRES_RUNTIME_URL>
+JWT_SECRET=<RANDOM_SECRET_AT_LEAST_32_CHARACTERS>
 OAUTH_FRONTEND_URL=<FRONTEND_ORIGIN>
 OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>
 CORS_ORIGINS=<FRONTEND_ORIGIN>,<ROOT_ORIGIN>
 OAUTH_COOKIE_SECURE=true
 ```
 
-Frontend service:
+Frontend static service (build time):
 
 ```text
 VITE_API_URL=<API_ORIGIN>
 ```
 
 After changing `VITE_API_URL`, redeploy/rebuild the frontend because Vite bakes environment variables into the compiled bundle.
+
+For the UI Docker image, use runtime `API_PUBLIC_URL=<API_ORIGIN>` instead. With a same-origin proxy use `API_PUBLIC_URL=/api` and `API_UPSTREAM=<PRIVATE_API_ORIGIN>`. Restart the container after changing these values; no frontend rebuild is needed. These settings are public configuration, not a place for credentials.
 
 Secrets must stay outside Git. Store these in Render environment variables or a secret manager, not in documentation:
 
@@ -169,6 +176,7 @@ Check API health:
 
 ```powershell
 curl.exe <API_ORIGIN>/health
+curl.exe <API_ORIGIN>/ready
 ```
 
 Expected result:
@@ -200,3 +208,4 @@ Expected important values:
 - If Google shows `403 Forbidden` before returning to the app, check OAuth consent publishing/test-user status and confirm the exact redirect URI is registered.
 - If Google shows `redirect_uri_mismatch`, the Google OAuth client does not contain the exact callback URI used by the backend.
 - If the frontend still calls an old API domain, redeploy the frontend after setting `VITE_API_URL=<API_ORIGIN>`.
+- If using the UI image, check its generated `/runtime-config.js` and restart with the intended `API_PUBLIC_URL` instead.

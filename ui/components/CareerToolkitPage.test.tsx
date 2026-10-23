@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CareerToolkitPage from './CareerToolkitPage';
-import { getLatestResume } from '../services/resumeService';
+import { getLatestResume, getResume, saveResume } from '../services/resumeService';
 import {
   analyzeCareer,
   createAchievement,
@@ -20,7 +20,10 @@ import {
 
 vi.mock('../services/resumeService', () => ({
   getLatestResume: vi.fn(),
+  getResume: vi.fn(),
+  saveResume: vi.fn(),
 }));
+vi.mock('../services/apiClient', () => ({ API_URL: 'http://localhost:3000', api: { get: vi.fn().mockResolvedValue({ shares: [] }) } }));
 
 vi.mock('../services/careerService', () => ({
   analyzeCareer: vi.fn(),
@@ -108,5 +111,20 @@ describe('CareerToolkitPage', () => {
     expect(await screen.findByText('82')).toBeInTheDocument();
     expect(screen.getByText('Terraform')).toBeInTheDocument();
     expect(screen.getByText(/deterministic local rules/i)).toBeInTheDocument();
+  });
+
+  it('reviews profile text before saving and opens the saved record', async () => {
+    const user = userEvent.setup();
+    const onOpenResume = vi.fn();
+    vi.mocked(saveResume).mockResolvedValue({ id: 'imported-profile' });
+    vi.mocked(getResume).mockResolvedValue({ id: 'imported-profile', title: 'Imported', templateId: 'classic_pro', content: { targetRole: 'Imported' } } as any);
+    render(<CareerToolkitPage onOpenResume={onOpenResume} />);
+    await user.type(screen.getByPlaceholderText('Paste LinkedIn profile text...'), 'Candidate Example\nEngineer\nAll experience');
+    await user.click(screen.getByRole('button', { name: 'Import Profile Text' }));
+    expect(await screen.findByText('Imported profile review')).toBeInTheDocument();
+    expect(saveResume).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Save and open resume' }));
+    await waitFor(() => expect(onOpenResume).toHaveBeenCalledWith(expect.objectContaining({ id: 'imported-profile' })));
+    expect(saveResume).toHaveBeenCalledWith(expect.objectContaining({ idempotencyKey: expect.any(String) }));
   });
 });

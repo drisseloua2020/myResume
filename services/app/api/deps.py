@@ -35,7 +35,9 @@ def get_optional_token_payload(authorization: str | None = Header(default=None))
 def get_current_user(payload: TokenPayload = Depends(get_current_token_payload), db: Session = Depends(get_db)) -> User:
     user = db.scalar(select(User).where(User.id == payload.user_id))
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+    if user.status != "Active" or payload.version != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired or account inactive")
     return user
 
 def require_roles(roles: set[RoleEnum]) -> Callable[..., User]:

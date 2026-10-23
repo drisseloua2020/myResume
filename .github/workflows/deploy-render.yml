@@ -15,10 +15,15 @@ jobs:
   deployment:
     name: Deployment
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Deploy Backend to Render
-        run: curl -X POST "${{ secrets.RENDER_API_DEPLOY_HOOK }}"
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+        run: curl --fail-with-body --silent --show-error --retry 2 -X POST "$DEPLOY_HOOK"
 
       - name: Deploy UI to Render
-        run: curl -X POST "${{ secrets.RENDER_UI_DEPLOY_HOOK }}"
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_UI_DEPLOY_HOOK }}
+        run: curl --fail-with-body --silent --show-error --retry 2 -X POST "$DEPLOY_HOOK"

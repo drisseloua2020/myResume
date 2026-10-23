@@ -6,7 +6,7 @@ export default defineConfig(() => {
   return {
     server: {
       port: 4000,
-      host: '0.0.0.0',
+      host: '127.0.0.1',
     },
     plugins: [react()],
      preview: {
@@ -22,7 +22,7 @@ export default defineConfig(() => {
     // Resume imports use the backend deterministic parser at /resumes/parse-upload.
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       }
     }
   };

@@ -4,8 +4,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import settings
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
 _ENGINE: Engine | None = None
 _SESSION_FACTORY: sessionmaker[Session] | None = None
 
@@ -19,8 +17,16 @@ def _normalize_database_url(database_url: str) -> str:
 
 def _build_engine(database_url: str) -> Engine:
     database_url = _normalize_database_url(database_url)
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, pool_pre_ping=True, future=True, connect_args=connect_args)
+    sqlite = database_url.startswith("sqlite")
+    connect_args = {"check_same_thread": False} if sqlite else {"connect_timeout": 10, "options": "-c statement_timeout=30000 -c lock_timeout=5000"}
+    engine = create_engine(database_url, pool_pre_ping=True, future=True, connect_args=connect_args,
+                          **({} if sqlite else {"pool_size": 5, "max_overflow": 5, "pool_timeout": 10}))
+    if sqlite:
+        from sqlalchemy import event
+        @event.listens_for(engine, "connect")
+        def enable_foreign_keys(connection, _):
+            connection.execute("PRAGMA foreign_keys=ON")
+    return engine
 
 def configure_engine(database_url: str | None = None) -> None:
     global _ENGINE, _SESSION_FACTORY
@@ -45,6 +51,9 @@ def get_db() -> Generator[Session, None, None]:
     db = get_session_factory()()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

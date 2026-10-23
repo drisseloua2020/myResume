@@ -6,10 +6,23 @@ from app.schemas.base import StrictModel
 class LoginIn(StrictModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=256)
+class UpdateAccountIn(StrictModel):
+    name: str = Field(min_length=1, max_length=120)
+class ChangePasswordIn(StrictModel):
+    currentPassword: str = Field(min_length=1, max_length=256)
+    newPassword: str = Field(min_length=12, max_length=256)
+class ForgotPasswordIn(StrictModel):
+    email: EmailStr
+class ResetPasswordIn(StrictModel):
+    token: str = Field(min_length=1, max_length=2000)
+    newPassword: str = Field(min_length=12, max_length=256)
+class DeleteAccountIn(StrictModel):
+    confirmationEmail: EmailStr
+    currentPassword: str = Field(default="", max_length=256)
 class SignupIn(StrictModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=256)
+    password: str = Field(min_length=12, max_length=256)
     plan: PlanEnum = PlanEnum.free
 class ProviderIn(StrictModel):
     provider: str = Field(min_length=2, max_length=40)
@@ -28,6 +41,7 @@ class ContactIn(StrictModel):
     subject: str = Field(min_length=2, max_length=160)
     message: str = Field(min_length=5, max_length=5000)
 class UserOut(StrictModel):
+    hasPassword: bool = False
     id: str
     name: str
     email: EmailStr
@@ -44,6 +58,7 @@ class UserEnvelope(StrictModel):
     user: UserOut
 class UsersEnvelope(StrictModel):
     users: list[UserOut]
+    total: int | None = None
 class ActivityLogOut(StrictModel):
     id: str
     userId: str
@@ -53,3 +68,4 @@ class ActivityLogOut(StrictModel):
     timestamp: datetime
 class ActivityLogsEnvelope(StrictModel):
     logs: list[ActivityLogOut]
+    total: int | None = None

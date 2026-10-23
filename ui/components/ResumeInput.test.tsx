@@ -2,77 +2,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ResumeInput from './ResumeInput';
+import { downloadResumeFile } from '../services/exportService';
 import { saveResume } from '../services/resumeService';
 import { generateCoverLetter } from '../services/coverLetterService';
 import { uploadProfilePhoto } from '../services/uploadService';
 import { SubscriptionPlan, UserRole } from '../types';
 
-const pdfMocks = vi.hoisted(() => ({
-  html2canvas: vi.fn(() => Promise.resolve({
-    width: 1000,
-    height: 1414,
-    toDataURL: () => 'data:image/jpeg;base64,resume',
-  })),
-  addImage: vi.fn(),
-  addPage: vi.fn(),
-  save: vi.fn(),
-}));
-
-function mockCreatedCanvases() {
-  const originalCreateElement = document.createElement.bind(document);
-  const drawImage = vi.fn();
-  const fillRect = vi.fn();
-  const toDataURL = vi.fn(() => 'data:image/jpeg;base64,resume-page');
-
-  const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
-    if (tagName.toLowerCase() === 'canvas') {
-      let width = 0;
-      let height = 0;
-      const context = { drawImage, fillRect } as any;
-
-      return {
-        get width() {
-          return width;
-        },
-        set width(value: number) {
-          width = value;
-        },
-        get height() {
-          return height;
-        },
-        set height(value: number) {
-          height = value;
-        },
-        getContext: vi.fn(() => context),
-        toDataURL,
-      } as any;
-    }
-
-    return originalCreateElement(tagName, options);
-  });
-
-  return { createElementSpy, drawImage, fillRect, toDataURL };
-}
-
-vi.mock('html2canvas', () => ({
-  default: pdfMocks.html2canvas,
-}));
-
-vi.mock('jspdf', () => ({
-  jsPDF: vi.fn(function () {
-    return {
-    internal: {
-      pageSize: {
-        getWidth: () => 210,
-        getHeight: () => 297,
-      },
-    },
-    addImage: pdfMocks.addImage,
-    addPage: pdfMocks.addPage,
-    save: pdfMocks.save,
-    };
-  }),
-}));
+vi.mock('../services/exportService', () => ({ downloadResumeFile: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../services/locationService', () => ({
   locationService: {
@@ -122,12 +58,27 @@ describe('ResumeInput', () => {
     });
   });
 
+  it('ignores a delayed parent echo of an older editor draft', async () => {
+    const onWorkspaceChange = vi.fn();
+    const props = { onImport: vi.fn(), onTemplateChange: vi.fn(), isLoading: false,
+      role: UserRole.USER, userPlan: SubscriptionPlan.FREE, selectedTemplateId: 'classic_pro',
+      user: { id: 'usr_echo', name: 'Echo User', email: 'echo@example.com', role: UserRole.USER,
+        plan: SubscriptionPlan.FREE, status: 'Active' as const, createdAt: '', paidAmount: '$0.00' },
+      onWorkspaceChange, prefilledData: { targetRole: 'Original' } };
+    const { rerender } = render(<ResumeInput {...props} />);
+    const target = screen.getByPlaceholderText('e.g. Senior Product Designer');
+    fireEvent.change(target, { target: { value: 'First edit' } });
+    const olderDraft = onWorkspaceChange.mock.calls.at(-1)?.[0];
+    fireEvent.change(target, { target: { value: 'Latest edit' } });
+    rerender(<ResumeInput {...props} prefilledData={olderDraft} />);
+    expect(target).toHaveValue('Latest edit');
+  });
+
   it('restores and persists the include-photo status from a loaded resume record', async () => {
     const user = userEvent.setup();
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -140,7 +91,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -202,7 +153,6 @@ describe('ResumeInput', () => {
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -215,7 +165,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -276,7 +226,6 @@ describe('ResumeInput', () => {
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -289,7 +238,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -357,7 +306,6 @@ describe('ResumeInput', () => {
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -370,7 +318,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -424,7 +372,6 @@ describe('ResumeInput', () => {
 
     const { container } = render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -437,7 +384,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -495,7 +442,7 @@ describe('ResumeInput', () => {
   });
 
   it('loads saved protected profile photos with the user session token', async () => {
-    localStorage.setItem('rf_token', 'session-token');
+    sessionStorage.setItem('rf_token', 'session-token');
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(new Blob(['saved-avatar'], { type: 'image/png' }), {
         status: 200,
@@ -505,7 +452,6 @@ describe('ResumeInput', () => {
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -518,7 +464,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -549,7 +495,6 @@ describe('ResumeInput', () => {
 
   it('clears an existing profile photo when imported resume data starts a new resume', async () => {
     const baseProps = {
-      onGenerate: vi.fn(),
       onImport: vi.fn(),
       onTemplateChange: vi.fn(),
       isLoading: false,
@@ -562,7 +507,7 @@ describe('ResumeInput', () => {
         email: 'resume@example.com',
         role: UserRole.USER,
         plan: SubscriptionPlan.FREE,
-        status: 'Active',
+        status: 'Active' as const,
         createdAt: '2026-05-25T00:00:00Z',
         paidAmount: '$0.00',
       },
@@ -618,7 +563,6 @@ describe('ResumeInput', () => {
 
     const { container } = render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={onImport}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -631,7 +575,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -661,7 +605,6 @@ describe('ResumeInput', () => {
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -674,7 +617,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -694,7 +637,6 @@ describe('ResumeInput', () => {
 
     const { container } = render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={onImport}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -707,7 +649,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -756,7 +698,6 @@ describe('ResumeInput', () => {
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -769,7 +710,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -859,301 +800,34 @@ describe('ResumeInput', () => {
     expect(savedContent.personalDetails?.links).toBe('LinkedIn: linkedin.com/in/jordan');
   });
 
-  it('downloads the live resume as a generated PDF without using browser print', async () => {
-    const user = userEvent.setup();
-    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
-    mockCreatedCanvases();
-
-    render(
-      <ResumeInput
-        onGenerate={vi.fn()}
-        onImport={vi.fn()}
-        onTemplateChange={vi.fn()}
-        isLoading={false}
-        role={UserRole.USER}
-        userPlan={SubscriptionPlan.FREE}
-        selectedTemplateId="classic_pro"
-        user={{
-          id: 'usr_1',
-          name: 'Resume User',
-          email: 'resume@example.com',
-          role: UserRole.USER,
-          plan: SubscriptionPlan.FREE,
-          status: 'Active',
-          createdAt: '2026-05-25T00:00:00Z',
-          paidAmount: '$0.00',
-        }}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /download pdf/i }));
-
-    await waitFor(() => {
-      expect(pdfMocks.html2canvas).toHaveBeenCalled();
-      expect(pdfMocks.save).toHaveBeenCalledWith('resume-user-resume.pdf');
-    });
-    expect(printSpy).not.toHaveBeenCalled();
-
-    printSpy.mockRestore();
+  it('downloads a selectable text PDF through the export service', async () => {
+    render(<ResumeInput onImport={vi.fn()} onTemplateChange={vi.fn()} isLoading={false}
+      role={UserRole.USER} userPlan={SubscriptionPlan.FREE} selectedTemplateId="classic_pro"
+      user={{ id: 'u', name: 'Resume User', email: 'resume@example.com', role: UserRole.USER,
+        plan: SubscriptionPlan.FREE, status: 'Active', createdAt: '', paidAmount: '$0.00' }} />);
+    await userEvent.click(screen.getByRole('button', { name: /download pdf/i }));
+    await waitFor(() => expect(downloadResumeFile).toHaveBeenCalledWith(
+      expect.objectContaining({ personalDetails: expect.objectContaining({ firstName: 'Resume' }) }),
+      'Resume User Resume', 'pdf'));
   });
 
-  it('slices long resume captures into separate PDF pages without overlapping offsets', async () => {
-    const user = userEvent.setup();
-    const { drawImage } = mockCreatedCanvases();
-
-    pdfMocks.html2canvas.mockResolvedValueOnce({
-      width: 1000,
-      height: 3000,
-      toDataURL: () => 'data:image/jpeg;base64,resume-full',
-    });
-
-    render(
-      <ResumeInput
-        onGenerate={vi.fn()}
-        onImport={vi.fn()}
-        onTemplateChange={vi.fn()}
-        isLoading={false}
-        role={UserRole.USER}
-        userPlan={SubscriptionPlan.FREE}
-        selectedTemplateId="classic_pro"
-        user={{
-          id: 'usr_1',
-          name: 'Resume User',
-          email: 'resume@example.com',
-          role: UserRole.USER,
-          plan: SubscriptionPlan.FREE,
-          status: 'Active',
-          createdAt: '2026-05-25T00:00:00Z',
-          paidAmount: '$0.00',
-        }}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /download pdf/i }));
-
-    await waitFor(() => {
-      expect(pdfMocks.addImage).toHaveBeenCalledTimes(3);
-      expect(pdfMocks.addPage).toHaveBeenCalledTimes(2);
-      expect(pdfMocks.save).toHaveBeenCalledWith('resume-user-resume.pdf');
-    });
-
-    for (const call of pdfMocks.addImage.mock.calls) {
-      expect(call[2]).toBe(0);
-      expect(call[3]).toBeGreaterThanOrEqual(0);
-    }
-    expect(drawImage).toHaveBeenCalledTimes(3);
-    expect(drawImage.mock.calls[0][4]).toBeLessThan(1414);
-    expect(drawImage.mock.calls[0][4]).toBeLessThanOrEqual(1328);
-  });
-
-  it('moves PDF page cuts to nearby quiet rows instead of slicing through content', async () => {
-    const user = userEvent.setup();
-    const { drawImage } = mockCreatedCanvases();
-    const quietRanges = [
-      [256, 268],
-      [516, 528],
-    ];
-
-    const getImageData = vi.fn((_x: number, y: number, width: number, height: number) => {
-      const data = new Uint8ClampedArray(width * height * 4);
-
-      for (let row = 0; row < height; row += 1) {
-        const absoluteY = y + row;
-        const isQuietRow = quietRanges.some(([start, end]) => absoluteY >= start && absoluteY <= end);
-
-        for (let col = 0; col < width; col += 1) {
-          const index = ((row * width) + col) * 4;
-          const value = isQuietRow ? 255 : (col % 8 < 4 ? 30 : 245);
-          data[index] = value;
-          data[index + 1] = value;
-          data[index + 2] = value;
-          data[index + 3] = 255;
-        }
-      }
-
-      return { data, width, height } as ImageData;
-    });
-
-    const renderedCanvas = {
-      width: 210,
-      height: 620,
-      getContext: vi.fn(() => ({ getImageData })),
-      toDataURL: () => 'data:image/jpeg;base64,resume-full',
-    };
-
-    pdfMocks.html2canvas.mockResolvedValueOnce(renderedCanvas);
-
-    render(
-      <ResumeInput
-        onGenerate={vi.fn()}
-        onImport={vi.fn()}
-        onTemplateChange={vi.fn()}
-        isLoading={false}
-        role={UserRole.USER}
-        userPlan={SubscriptionPlan.FREE}
-        selectedTemplateId="classic_pro"
-        user={{
-          id: 'usr_1',
-          name: 'Resume User',
-          email: 'resume@example.com',
-          role: UserRole.USER,
-          plan: SubscriptionPlan.FREE,
-          status: 'Active',
-          createdAt: '2026-05-25T00:00:00Z',
-          paidAmount: '$0.00',
-        }}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /download pdf/i }));
-
-    await waitFor(() => {
-      expect(pdfMocks.addImage).toHaveBeenCalledTimes(3);
-      expect(pdfMocks.addPage).toHaveBeenCalledTimes(2);
-    });
-
-    expect(drawImage.mock.calls[0][4]).toBeLessThan(297);
-    expect(drawImage.mock.calls[0][4]).toBeGreaterThanOrEqual(256);
-    expect(drawImage.mock.calls[1][2]).toBe(drawImage.mock.calls[0][4]);
-    expect(drawImage.mock.calls[1][4]).toBeLessThan(289);
-    expect(drawImage.mock.calls[1][6]).toBe(8);
-  });
-
-  it('keeps marked resume blocks together when choosing PDF page cuts', async () => {
-    const user = userEvent.setup();
-    const { drawImage } = mockCreatedCanvases();
-    const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
-      const isBlock = this instanceof HTMLElement && this.hasAttribute('data-pdf-block');
-      return {
-        x: 0,
-        y: isBlock ? 250 : 0,
-        top: isBlock ? 250 : 0,
-        bottom: isBlock ? 360 : 620,
-        left: 0,
-        right: 210,
-        width: 210,
-        height: isBlock ? 110 : 620,
-        toJSON: () => {},
-      } as DOMRect;
-    });
-
-    const getImageData = vi.fn((_x: number, _y: number, width: number, height: number) => ({
-      width,
-      height,
-      data: new Uint8ClampedArray(width * height * 4).fill(80),
-    } as ImageData));
-
-    pdfMocks.html2canvas.mockResolvedValueOnce({
-      width: 210,
-      height: 620,
-      getContext: vi.fn(() => ({ getImageData })),
-      toDataURL: () => 'data:image/jpeg;base64,resume-full',
-    });
-
-    render(
-      <ResumeInput
-        onGenerate={vi.fn()}
-        onImport={vi.fn()}
-        onTemplateChange={vi.fn()}
-        isLoading={false}
-        role={UserRole.USER}
-        userPlan={SubscriptionPlan.FREE}
-        selectedTemplateId="modern_tech"
-        user={{
-          id: 'usr_1',
-          name: 'Resume User',
-          email: 'resume@example.com',
-          role: UserRole.USER,
-          plan: SubscriptionPlan.FREE,
-          status: 'Active',
-          createdAt: '2026-05-25T00:00:00Z',
-          paidAmount: '$0.00',
-        }}
-        prefilledData={{
-          targetRole: 'Application Lead',
-          personalDetails: {
-            firstName: 'Resume',
-            lastName: 'User',
-            email: 'resume@example.com',
-            summary: 'Experienced developer.',
-          },
-          experienceItems: [
-            {
-              id: 'exp_1',
-              role: 'Application Lead',
-              company: 'Honda',
-              dates: 'Jun 2013 - Jun 2014',
-              description: 'Led development of enterprise web services and implemented API security controls.',
-            },
-          ],
-        }}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /download pdf/i }));
-
-    await waitFor(() => {
-      expect(pdfMocks.addImage).toHaveBeenCalledTimes(3);
-    });
-
-    expect(drawImage.mock.calls[0][4]).toBeLessThan(250);
-    expect(drawImage.mock.calls[0][4]).toBeGreaterThanOrEqual(201);
-    expect(drawImage.mock.calls[1][2]).toBe(drawImage.mock.calls[0][4]);
-
-    rectSpy.mockRestore();
-  });
-
-  it('paints the modern template sidebar across every generated PDF page', async () => {
-    const user = userEvent.setup();
-    const { drawImage, fillRect } = mockCreatedCanvases();
-
-    pdfMocks.html2canvas.mockResolvedValueOnce({
-      width: 1000,
-      height: 3000,
-      toDataURL: () => 'data:image/jpeg;base64,resume-full',
-    });
-
-    render(
-      <ResumeInput
-        onGenerate={vi.fn()}
-        onImport={vi.fn()}
-        onTemplateChange={vi.fn()}
-        isLoading={false}
-        role={UserRole.USER}
-        userPlan={SubscriptionPlan.FREE}
-        selectedTemplateId="modern_tech"
-        user={{
-          id: 'usr_1',
-          name: 'Resume User',
-          email: 'resume@example.com',
-          role: UserRole.USER,
-          plan: SubscriptionPlan.FREE,
-          status: 'Active',
-          createdAt: '2026-05-25T00:00:00Z',
-          paidAmount: '$0.00',
-        }}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /download pdf/i }));
-
-    await waitFor(() => {
-      expect(pdfMocks.addImage).toHaveBeenCalledTimes(3);
-    });
-
-    const sidebarFillCalls = fillRect.mock.calls.filter((call) => call[0] === 0 && call[1] === 0 && call[2] === 320);
-    expect(sidebarFillCalls).toHaveLength(3);
-    for (const call of sidebarFillCalls) {
-      expect(call[3]).toBe(1414);
-    }
-    expect(drawImage.mock.calls[1][1]).toBe(320);
-    expect(drawImage.mock.calls[1][5]).toBe(320);
+  it('preserves international postal codes and emits live workspace data', async () => {
+    const changed = vi.fn();
+    render(<ResumeInput onImport={vi.fn()} onTemplateChange={vi.fn()} onWorkspaceChange={changed}
+      isLoading={false} role={UserRole.USER} userPlan={SubscriptionPlan.FREE} selectedTemplateId="classic_pro"
+      user={{ id: 'u', name: 'User', email: 'user@example.com', role: UserRole.USER,
+        plan: SubscriptionPlan.FREE, status: 'Active', createdAt: '', paidAmount: '$0.00' }} />);
+    const postal = screen.getByPlaceholderText('e.g. 94105');
+    await userEvent.type(postal, 'K1A 0B1');
+    expect(postal).toHaveValue('K1A 0B1');
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({
+      personalDetails: expect.objectContaining({ postalCode: 'K1A 0B1' }),
+    }));
   });
 
   it('does not expose ATS scoring from the resume editor tabs', () => {
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -1166,7 +840,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}
@@ -1182,7 +856,6 @@ describe('ResumeInput', () => {
 
     render(
       <ResumeInput
-        onGenerate={vi.fn()}
         onImport={vi.fn()}
         onTemplateChange={vi.fn()}
         isLoading={false}
@@ -1196,7 +869,7 @@ describe('ResumeInput', () => {
           email: 'resume@example.com',
           role: UserRole.USER,
           plan: SubscriptionPlan.FREE,
-          status: 'Active',
+          status: 'Active' as const,
           createdAt: '2026-05-25T00:00:00Z',
           paidAmount: '$0.00',
         }}

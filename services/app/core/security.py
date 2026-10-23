@@ -14,6 +14,7 @@ class TokenPayload:
     email: str
     role: RoleEnum
     name: str | None = None
+    version: int = 0
 
 def parse_expiry(spec: str) -> timedelta:
     raw = (spec or "15m").strip().lower()
@@ -39,16 +40,22 @@ def verify_password(stored: str | None, plain: str) -> tuple[bool, bool]:
             return True, False
         except (VerifyMismatchError, InvalidHashError):
             return False, False
-    ok = trimmed == plain
-    return ok, ok
+    return False, False
 
 def sign_token(payload: dict[str, Any]) -> str:
     now = datetime.now(timezone.utc)
     claims = dict(payload)
     claims["exp"] = now + parse_expiry(settings.jwt_expires_in)
     claims["iat"] = now
+    claims["iss"] = settings.jwt_issuer
+    claims["aud"] = settings.jwt_audience
     return jwt.encode(claims, settings.jwt_secret, algorithm="HS256")
 
 def decode_token(token: str) -> TokenPayload:
-    decoded = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
-    return TokenPayload(user_id=str(decoded["userId"]), email=str(decoded["email"]), role=RoleEnum(str(decoded["role"])), name=decoded.get("name"))
+    decoded = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer,
+                         audience=settings.jwt_audience, options={"require": ["exp", "iat", "userId", "email", "role"]})
+    try:
+        return TokenPayload(user_id=str(decoded["userId"]), email=str(decoded["email"]),
+                            role=RoleEnum(str(decoded["role"])), name=decoded.get("name"), version=int(decoded.get("version", 0)))
+    except (ValueError, TypeError, KeyError) as exc:
+        raise jwt.InvalidTokenError("Invalid token claims") from exc

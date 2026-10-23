@@ -1,4 +1,5 @@
-import { api } from './apiClient';
+import { api, getToken } from './apiClient';
+const draftQueues = new Map<string, Promise<void>>();
 
 export type ResumeListItem = {
   id: string;
@@ -13,6 +14,7 @@ export type ResumeRecord = ResumeListItem & {
 };
 
 export type ResumeDraft = {
+  resumeId?: string | null;
   id: string;
   templateId: string;
   content: any;
@@ -28,7 +30,7 @@ export type ParsedResumeUpload = {
   atsReport: Record<string, unknown>;
 };
 
-export async function saveResume(payload: { templateId: string; title: string; content: any }): Promise<{ id: string }> {
+export async function saveResume(payload: { templateId: string; title: string; content: any; idempotencyKey?: string }): Promise<{ id: string }> {
   return api.post<{ id: string }>('/resumes', payload);
 }
 
@@ -57,12 +59,23 @@ export async function deleteResume(id: string): Promise<void> {
 
 // ---- Drafts (autosave workspace state) ----
 
-export async function saveDraft(payload: { templateId?: string; content: any }): Promise<void> {
-  await api.post('/resumes/draft', payload);
+export async function saveDraft(payload: { templateId?: string; resumeId?: string | null; content: any }): Promise<void> {
+  const token = getToken();
+  const key = `${token}:${payload.resumeId || `new:${payload.templateId || ''}`}`;
+  const previous = draftQueues.get(key) || Promise.resolve();
+  const next = previous.catch(() => undefined).then(async () => {
+    if (!token || getToken() !== token) throw new Error('Session changed before the draft could be saved.');
+    await api.post('/resumes/draft', payload);
+  });
+  draftQueues.set(key, next);
+  try { await next; } finally { if (draftQueues.get(key) === next) draftQueues.delete(key); }
 }
 
-export async function getLatestDraft(templateId?: string): Promise<ResumeDraft | null> {
-  const qs = templateId ? `?templateId=${encodeURIComponent(templateId)}` : '';
+export async function getLatestDraft(templateId?: string, resumeId?: string): Promise<ResumeDraft | null> {
+  const query = new URLSearchParams();
+  if (templateId) query.set('templateId', templateId);
+  if (resumeId) query.set('resumeId', resumeId);
+  const qs = query.size ? `?${query}` : '';
   const res = await api.get<{ draft: ResumeDraft | null }>(`/resumes/latest-draft${qs}`);
   return res.draft;
 }

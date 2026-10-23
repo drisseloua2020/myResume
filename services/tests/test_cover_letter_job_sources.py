@@ -4,7 +4,7 @@ from __future__ import annotations
 def _signup(client, email: str = "cover-url@example.com") -> str:
     response = client.post(
         "/auth/signup",
-        json={"name": "Cover User", "email": email, "password": "secret123", "plan": "free"},
+        json={"name": "Cover User", "email": email, "password": "secure-password-123", "plan": "free"},
     )
     assert response.status_code == 201, response.text
     return response.json()["token"]

@@ -1,94 +1,5406 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: ResumeForge API (Refactored)
-  version: 1.0.0
-servers:
-  - url: http://localhost:3000
+  title: ResumeForge API - Python
+  version: 2.0.0
 paths:
   /health:
     get:
-      summary: Health check
+      summary: Health
+      operationId: health_health_get
       responses:
         '200':
-          description: OK
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /ready:
+    get:
+      summary: Ready
+      operationId: ready_ready_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /auth/providers:
+    get:
+      tags:
+      - auth
+      summary: Configured Providers
+      operationId: configured_providers_auth_providers_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /auth/me:
+    patch:
+      tags:
+      - auth
+      summary: Update Account
+      operationId: update_account_auth_me_patch
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - auth
+      summary: Me
+      operationId: me_auth_me_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/me/password:
+    post:
+      tags:
+      - auth
+      summary: Change Password
+      operationId: change_password_auth_me_password_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/forgot-password:
+    post:
+      tags:
+      - auth
+      summary: Forgot Password
+      operationId: forgot_password_auth_forgot_password_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/reset-password:
+    post:
+      tags:
+      - auth
+      summary: Reset Password
+      operationId: reset_password_auth_reset_password_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/me/data:
+    get:
+      tags:
+      - auth
+      summary: Export Account
+      operationId: export_account_auth_me_data_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/me/delete:
+    post:
+      tags:
+      - auth
+      summary: Delete Account
+      operationId: delete_account_auth_me_delete_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /auth/login:
     post:
-      summary: Login with email/password
+      tags:
+      - auth
+      summary: Login
+      operationId: login_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginIn'
+        required: true
       responses:
-        '200': { description: OK }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /auth/signup:
     post:
-      summary: Signup with email/password
+      tags:
+      - auth
+      summary: Signup
+      operationId: signup_auth_signup_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupIn'
+        required: true
       responses:
-        '201': { description: Created }
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /auth/oauth/{provider}/start:
     get:
-      summary: Start Google, Microsoft, or LinkedIn OAuth login
+      tags:
+      - auth
+      summary: Oauth Start
+      operationId: oauth_start_auth_oauth__provider__start_get
       parameters:
-        - in: path
-          name: provider
-          required: true
-          schema: { type: string, enum: [google, microsoft, linkedin] }
-        - in: query
-          name: plan
-          schema: { type: string, default: free }
-        - in: query
-          name: templateId
-          schema: { type: string }
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Provider
+      - name: plan
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/PlanEnum'
+          default: free
+      - name: templateId
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Templateid
+      - name: returnTo
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Returnto
       responses:
-        '302': { description: Redirect to provider authorization page }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/oauth/{provider}/diagnostics:
+    get:
+      tags:
+      - auth
+      summary: Oauth Provider Diagnostics
+      operationId: oauth_provider_diagnostics_auth_oauth__provider__diagnostics_get
+      parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Provider
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Oauth Provider Diagnostics Auth Oauth  Provider  Diagnostics
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /auth/oauth/{provider}/callback:
     get:
-      summary: OAuth provider callback
+      tags:
+      - auth
+      summary: Oauth Callback
+      operationId: oauth_callback_auth_oauth__provider__callback_get
       parameters:
-        - in: path
-          name: provider
-          required: true
-          schema: { type: string, enum: [google, microsoft, linkedin] }
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Provider
+      - name: code
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+      - name: state
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: State
+      - name: error
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
       responses:
-        '302': { description: Redirect to frontend with app token or authError }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /auth/provider:
     post:
-      summary: Deprecated mock SSO login/signup
+      tags:
+      - auth
+      summary: Provider Login
+      operationId: provider_login_auth_provider_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderIn'
+        required: true
       responses:
-        '410': { description: Gone }
-  /auth/me:
-    get:
-      summary: Current user
+        '410':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/me/plan:
+    patch:
+      tags:
+      - auth
+      summary: Update My Plan
+      operationId: update_my_plan_auth_me_plan_patch
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlanIn'
       responses:
-        '200': { description: OK }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/logout:
+    post:
+      tags:
+      - auth
+      summary: Logout
+      operationId: logout_auth_logout_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/activity:
+    post:
+      tags:
+      - auth
+      summary: Activity
+      operationId: activity_auth_activity_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /auth/users:
     get:
-      summary: List users (admin)
+      tags:
+      - auth
+      summary: Users
+      operationId: users_auth_users_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
-        '200': { description: OK }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /auth/logs:
     get:
-      summary: List activity logs (admin)
+      tags:
+      - auth
+      summary: Logs
+      operationId: logs_auth_logs_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
-        '200': { description: OK }
-  /auth/users/{id}/plan:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityLogsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/users/{user_id}/plan:
     patch:
-      summary: Update user plan (admin)
+      tags:
+      - auth
+      summary: Update User Plan
+      operationId: update_user_plan_auth_users__user_id__plan_patch
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdatePlanIn'
       responses:
-        '200': { description: OK }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/contact:
+    post:
+      tags:
+      - auth
+      summary: Contact
+      operationId: contact_auth_contact_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /agent/sources:
     get:
-      summary: Get connected sources
+      tags:
+      - agent
+      summary: List Sources
+      operationId: list_sources_agent_sources_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
-        '200': { description: OK }
-  /agent/sources/{id}/toggle:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSourcesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /agent/sources/{source_id}/toggle:
     post:
-      summary: Toggle a source connection
+      tags:
+      - agent
+      summary: Toggle Source
+      operationId: toggle_source_agent_sources__source_id__toggle_post
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Source Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
-        '200': { description: OK }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSourceEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /agent/check:
     post:
-      summary: Check for agent updates (mock)
+      tags:
+      - agent
+      summary: Check
+      operationId: check_agent_check_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
-        '200': { description: OK }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentUpdatesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /agent/updates:
     get:
-      summary: List agent updates
+      tags:
+      - agent
+      summary: List Updates
+      operationId: list_updates_agent_updates_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
-        '200': { description: OK }
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentUpdatesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /agent/generate-resume:
+    post:
+      tags:
+      - agent
+      summary: Generate Resume
+      description: 'Legacy no-AI compatibility endpoint.
+
+
+        New clients should call POST /resumes/parse-upload for ATS resume imports
+        or save
+
+        structured editor content through POST /resumes.'
+      operationId: generate_resume_agent_generate_resume_post
+      deprecated: true
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateResumeIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateResumeOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /resumes/:
+    post:
+      tags:
+      - resumes
+      summary: Create Resume
+      operationId: create_resume_resumes__post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResumeIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - resumes
+      summary: List Resumes
+      operationId: list_resumes_resumes__get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /resumes/latest:
+    get:
+      tags:
+      - resumes
+      summary: Latest Resume
+      operationId: latest_resume_resumes_latest_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LatestResumeEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /resumes/draft:
+    post:
+      tags:
+      - resumes
+      summary: Save Draft
+      operationId: save_draft_resumes_draft_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /resumes/latest-draft:
+    get:
+      tags:
+      - resumes
+      summary: Latest Draft
+      operationId: latest_draft_resumes_latest_draft_get
+      parameters:
+      - name: templateId
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Templateid
+      - name: resumeId
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resumeid
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeDraftEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /resumes/parse-upload:
+    post:
+      tags:
+      - resumes
+      summary: Parse Upload
+      operationId: parse_upload_resumes_parse_upload_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParseResumeUploadIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParseResumeUploadOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /resumes/{resume_id}:
+    put:
+      tags:
+      - resumes
+      summary: Update Resume
+      operationId: update_resume_resumes__resume_id__put
+      parameters:
+      - name: resume_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Resume Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResumeIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - resumes
+      summary: Get Resume
+      operationId: get_resume_resumes__resume_id__get
+      parameters:
+      - name: resume_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Resume Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - resumes
+      summary: Delete Resume
+      operationId: delete_resume_resumes__resume_id__delete
+      parameters:
+      - name: resume_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Resume Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /cover-letters/generate:
+    post:
+      tags:
+      - cover-letters
+      summary: Generate
+      operationId: generate_cover_letters_generate_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateCoverLetterIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverLetterEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /cover-letters/:
+    get:
+      tags:
+      - cover-letters
+      summary: List Cover Letters
+      operationId: list_cover_letters_cover_letters__get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverLettersEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /cover-letters/{cover_letter_id}:
+    get:
+      tags:
+      - cover-letters
+      summary: Get Cover Letter
+      operationId: get_cover_letter_cover_letters__cover_letter_id__get
+      parameters:
+      - name: cover_letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Cover Letter Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverLetterEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - cover-letters
+      summary: Delete Cover Letter
+      operationId: delete_cover_letter_cover_letters__cover_letter_id__delete
+      parameters:
+      - name: cover_letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Cover Letter Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /cover-letters/{cover_letter_id}/pdf:
+    get:
+      tags:
+      - cover-letters
+      summary: Download Cover Letter Pdf
+      operationId: download_cover_letter_pdf_cover_letters__cover_letter_id__pdf_get
+      parameters:
+      - name: cover_letter_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Cover Letter Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/onboarding-profile:
+    get:
+      tags:
+      - career
+      summary: Get Onboarding Profile
+      operationId: get_onboarding_profile_career_onboarding_profile_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareerOnboardingProfileEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - career
+      summary: Save Onboarding Profile
+      operationId: save_onboarding_profile_career_onboarding_profile_put
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CareerOnboardingProfileIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareerOnboardingProfileEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/profile-analysis:
+    get:
+      tags:
+      - career
+      summary: Get Profile Analysis
+      operationId: get_profile_analysis_career_profile_analysis_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareerProfileAnalysisEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - career
+      summary: Generate Profile Analysis
+      operationId: generate_profile_analysis_career_profile_analysis_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateCareerProfileAnalysisIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareerProfileAnalysisEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/analyze:
+    post:
+      tags:
+      - career
+      summary: Analyze
+      operationId: analyze_career_analyze_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeCareerIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeCareerOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/exports/resume:
+    post:
+      tags:
+      - career
+      summary: Export Resume
+      operationId: export_resume_career_exports_resume_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportResumeIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResumeOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/import/linkedin:
+    post:
+      tags:
+      - career
+      summary: Import Linkedin
+      operationId: import_linkedin_career_import_linkedin_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkedInImportIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkedInImportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/features:
+    get:
+      tags:
+      - career
+      summary: Features
+      operationId: features_career_features_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareerFeatureCatalogOut'
+  /career/jobs:
+    post:
+      tags:
+      - career
+      summary: Create Job
+      operationId: create_job_career_jobs_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobApplicationIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - career
+      summary: List Jobs
+      operationId: list_jobs_career_jobs_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/jobs/{job_id}:
+    patch:
+      tags:
+      - career
+      summary: Update Job
+      operationId: update_job_career_jobs__job_id__patch
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateJobApplicationIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - career
+      summary: Delete Job
+      operationId: delete_job_career_jobs__job_id__delete
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/jobs/{job_id}/prepare:
+    post:
+      tags:
+      - career
+      summary: Prepare Packet
+      operationId: prepare_packet_career_jobs__job_id__prepare_post
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/jobs/{job_id}/decision:
+    post:
+      tags:
+      - career
+      summary: Decide Packet
+      operationId: decide_packet_career_jobs__job_id__decision_post
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PacketDecisionIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobApplicationEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/jobs/analytics:
+    get:
+      tags:
+      - career
+      summary: Job Analytics
+      operationId: job_analytics_career_jobs_analytics_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareerAnalyticsOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/achievements:
+    post:
+      tags:
+      - career
+      summary: Create Achievement
+      operationId: create_achievement_career_achievements_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAchievementIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - career
+      summary: List Achievements
+      operationId: list_achievements_career_achievements_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/achievements/{achievement_id}:
+    put:
+      tags:
+      - career
+      summary: Update Achievement
+      operationId: update_achievement_career_achievements__achievement_id__put
+      parameters:
+      - name: achievement_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Achievement Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAchievementIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AchievementsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - career
+      summary: Delete Achievement
+      operationId: delete_achievement_career_achievements__achievement_id__delete
+      parameters:
+      - name: achievement_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Achievement Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/resume-versions:
+    post:
+      tags:
+      - career
+      summary: Create Version
+      operationId: create_version_career_resume_versions_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResumeVersionIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeVersionsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - career
+      summary: List Versions
+      operationId: list_versions_career_resume_versions_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeVersionsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/resume-versions/{version_id}/restore:
+    post:
+      tags:
+      - career
+      summary: Restore Version
+      operationId: restore_version_career_resume_versions__version_id__restore_post
+      parameters:
+      - name: version_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Version Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/shares:
+    post:
+      tags:
+      - career
+      summary: Create Share
+      operationId: create_share_career_shares_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResumeShareIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeShareEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - career
+      summary: List Shares
+      operationId: list_shares_career_shares_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/shares/{share_id}:
+    delete:
+      tags:
+      - career
+      summary: Revoke Share
+      operationId: revoke_share_career_shares__share_id__delete
+      parameters:
+      - name: share_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Share Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/public/resumes/{slug}:
+    get:
+      tags:
+      - career
+      summary: Public Resume
+      operationId: public_resume_career_public_resumes__slug__get
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Slug
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/plain:
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/data-export:
+    get:
+      tags:
+      - career
+      summary: Data Export
+      operationId: data_export_career_data_export_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Data Export Career Data Export Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /career/data:
+    delete:
+      tags:
+      - career
+      summary: Delete Career Data
+      operationId: delete_career_data_career_data_delete
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /profile/updates:
+    get:
+      tags:
+      - profile
+      summary: List Updates
+      operationId: list_updates_profile_updates_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSyncUpdatesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /profile/sources:
+    get:
+      tags:
+      - profile
+      summary: List Sources
+      operationId: list_sources_profile_sources_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSourcesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /profile/sources/{source}/connect:
+    post:
+      tags:
+      - profile
+      summary: Connect Source
+      operationId: connect_source_profile_sources__source__connect_post
+      parameters:
+      - name: source
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Source
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataSourcesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /profile/sync:
+    post:
+      tags:
+      - profile
+      summary: Sync Profile
+      operationId: sync_profile_profile_sync_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSyncUpdatesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /providers/capabilities:
+    get:
+      tags:
+      - provider-demo
+      summary: Capabilities
+      operationId: capabilities_providers_capabilities_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /providers/demo/operations:
+    get:
+      tags:
+      - provider-demo
+      summary: List Operations
+      operationId: list_operations_providers_demo_operations_get
+      parameters:
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 100
+          title: Limit
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /providers/demo/state:
+    get:
+      tags:
+      - provider-demo
+      summary: State
+      operationId: state_providers_demo_state_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /providers/demo/execute:
+    post:
+      tags:
+      - provider-demo
+      summary: Execute
+      operationId: execute_providers_demo_execute_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DemoRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/overview:
+    get:
+      tags:
+      - admin
+      summary: Overview
+      operationId: overview_admin_overview_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/users/{user_id}/status:
+    patch:
+      tags:
+      - admin
+      summary: Change User Status
+      operationId: change_user_status_admin_users__user_id__status_patch
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserStatusIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/users:
+    get:
+      tags:
+      - admin
+      summary: Users
+      operationId: users_admin_users_get
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+          default: ''
+          title: Q
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 1000
+          title: Limit
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/activity-logs:
+    get:
+      tags:
+      - admin
+      summary: Activity Logs
+      operationId: activity_logs_admin_activity_logs_get
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+          default: ''
+          title: Q
+      - name: userId
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Userid
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 2000
+          minimum: 1
+          default: 2000
+          title: Limit
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityLogsEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/templates:
+    get:
+      tags:
+      - admin
+      summary: Templates
+      operationId: templates_admin_templates_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplatesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/profile-sources:
+    get:
+      tags:
+      - admin
+      summary: Profile Sources
+      operationId: profile_sources_admin_profile_sources_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSourcesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - admin
+      summary: Create Profile Source
+      operationId: create_profile_source_admin_profile_sources_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProfileSourceIn'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSourcesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/profile-sources/{source_id}/toggle:
+    patch:
+      tags:
+      - admin
+      summary: Toggle Profile Source
+      operationId: toggle_profile_source_admin_profile_sources__source_id__toggle_patch
+      parameters:
+      - name: source_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Source Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSourcesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/contact-messages:
+    get:
+      tags:
+      - admin
+      summary: Contact Messages
+      operationId: contact_messages_admin_contact_messages_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactMessagesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/contact-messages/{message_id}/reply:
+    post:
+      tags:
+      - admin
+      summary: Reply
+      operationId: reply_admin_contact_messages__message_id__reply_post
+      parameters:
+      - name: message_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Message Id
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplyIn'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/resumes:
+    get:
+      tags:
+      - admin
+      summary: Resumes
+      operationId: resumes_admin_resumes_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminResumesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/agent-updates:
+    get:
+      tags:
+      - admin
+      summary: Agent Updates
+      operationId: agent_updates_admin_agent_updates_get
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAgentUpdatesEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /uploads/profile-photo:
+    post:
+      tags:
+      - uploads
+      summary: Upload Profile Photo
+      operationId: upload_profile_photo_uploads_profile_photo_post
+      parameters:
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_profile_photo_uploads_profile_photo_post'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /uploads/profile-photo/{filename}:
+    get:
+      tags:
+      - uploads
+      summary: Get Profile Photo
+      operationId: get_profile_photo_uploads_profile_photo__filename__get
+      parameters:
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Filename
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /uploads/profile-photos/{user_id}/{filename}:
+    get:
+      tags:
+      - uploads
+      summary: Get Legacy Profile Photo
+      operationId: get_legacy_profile_photo_uploads_profile_photos__user_id___filename__get
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: User Id
+      - name: filename
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Filename
+      - name: authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AchievementOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        category:
+          type: string
+          title: Category
+        content:
+          type: string
+          title: Content
+        tags:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Tags
+        metrics:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Metrics
+        sourceResumeId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sourceresumeid
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - title
+      - category
+      - content
+      - tags
+      - metrics
+      - sourceResumeId
+      - createdAt
+      title: AchievementOut
+    AchievementsEnvelope:
+      properties:
+        achievements:
+          items:
+            $ref: '#/components/schemas/AchievementOut'
+          type: array
+          title: Achievements
+      additionalProperties: false
+      type: object
+      required:
+      - achievements
+      title: AchievementsEnvelope
+    ActivityIn:
+      properties:
+        action:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Action
+        details:
+          anyOf:
+          - type: string
+            maxLength: 4000
+          - type: 'null'
+          title: Details
+      additionalProperties: false
+      type: object
+      required:
+      - action
+      title: ActivityIn
+    ActivityLogOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        userId:
+          type: string
+          title: Userid
+        userName:
+          type: string
+          title: Username
+        action:
+          type: string
+          title: Action
+        details:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Details
+        timestamp:
+          type: string
+          format: date-time
+          title: Timestamp
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - userId
+      - userName
+      - action
+      - timestamp
+      title: ActivityLogOut
+    ActivityLogsEnvelope:
+      properties:
+        logs:
+          items:
+            $ref: '#/components/schemas/ActivityLogOut'
+          type: array
+          title: Logs
+        total:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total
+      additionalProperties: false
+      type: object
+      required:
+      - logs
+      title: ActivityLogsEnvelope
+    AdminAgentUpdatesEnvelope:
+      properties:
+        updates:
+          items:
+            $ref: '#/components/schemas/AgentUpdateOut'
+          type: array
+          title: Updates
+      additionalProperties: false
+      type: object
+      required:
+      - updates
+      title: AdminAgentUpdatesEnvelope
+    AdminResumesEnvelope:
+      properties:
+        resumes:
+          items:
+            $ref: '#/components/schemas/ResumeSummaryOut'
+          type: array
+          title: Resumes
+      additionalProperties: false
+      type: object
+      required:
+      - resumes
+      title: AdminResumesEnvelope
+    AdminUpdatePlanIn:
+      properties:
+        plan:
+          $ref: '#/components/schemas/PlanEnum'
+        amount:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Amount
+      additionalProperties: false
+      type: object
+      required:
+      - plan
+      - amount
+      title: AdminUpdatePlanIn
+    AgentUpdateOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        source:
+          type: string
+          title: Source
+        type:
+          type: string
+          title: Type
+        title:
+          type: string
+          title: Title
+        description:
+          type: string
+          title: Description
+        dateFound:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Datefound
+        status:
+          type: string
+          title: Status
+        userId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Userid
+        userEmail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Useremail
+        userName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - source
+      - type
+      - title
+      - description
+      - status
+      title: AgentUpdateOut
+    AgentUpdatesEnvelope:
+      properties:
+        updates:
+          items:
+            $ref: '#/components/schemas/AgentUpdateOut'
+          type: array
+          title: Updates
+      additionalProperties: false
+      type: object
+      required:
+      - updates
+      title: AgentUpdatesEnvelope
+    AnalyzeCareerIn:
+      properties:
+        resumeJson:
+          additionalProperties: true
+          type: object
+          title: Resumejson
+        jobDescription:
+          type: string
+          maxLength: 50000
+          title: Jobdescription
+        jobUrl:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Joburl
+        targetCountry:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Targetcountry
+          default: US
+        targetLanguage:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Targetlanguage
+          default: en
+      additionalProperties: false
+      type: object
+      required:
+      - jobDescription
+      title: AnalyzeCareerIn
+    AnalyzeCareerOut:
+      properties:
+        report:
+          additionalProperties: true
+          type: object
+          title: Report
+      additionalProperties: false
+      type: object
+      required:
+      - report
+      title: AnalyzeCareerOut
+    Body_upload_profile_photo_uploads_profile_photo_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_upload_profile_photo_uploads_profile_photo_post
+    CareerAnalyticsOut:
+      properties:
+        analytics:
+          additionalProperties: true
+          type: object
+          title: Analytics
+      additionalProperties: false
+      type: object
+      required:
+      - analytics
+      title: CareerAnalyticsOut
+    CareerFeatureCatalogOut:
+      properties:
+        features:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Features
+      additionalProperties: false
+      type: object
+      required:
+      - features
+      title: CareerFeatureCatalogOut
+    CareerOnboardingProfileEnvelope:
+      properties:
+        profile:
+          anyOf:
+          - $ref: '#/components/schemas/CareerOnboardingProfileOut'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - profile
+      title: CareerOnboardingProfileEnvelope
+    CareerOnboardingProfileIn:
+      properties:
+        currentExperience:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Currentexperience
+        strengths:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Strengths
+        targetRoles:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Targetroles
+        marketStatus:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Marketstatus
+        shortTermGoal:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Shorttermgoal
+        futureGoal:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Futuregoal
+        jobPreferences:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Jobpreferences
+        supportNeeds:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Supportneeds
+      additionalProperties: false
+      type: object
+      required:
+      - currentExperience
+      - strengths
+      - targetRoles
+      - marketStatus
+      - shortTermGoal
+      - futureGoal
+      - jobPreferences
+      - supportNeeds
+      title: CareerOnboardingProfileIn
+    CareerOnboardingProfileOut:
+      properties:
+        currentExperience:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Currentexperience
+        strengths:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Strengths
+        targetRoles:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Targetroles
+        marketStatus:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Marketstatus
+        shortTermGoal:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Shorttermgoal
+        futureGoal:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Futuregoal
+        jobPreferences:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Jobpreferences
+        supportNeeds:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Supportneeds
+        id:
+          type: string
+          title: Id
+        userId:
+          type: string
+          title: Userid
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        updatedAt:
+          type: string
+          format: date-time
+          title: Updatedat
+      additionalProperties: false
+      type: object
+      required:
+      - currentExperience
+      - strengths
+      - targetRoles
+      - marketStatus
+      - shortTermGoal
+      - futureGoal
+      - jobPreferences
+      - supportNeeds
+      - id
+      - userId
+      - createdAt
+      - updatedAt
+      title: CareerOnboardingProfileOut
+    CareerProfileAnalysisEnvelope:
+      properties:
+        analysis:
+          anyOf:
+          - $ref: '#/components/schemas/CareerProfileAnalysisOut'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - analysis
+      title: CareerProfileAnalysisEnvelope
+    CareerProfileAnalysisOut:
+      properties:
+        stale:
+          type: boolean
+          title: Stale
+          default: false
+        id:
+          type: string
+          title: Id
+        userId:
+          type: string
+          title: Userid
+        onboardingProfileId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Onboardingprofileid
+        resumeId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resumeid
+        profileCategory:
+          type: string
+          title: Profilecategory
+        resumeCategory:
+          type: string
+          title: Resumecategory
+        recommendedJobFamily:
+          type: string
+          title: Recommendedjobfamily
+        skillFocus:
+          type: string
+          title: Skillfocus
+        analysis:
+          additionalProperties: true
+          type: object
+          title: Analysis
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        updatedAt:
+          type: string
+          format: date-time
+          title: Updatedat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - userId
+      - onboardingProfileId
+      - resumeId
+      - profileCategory
+      - resumeCategory
+      - recommendedJobFamily
+      - skillFocus
+      - analysis
+      - createdAt
+      - updatedAt
+      title: CareerProfileAnalysisOut
+    ChangePasswordIn:
+      properties:
+        currentPassword:
+          type: string
+          maxLength: 256
+          minLength: 1
+          title: Currentpassword
+        newPassword:
+          type: string
+          maxLength: 256
+          minLength: 12
+          title: Newpassword
+      additionalProperties: false
+      type: object
+      required:
+      - currentPassword
+      - newPassword
+      title: ChangePasswordIn
+    ContactIn:
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 2
+          title: Name
+        email:
+          type: string
+          format: email
+          title: Email
+        subject:
+          type: string
+          maxLength: 160
+          minLength: 2
+          title: Subject
+        message:
+          type: string
+          maxLength: 5000
+          minLength: 5
+          title: Message
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - email
+      - subject
+      - message
+      title: ContactIn
+    ContactMessageOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        userId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Userid
+        name:
+          type: string
+          title: Name
+        email:
+          type: string
+          title: Email
+        subject:
+          type: string
+          title: Subject
+        message:
+          type: string
+          title: Message
+        status:
+          type: string
+          title: Status
+        createdAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Createdat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - name
+      - email
+      - subject
+      - message
+      - status
+      title: ContactMessageOut
+    ContactMessagesEnvelope:
+      properties:
+        messages:
+          items:
+            $ref: '#/components/schemas/ContactMessageOut'
+          type: array
+          title: Messages
+      additionalProperties: false
+      type: object
+      required:
+      - messages
+      title: ContactMessagesEnvelope
+    CoverLetterEnvelope:
+      properties:
+        coverLetter:
+          $ref: '#/components/schemas/CoverLetterOut'
+      additionalProperties: false
+      type: object
+      required:
+      - coverLetter
+      title: CoverLetterEnvelope
+    CoverLetterOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        templateId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Templateid
+        title:
+          type: string
+          title: Title
+        jobDescription:
+          type: string
+          title: Jobdescription
+        jobUrl:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Joburl
+        content:
+          anyOf:
+          - $ref: '#/components/schemas/GeneratedCoverLetterContent'
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Content
+        createdAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Createdat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - title
+      - jobDescription
+      title: CoverLetterOut
+    CoverLettersEnvelope:
+      properties:
+        coverLetters:
+          items:
+            $ref: '#/components/schemas/CoverLetterOut'
+          type: array
+          title: Coverletters
+      additionalProperties: false
+      type: object
+      required:
+      - coverLetters
+      title: CoverLettersEnvelope
+    CreateAchievementIn:
+      properties:
+        title:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Title
+        category:
+          type: string
+          maxLength: 80
+          title: Category
+          default: General
+        content:
+          type: string
+          maxLength: 5000
+          minLength: 1
+          title: Content
+        tags:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Tags
+        metrics:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Metrics
+        sourceResumeId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Sourceresumeid
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - content
+      title: CreateAchievementIn
+    CreateJobApplicationIn:
+      properties:
+        status:
+          type: string
+          enum:
+          - saved
+          - applied
+          - interview
+          - offer
+          - rejected
+          title: Status
+          default: saved
+        title:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Title
+        company:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Company
+        jobUrl:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Joburl
+        jobDescription:
+          type: string
+          maxLength: 50000
+          title: Jobdescription
+          default: ''
+        location:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Location
+        salary:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Salary
+        contactName:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Contactname
+        contactEmail:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Contactemail
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 20000
+          - type: 'null'
+          title: Notes
+        deadline:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Deadline
+        resumeId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Resumeid
+        coverLetterId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Coverletterid
+        packet:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Packet
+        reminders:
+          anyOf:
+          - items:
+              additionalProperties: true
+              type: object
+            type: array
+          - type: 'null'
+          title: Reminders
+        savedAnswers:
+          anyOf:
+          - items:
+              additionalProperties: true
+              type: object
+            type: array
+          - type: 'null'
+          title: Savedanswers
+      additionalProperties: false
+      type: object
+      title: CreateJobApplicationIn
+    CreateProfileSourceIn:
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          minLength: 2
+          title: Name
+        icon:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Icon
+          default: link
+        oauthProvider:
+          anyOf:
+          - type: string
+            maxLength: 40
+            minLength: 2
+          - type: 'null'
+          title: Oauthprovider
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      title: CreateProfileSourceIn
+    CreateResumeIn:
+      properties:
+        idempotencyKey:
+          anyOf:
+          - type: string
+            maxLength: 64
+            minLength: 16
+          - type: 'null'
+          title: Idempotencykey
+        templateId:
+          type: string
+          maxLength: 80
+          minLength: 1
+          title: Templateid
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+        content:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Content
+      additionalProperties: false
+      type: object
+      required:
+      - templateId
+      - title
+      - content
+      title: CreateResumeIn
+    CreateResumeShareIn:
+      properties:
+        resumeId:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Resumeid
+        isPublic:
+          type: boolean
+          title: Ispublic
+          default: false
+        redactPii:
+          type: boolean
+          title: Redactpii
+          default: true
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Metadata
+      additionalProperties: false
+      type: object
+      required:
+      - resumeId
+      title: CreateResumeShareIn
+    CreateResumeVersionIn:
+      properties:
+        resumeId:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Resumeid
+        jobApplicationId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Jobapplicationid
+        kind:
+          type: string
+          maxLength: 40
+          title: Kind
+          default: base
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+        locale:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Locale
+        content:
+          additionalProperties: true
+          type: object
+          title: Content
+        changeSummary:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Changesummary
+      additionalProperties: false
+      type: object
+      required:
+      - resumeId
+      - title
+      title: CreateResumeVersionIn
+    DataSourceEnvelope:
+      properties:
+        source:
+          $ref: '#/components/schemas/DataSourceOut'
+      additionalProperties: false
+      type: object
+      required:
+      - source
+      title: DataSourceEnvelope
+    DataSourceOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        icon:
+          type: string
+          title: Icon
+        isConnected:
+          type: boolean
+          title: Isconnected
+        lastSync:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Lastsync
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - name
+      - icon
+      - isConnected
+      title: DataSourceOut
+    DataSourcesEnvelope:
+      properties:
+        sources:
+          items:
+            $ref: '#/components/schemas/DataSourceOut'
+          type: array
+          title: Sources
+      additionalProperties: false
+      type: object
+      required:
+      - sources
+      title: DataSourcesEnvelope
+    DeleteAccountIn:
+      properties:
+        confirmationEmail:
+          type: string
+          format: email
+          title: Confirmationemail
+        currentPassword:
+          type: string
+          maxLength: 256
+          title: Currentpassword
+          default: ''
+      additionalProperties: false
+      type: object
+      required:
+      - confirmationEmail
+      title: DeleteAccountIn
+    DemoRequest:
+      properties:
+        provider:
+          type: string
+          enum:
+          - billing
+          - email
+          - jobs
+          - profile
+          - applications
+          title: Provider
+        action:
+          type: string
+          enum:
+          - checkout
+          - cancel
+          - send
+          - discover
+          - save
+          - connect
+          - sync
+          - disconnect
+          - submit
+          title: Action
+        scenario:
+          type: string
+          enum:
+          - success
+          - failure
+          - timeout
+          title: Scenario
+          default: success
+        subjectId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Subjectid
+        plan:
+          type: string
+          enum:
+          - pro_monthly
+          - pro_yearly
+          title: Plan
+          default: pro_monthly
+        idempotencyKey:
+          type: string
+          maxLength: 64
+          minLength: 16
+          title: Idempotencykey
+      additionalProperties: false
+      type: object
+      required:
+      - provider
+      - action
+      - idempotencyKey
+      title: DemoRequest
+    DraftIn:
+      properties:
+        resumeId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Resumeid
+        templateId:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Templateid
+        content:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Content
+      additionalProperties: false
+      type: object
+      required:
+      - content
+      title: DraftIn
+    ExportResumeIn:
+      properties:
+        resumeJson:
+          additionalProperties: true
+          type: object
+          title: Resumejson
+        title:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Title
+          default: resume
+        publicProfileUrl:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Publicprofileurl
+        redactPii:
+          type: boolean
+          title: Redactpii
+          default: false
+        format:
+          type: string
+          enum:
+          - all
+          - pdf
+          - txt
+          - docx
+          title: Format
+          default: all
+      additionalProperties: false
+      type: object
+      title: ExportResumeIn
+    ExportResumeOut:
+      properties:
+        exports:
+          additionalProperties: true
+          type: object
+          title: Exports
+      additionalProperties: false
+      type: object
+      required:
+      - exports
+      title: ExportResumeOut
+    ForgotPasswordIn:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      title: ForgotPasswordIn
+    GenerateCareerProfileAnalysisIn:
+      properties:
+        resumeId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Resumeid
+      additionalProperties: false
+      type: object
+      title: GenerateCareerProfileAnalysisIn
+    GenerateCoverLetterIn:
+      properties:
+        templateId:
+          anyOf:
+          - type: string
+            maxLength: 80
+            minLength: 1
+          - type: 'null'
+          title: Templateid
+        title:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Title
+        jobDescription:
+          anyOf:
+          - type: string
+            maxLength: 20000
+          - type: 'null'
+          title: Jobdescription
+        jobUrl:
+          anyOf:
+          - type: string
+            maxLength: 2000
+            minLength: 8
+          - type: 'null'
+          title: Joburl
+        resumeJson:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Resumejson
+      additionalProperties: false
+      type: object
+      title: GenerateCoverLetterIn
+    GenerateResumeIn:
+      properties:
+        mode:
+          type: string
+          pattern: ^(MODE_A|MODE_B)$
+          title: Mode
+        input:
+          additionalProperties: true
+          type: object
+          title: Input
+      additionalProperties: false
+      type: object
+      required:
+      - mode
+      - input
+      title: GenerateResumeIn
+    GenerateResumeOut:
+      properties:
+        text:
+          type: string
+          title: Text
+      additionalProperties: false
+      type: object
+      required:
+      - text
+      title: GenerateResumeOut
+    GeneratedCoverLetterContent:
+      properties:
+        coverLetterFull:
+          type: string
+          title: Coverletterfull
+        coverLetterShort:
+          type: string
+          title: Coverlettershort
+        coldEmail:
+          type: string
+          title: Coldemail
+        resumeReference:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resumereference
+        generationSource:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Generationsource
+      additionalProperties: false
+      type: object
+      required:
+      - coverLetterFull
+      - coverLetterShort
+      - coldEmail
+      title: GeneratedCoverLetterContent
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      title: HealthResponse
+    IdResponse:
+      properties:
+        id:
+          type: string
+          title: Id
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      title: IdResponse
+    JobApplicationEnvelope:
+      properties:
+        job:
+          $ref: '#/components/schemas/JobApplicationOut'
+      additionalProperties: false
+      type: object
+      required:
+      - job
+      title: JobApplicationEnvelope
+    JobApplicationOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        status:
+          type: string
+          title: Status
+        title:
+          type: string
+          title: Title
+        company:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Company
+        jobUrl:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Joburl
+        jobDescription:
+          type: string
+          title: Jobdescription
+        location:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Location
+        salary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Salary
+        contactName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Contactname
+        contactEmail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Contactemail
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        deadline:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Deadline
+        resumeId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resumeid
+        coverLetterId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Coverletterid
+        packet:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Packet
+        reminders:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Reminders
+        savedAnswers:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Savedanswers
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        updatedAt:
+          type: string
+          format: date-time
+          title: Updatedat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - status
+      - title
+      - company
+      - jobUrl
+      - jobDescription
+      - location
+      - salary
+      - contactName
+      - contactEmail
+      - notes
+      - deadline
+      - resumeId
+      - coverLetterId
+      - packet
+      - reminders
+      - savedAnswers
+      - createdAt
+      - updatedAt
+      title: JobApplicationOut
+    JobApplicationsEnvelope:
+      properties:
+        jobs:
+          items:
+            $ref: '#/components/schemas/JobApplicationOut'
+          type: array
+          title: Jobs
+      additionalProperties: false
+      type: object
+      required:
+      - jobs
+      title: JobApplicationsEnvelope
+    LatestResumeEnvelope:
+      properties:
+        resume:
+          anyOf:
+          - $ref: '#/components/schemas/ResumeOut'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - resume
+      title: LatestResumeEnvelope
+    LinkedInImportIn:
+      properties:
+        profileText:
+          type: string
+          maxLength: 50000
+          minLength: 1
+          title: Profiletext
+      additionalProperties: false
+      type: object
+      required:
+      - profileText
+      title: LinkedInImportIn
+    LinkedInImportOut:
+      properties:
+        resume:
+          additionalProperties: true
+          type: object
+          title: Resume
+        checklist:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Checklist
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      additionalProperties: false
+      type: object
+      required:
+      - resume
+      - checklist
+      - warnings
+      title: LinkedInImportOut
+    LoginIn:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+        password:
+          type: string
+          maxLength: 256
+          minLength: 6
+          title: Password
+      additionalProperties: false
+      type: object
+      required:
+      - email
+      - password
+      title: LoginIn
+    OkResponse:
+      properties:
+        ok:
+          type: boolean
+          title: Ok
+          default: true
+      additionalProperties: false
+      type: object
+      title: OkResponse
+    PacketDecisionIn:
+      properties:
+        packetId:
+          type: string
+          title: Packetid
+        decision:
+          type: string
+          enum:
+          - approved
+          - rejected
+          title: Decision
+      type: object
+      required:
+      - packetId
+      - decision
+      title: PacketDecisionIn
+    ParseResumeUploadIn:
+      properties:
+        importFormat:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          title: Importformat
+          default: ats
+        fileData:
+          $ref: '#/components/schemas/ResumeUploadFileData'
+      additionalProperties: false
+      type: object
+      required:
+      - fileData
+      title: ParseResumeUploadIn
+    ParseResumeUploadOut:
+      properties:
+        resume:
+          additionalProperties: true
+          type: object
+          title: Resume
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+        confidence:
+          additionalProperties: true
+          type: object
+          title: Confidence
+        document:
+          additionalProperties: true
+          type: object
+          title: Document
+        atsReport:
+          additionalProperties: true
+          type: object
+          title: Atsreport
+      additionalProperties: false
+      type: object
+      required:
+      - resume
+      - warnings
+      - confidence
+      - document
+      - atsReport
+      title: ParseResumeUploadOut
+    PlanEnum:
+      type: string
+      enum:
+      - free
+      - monthly
+      - yearly
+      title: PlanEnum
+    ProfileSourceOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        icon:
+          type: string
+          title: Icon
+        oauthProvider:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Oauthprovider
+        isEnabled:
+          type: boolean
+          title: Isenabled
+        createdAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Createdat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - name
+      - icon
+      - isEnabled
+      title: ProfileSourceOut
+    ProfileSourcesEnvelope:
+      properties:
+        sources:
+          items:
+            $ref: '#/components/schemas/ProfileSourceOut'
+          type: array
+          title: Sources
+      additionalProperties: false
+      type: object
+      required:
+      - sources
+      title: ProfileSourcesEnvelope
+    ProfileSyncUpdateOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        source:
+          type: string
+          title: Source
+        category:
+          type: string
+          title: Category
+        title:
+          type: string
+          title: Title
+        details:
+          type: string
+          title: Details
+        payload:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Payload
+        createdAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Createdat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - source
+      - category
+      - title
+      - details
+      title: ProfileSyncUpdateOut
+    ProfileSyncUpdatesEnvelope:
+      properties:
+        updates:
+          items:
+            $ref: '#/components/schemas/ProfileSyncUpdateOut'
+          type: array
+          title: Updates
+      additionalProperties: false
+      type: object
+      required:
+      - updates
+      title: ProfileSyncUpdatesEnvelope
+    ProviderIn:
+      properties:
+        provider:
+          type: string
+          maxLength: 40
+          minLength: 2
+          title: Provider
+        plan:
+          $ref: '#/components/schemas/PlanEnum'
+          default: free
+      additionalProperties: false
+      type: object
+      required:
+      - provider
+      title: ProviderIn
+    ReplyIn:
+      properties:
+        subject:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Subject
+        message:
+          type: string
+          maxLength: 5000
+          minLength: 1
+          title: Message
+      additionalProperties: false
+      type: object
+      required:
+      - subject
+      - message
+      title: ReplyIn
+    ResetPasswordIn:
+      properties:
+        token:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Token
+        newPassword:
+          type: string
+          maxLength: 256
+          minLength: 12
+          title: Newpassword
+      additionalProperties: false
+      type: object
+      required:
+      - token
+      - newPassword
+      title: ResetPasswordIn
+    ResumeDraftEnvelope:
+      properties:
+        draft:
+          anyOf:
+          - $ref: '#/components/schemas/ResumeDraftOut'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - draft
+      title: ResumeDraftEnvelope
+    ResumeDraftOut:
+      properties:
+        resumeId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resumeid
+        id:
+          type: string
+          title: Id
+        templateId:
+          type: string
+          title: Templateid
+        content:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Content
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        updatedAt:
+          type: string
+          format: date-time
+          title: Updatedat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - templateId
+      - content
+      - createdAt
+      - updatedAt
+      title: ResumeDraftOut
+    ResumeEnvelope:
+      properties:
+        resume:
+          $ref: '#/components/schemas/ResumeOut'
+      additionalProperties: false
+      type: object
+      required:
+      - resume
+      title: ResumeEnvelope
+    ResumeOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        templateId:
+          type: string
+          title: Templateid
+        title:
+          type: string
+          title: Title
+        content:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Content
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        updatedAt:
+          type: string
+          format: date-time
+          title: Updatedat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - templateId
+      - title
+      - content
+      - createdAt
+      - updatedAt
+      title: ResumeOut
+    ResumeShareEnvelope:
+      properties:
+        share:
+          $ref: '#/components/schemas/ResumeShareOut'
+      additionalProperties: false
+      type: object
+      required:
+      - share
+      title: ResumeShareEnvelope
+    ResumeShareOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        resumeId:
+          type: string
+          title: Resumeid
+        slug:
+          type: string
+          title: Slug
+        isPublic:
+          type: boolean
+          title: Ispublic
+        redactPii:
+          type: boolean
+          title: Redactpii
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Metadata
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - resumeId
+      - slug
+      - isPublic
+      - redactPii
+      - metadata
+      - createdAt
+      title: ResumeShareOut
+    ResumeSummaryOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        templateId:
+          type: string
+          title: Templateid
+        title:
+          type: string
+          title: Title
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+        updatedAt:
+          type: string
+          format: date-time
+          title: Updatedat
+        userId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Userid
+        userEmail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Useremail
+        userName:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - templateId
+      - title
+      - createdAt
+      - updatedAt
+      title: ResumeSummaryOut
+    ResumeUploadFileData:
+      properties:
+        mimeType:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Mimetype
+        data:
+          type: string
+          maxLength: 14680064
+          minLength: 1
+          title: Data
+        name:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Name
+      additionalProperties: false
+      type: object
+      required:
+      - mimeType
+      - data
+      title: ResumeUploadFileData
+    ResumeVersionOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        resumeId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resumeid
+        jobApplicationId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Jobapplicationid
+        kind:
+          type: string
+          title: Kind
+        title:
+          type: string
+          title: Title
+        locale:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Locale
+        content:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Content
+        changeSummary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Changesummary
+        createdAt:
+          type: string
+          format: date-time
+          title: Createdat
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - resumeId
+      - jobApplicationId
+      - kind
+      - title
+      - locale
+      - content
+      - changeSummary
+      - createdAt
+      title: ResumeVersionOut
+    ResumeVersionsEnvelope:
+      properties:
+        versions:
+          items:
+            $ref: '#/components/schemas/ResumeVersionOut'
+          type: array
+          title: Versions
+      additionalProperties: false
+      type: object
+      required:
+      - versions
+      title: ResumeVersionsEnvelope
+    ResumesEnvelope:
+      properties:
+        resumes:
+          items:
+            $ref: '#/components/schemas/ResumeSummaryOut'
+          type: array
+          title: Resumes
+      additionalProperties: false
+      type: object
+      required:
+      - resumes
+      title: ResumesEnvelope
+    RoleEnum:
+      type: string
+      enum:
+      - admin
+      - user
+      title: RoleEnum
+    SignupIn:
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Name
+        email:
+          type: string
+          format: email
+          title: Email
+        password:
+          type: string
+          maxLength: 256
+          minLength: 12
+          title: Password
+        plan:
+          $ref: '#/components/schemas/PlanEnum'
+          default: free
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - email
+      - password
+      title: SignupIn
+    SyncIn:
+      properties:
+        providers:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Providers
+      additionalProperties: false
+      type: object
+      title: SyncIn
+    TemplatesEnvelope:
+      properties:
+        templates:
+          items:
+            additionalProperties:
+              type: string
+            type: object
+          type: array
+          title: Templates
+      additionalProperties: false
+      type: object
+      required:
+      - templates
+      title: TemplatesEnvelope
+    TokenResponse:
+      properties:
+        token:
+          type: string
+          title: Token
+        user:
+          $ref: '#/components/schemas/UserOut'
+      additionalProperties: false
+      type: object
+      required:
+      - token
+      - user
+      title: TokenResponse
+    UpdateAccountIn:
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Name
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      title: UpdateAccountIn
+    UpdateJobApplicationIn:
+      properties:
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - saved
+            - applied
+            - interview
+            - offer
+            - rejected
+          - type: 'null'
+          title: Status
+        title:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Title
+        company:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Company
+        jobUrl:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Joburl
+        jobDescription:
+          anyOf:
+          - type: string
+            maxLength: 50000
+          - type: 'null'
+          title: Jobdescription
+        location:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Location
+        salary:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Salary
+        contactName:
+          anyOf:
+          - type: string
+            maxLength: 160
+          - type: 'null'
+          title: Contactname
+        contactEmail:
+          anyOf:
+          - type: string
+            maxLength: 255
+          - type: 'null'
+          title: Contactemail
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 20000
+          - type: 'null'
+          title: Notes
+        deadline:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Deadline
+        resumeId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Resumeid
+        coverLetterId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Coverletterid
+        packet:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Packet
+        reminders:
+          anyOf:
+          - items:
+              additionalProperties: true
+              type: object
+            type: array
+          - type: 'null'
+          title: Reminders
+        savedAnswers:
+          anyOf:
+          - items:
+              additionalProperties: true
+              type: object
+            type: array
+          - type: 'null'
+          title: Savedanswers
+      additionalProperties: false
+      type: object
+      title: UpdateJobApplicationIn
+    UpdatePlanIn:
+      properties:
+        plan:
+          $ref: '#/components/schemas/PlanEnum'
+      additionalProperties: false
+      type: object
+      required:
+      - plan
+      title: UpdatePlanIn
+    UpdateResumeIn:
+      properties:
+        templateId:
+          anyOf:
+          - type: string
+            maxLength: 80
+            minLength: 1
+          - type: 'null'
+          title: Templateid
+        title:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Title
+        content:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - items: {}
+            type: array
+          - type: string
+          - type: integer
+          - type: number
+          - type: boolean
+          - type: 'null'
+          title: Content
+      additionalProperties: false
+      type: object
+      title: UpdateResumeIn
+    UploadResponse:
+      properties:
+        url:
+          type: string
+          title: Url
+        filename:
+          type: string
+          title: Filename
+        contentType:
+          type: string
+          title: Contenttype
+        size:
+          type: integer
+          title: Size
+      additionalProperties: false
+      type: object
+      required:
+      - url
+      - filename
+      - contentType
+      - size
+      title: UploadResponse
+    UserEnvelope:
+      properties:
+        user:
+          $ref: '#/components/schemas/UserOut'
+      additionalProperties: false
+      type: object
+      required:
+      - user
+      title: UserEnvelope
+    UserOut:
+      properties:
+        hasPassword:
+          type: boolean
+          title: Haspassword
+          default: false
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        email:
+          type: string
+          format: email
+          title: Email
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        plan:
+          $ref: '#/components/schemas/PlanEnum'
+        status:
+          type: string
+          title: Status
+        createdAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Createdat
+        paidAmount:
+          type: string
+          title: Paidamount
+        authProvider:
+          type: string
+          title: Authprovider
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - name
+      - email
+      - role
+      - plan
+      - status
+      - paidAmount
+      - authProvider
+      title: UserOut
+    UserStatusIn:
+      properties:
+        status:
+          type: string
+          enum:
+          - Active
+          - Canceled
+          title: Status
+      type: object
+      required:
+      - status
+      title: UserStatusIn
+    UsersEnvelope:
+      properties:
+        users:
+          items:
+            $ref: '#/components/schemas/UserOut'
+          type: array
+          title: Users
+        total:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Total
+      additionalProperties: false
+      type: object
+      required:
+      - users
+      title: UsersEnvelope
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
