@@ -95,6 +95,27 @@ VITE_API_URL=<API_ORIGIN>
 
 After changing `VITE_API_URL`, redeploy/rebuild the frontend because Vite bakes environment variables into the compiled bundle.
 
+If users also open the existing Render UI directly, include its origin in the **backend** service's environment:
+
+```text
+CORS_ORIGINS=https://myresumes.net,https://www.myresumes.net,https://myresume-rrcy.onrender.com
+```
+
+Restart/redeploy the API after changing this setting. `INCLUDE_LEGACY_FRONTEND_ALIASES=true` (default) preserves these exact three aliases when at least one is configured; no other Render hosts are trusted. Set it to `false` when only the explicitly listed origins should be accepted. Custom deployments on unrelated domains are not expanded.
+
+An `OPTIONS /auth/login` response of `400 Disallowed CORS origin` blocks the browser before credential validation. It is not evidence that the database password is incorrect. Verify preflight independently of login:
+
+```powershell
+$headers = @{
+  Origin = 'https://myresume-rrcy.onrender.com'
+  'Access-Control-Request-Method' = 'POST'
+  'Access-Control-Request-Headers' = 'content-type'
+}
+Invoke-WebRequest -Method Options -Uri 'https://api.myresumes.net/auth/login' -Headers $headers
+```
+
+Expect 200 and `Access-Control-Allow-Origin` matching the requested origin. Do not add `*`, remove authentication, or reset passwords to work around a preflight failure.
+
 For the UI Docker image, use runtime `API_PUBLIC_URL=<API_ORIGIN>` instead. With a same-origin proxy use `API_PUBLIC_URL=/api` and `API_UPSTREAM=<PRIVATE_API_ORIGIN>`. Restart the container after changing these values; no frontend rebuild is needed. These settings are public configuration, not a place for credentials.
 
 Secrets must stay outside Git. Store these in Render environment variables or a secret manager, not in documentation:

@@ -22,6 +22,8 @@ PDF export is an ATS-oriented text layout, not a pixel-identical export of every
 
 For the frontend image, set `API_PUBLIC_URL` to `/api` for the same-origin proxy, or an HTTPS API origin. Set `API_UPSTREAM` to the reachable API service origin for the proxy. The startup script writes non-secret runtime configuration. A static-host build can instead set `VITE_API_URL` at build time. Unconfigured production builds no longer point to a visitor's localhost.
 
+List every browser-visible frontend origin in `CORS_ORIGINS`, including the existing Render UI if users access it directly. By default, `INCLUDE_LEGACY_FRONTEND_ALIASES` preserves the exact MyResumes apex/www/Render aliases when one is configured; set false for strict explicit-only behavior. Unrelated/custom deployments are not expanded. Test anonymous login preflights for each supported origin after deployment. A 400 `Disallowed CORS origin` means the login handler has not evaluated credentials; see [configuration troubleshooting](../README_Configuration.md).
+
 ## Database Roles and the Public Schema Error
 
 `NOTICE: table ... does not exist, skipping` is informational. SQLSTATE `42501` on `CREATE TABLE public...` means the restoring/migration role lacks schema permission. Run DDL through a dedicated migration role, not the API runtime account.

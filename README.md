@@ -207,6 +207,7 @@ The backend reads `.env` from the `services/` working directory via Pydantic set
 | `JWT_EXPIRES_IN` | `15m` | Token lifetime string used by auth helpers. |
 | `PORT` | `3000` in settings, container defaults to `10000` | API port, depending on runner. |
 | `CORS_ORIGINS` | Local development origins | Explicit comma-separated allowed frontend origins; HTTPS-only in production. |
+| `INCLUDE_LEGACY_FRONTEND_ALIASES` | `true` | When a MyResumes production origin is listed, also allow its existing apex/www/Render aliases. Set `false` for an exact allowlist. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | Empty | Optional contact-message reply email transport. |
 | `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Empty / `admin@myresume.net` | Optional support email credentials and sender. |
 | `UPLOAD_DIR` | `protected_uploads` | Private upload storage root. |

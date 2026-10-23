@@ -4,6 +4,13 @@ from pathlib import Path
 from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MYRESUMES_FRONTEND_ORIGINS = (
+    "https://myresumes.net",
+    "https://www.myresumes.net",
+    "https://myresume-rrcy.onrender.com",
+)
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     app_env: Literal["development", "test", "production"] = "development"
@@ -12,6 +19,7 @@ class Settings(BaseSettings):
     jwt_expires_in: str = "15m"
     port: int = 3000
     cors_origins: str = Field(default="http://localhost:4000,http://127.0.0.1:4000")
+    include_legacy_frontend_aliases: bool = True
     smtp_host: str = ""
     smtp_port: int | None = None
     smtp_secure: bool = False
@@ -50,6 +58,11 @@ class Settings(BaseSettings):
         for origin in extras:
             if origin not in seen:
                 seen.append(origin)
+        # Existing deployments used these exact aliases for the same frontend.
+        if self.include_legacy_frontend_aliases and any(origin in seen for origin in MYRESUMES_FRONTEND_ORIGINS):
+            for origin in MYRESUMES_FRONTEND_ORIGINS:
+                if origin not in seen:
+                    seen.append(origin)
         return seen
     def validate_runtime_settings(self) -> None:
         if not self.database_url:
