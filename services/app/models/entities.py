@@ -2,18 +2,20 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
-from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("email", name="uq_users_email"),)
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
     plan: Mapped[str] = mapped_column(String(20), nullable=False, default="free")
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="Active")
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     paid_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=Decimal("0.00"))
     auth_provider: Mapped[str] = mapped_column(String(40), nullable=False, default="email")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -21,11 +23,29 @@ class User(Base):
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     user_name: Mapped[str] = mapped_column(String(120), nullable=False)
     action: Mapped[str] = mapped_column(String(80), nullable=False)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+class ProviderOperation(Base):
+    __tablename__ = "provider_operations"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", "idempotency_key", name="uq_provider_operation_request"),
+        UniqueConstraint("user_id", "provider", "effect_key", name="uq_provider_operation_effect"),
+        Index("ix_provider_operations_user_created", "user_id", "created_at"),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(30), nullable=False)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    subject_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    effect_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 class DataSource(Base):
     __tablename__ = "data_sources"
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_data_sources_user_name"),)
@@ -58,19 +78,23 @@ class ContactMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 class Resume(Base):
     __tablename__ = "resumes"
+    __table_args__ = (Index("ix_resumes_user_created_at", "user_id", "created_at"), UniqueConstraint("user_id", "creation_key", name="uq_resumes_user_creation_key"))
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     template_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    creation_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[dict[str, Any] | list[Any] | str | int | float | bool | None] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 class ResumeDraft(Base):
     __tablename__ = "resume_drafts"
-    __table_args__ = (UniqueConstraint("user_id", "template_id", name="uq_resume_drafts_user_template"),)
+    __table_args__ = (UniqueConstraint("user_id", "draft_key", name="uq_resume_drafts_user_key"),)
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     template_id: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    draft_key: Mapped[str] = mapped_column(String(100), nullable=False, default="new")
+    resume_id: Mapped[str | None] = mapped_column(ForeignKey("resumes.id", ondelete="CASCADE"), nullable=True)
     content: Mapped[dict[str, Any] | list[Any] | str | int | float | bool | None] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
@@ -106,7 +130,7 @@ class CareerProfileAnalysis(Base):
 class ResumeVersion(Base):
     __tablename__ = "resume_versions"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     resume_id: Mapped[str | None] = mapped_column(ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True)
     job_application_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     kind: Mapped[str] = mapped_column(String(40), nullable=False, default="base")
@@ -128,7 +152,7 @@ class ResumeShare(Base):
 class Achievement(Base):
     __tablename__ = "achievements"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     category: Mapped[str] = mapped_column(String(80), nullable=False, default="General")
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -139,7 +163,7 @@ class Achievement(Base):
 class JobApplication(Base):
     __tablename__ = "job_applications"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="saved")
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     company: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -161,7 +185,7 @@ class JobApplication(Base):
 class CoverLetter(Base):
     __tablename__ = "cover_letters"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     template_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     job_description: Mapped[str] = mapped_column(Text, nullable=False)

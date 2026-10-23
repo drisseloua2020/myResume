@@ -4,6 +4,7 @@ import base64
 from io import BytesIO
 from uuid import uuid4
 from zipfile import ZipFile
+from PIL import Image
 
 from sqlalchemy.orm import Session
 
@@ -111,22 +112,24 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
     assert activity.status_code == 200, activity.text
     assert activity.json()["ok"] is True
 
+    image = BytesIO()
+    Image.new('RGB', (20, 20), color='white').save(image, format='PNG')
     uploaded_photo = client.post(
         "/uploads/profile-photo",
         headers=user_headers,
-        files={"file": ("profile.png", b"\x89PNG\r\n\x1a\npytest-profile-photo", "image/png")},
+        files={"file": ("profile.png", image.getvalue(), "image/png")},
     )
     assert uploaded_photo.status_code == 201, uploaded_photo.text
     uploaded_photo_json = uploaded_photo.json()
     assert uploaded_photo_json["url"].startswith("/uploads/profile-photo/")
-    assert uploaded_photo_json["contentType"] == "image/png"
+    assert uploaded_photo_json["contentType"] == "image/jpeg"
 
     public_photo = client.get(uploaded_photo_json["url"])
     assert public_photo.status_code == 401
 
     protected_photo = client.get(uploaded_photo_json["url"], headers=user_headers)
     assert protected_photo.status_code == 200, protected_photo.text
-    assert protected_photo.content.startswith(b"\x89PNG")
+    assert protected_photo.content.startswith(b"\xff\xd8")
 
     other_signup = _signup(client, name=f"Other User {run_id}", email=f"other.{run_id}@example.com")
     other_photo = client.get(uploaded_photo_json["url"], headers=_auth_headers(other_signup["token"]))
@@ -181,35 +184,29 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
     assert profile_sources.json()["sources"]
 
     connected_source = client.post(f"/profile/sources/{SOURCE_TO_CONNECT}/connect", headers=user_headers)
-    assert connected_source.status_code == 200, connected_source.text
-    assert any(
-        source["name"].lower() == SOURCE_TO_CONNECT and source["isConnected"]
-        for source in connected_source.json()["sources"]
-    )
+    assert connected_source.status_code == 501, connected_source.text
 
     profile_sync = client.post("/profile/sync", headers=user_headers, json={"providers": [SOURCE_TO_CONNECT]})
-    assert profile_sync.status_code == 200, profile_sync.text
-    assert profile_sync.json()["updates"]
+    assert profile_sync.status_code == 501, profile_sync.text
 
     profile_updates = client.get("/profile/updates", headers=user_headers)
     assert profile_updates.status_code == 200, profile_updates.text
-    assert profile_updates.json()["updates"]
+    assert profile_updates.json()["updates"] == []
 
     agent_sources = client.get("/agent/sources", headers=user_headers)
     assert agent_sources.status_code == 200, agent_sources.text
     agent_source_id = agent_sources.json()["sources"][0]["id"]
 
     toggled_source = client.post(f"/agent/sources/{agent_source_id}/toggle", headers=user_headers)
-    assert toggled_source.status_code == 200, toggled_source.text
-    assert toggled_source.json()["source"]["id"] == agent_source_id
+    assert toggled_source.status_code == 501, toggled_source.text
 
     agent_check = client.post("/agent/check", headers=user_headers)
     assert agent_check.status_code == 200, agent_check.text
-    assert agent_check.json()["updates"]
+    assert agent_check.json()["updates"] == []
 
     agent_updates = client.get("/agent/updates", headers=user_headers)
     assert agent_updates.status_code == 200, agent_updates.text
-    assert agent_updates.json()["updates"]
+    assert agent_updates.json()["updates"] == []
 
     ats_resume = _docx_bytes(
         "\n".join([
@@ -336,7 +333,7 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
 
     admin_agent_updates = client.get("/admin/agent-updates", headers=admin_headers)
     assert admin_agent_updates.status_code == 200, admin_agent_updates.text
-    assert admin_agent_updates.json()["updates"]
+    assert admin_agent_updates.json()["updates"] == []
 
     deleted_cover_letter = client.delete(f"/cover-letters/{cover_letter_id}", headers=user_headers)
     assert deleted_cover_letter.status_code == 200, deleted_cover_letter.text
@@ -346,6 +343,6 @@ def test_postman_collection_happy_path_e2e(client, db_session, monkeypatch):
     assert deleted_resume.status_code == 200, deleted_resume.text
     assert deleted_resume.json()["ok"] is True
 
-    logout = client.post("/auth/logout")
+    logout = client.post("/auth/logout", headers=user_headers)
     assert logout.status_code == 200, logout.text
     assert logout.json()["ok"] is True

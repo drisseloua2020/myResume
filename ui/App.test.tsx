@@ -30,7 +30,7 @@ const testUser = {
   email: 'resume@example.com',
   role: UserRole.USER,
   plan: SubscriptionPlan.FREE,
-  status: 'Active',
+  status: 'Active' as const,
   createdAt: '2026-05-25T00:00:00Z',
   paidAmount: '$0.00',
 };
@@ -51,6 +51,10 @@ vi.mock('./services/agentService', () => ({
   agentService: {
     checkForUpdates: vi.fn().mockResolvedValue([]),
   },
+}));
+
+vi.mock('./services/providerService', () => ({
+  getProviderCapabilities: vi.fn().mockResolvedValue({ demoEnabled: false, mode: 'disabled' }),
 }));
 
 vi.mock('./services/resumeService', () => ({
@@ -969,8 +973,10 @@ describe('App import flow', () => {
   });
 
   it('keeps the editor and preview empty when there are no saved resumes', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
     vi.mocked(getLatestResume).mockResolvedValue(null);
     vi.mocked(getLatestDraft).mockResolvedValue({
+      id: 'draft_1', createdAt: '2026-01-01', updatedAt: '2026-01-01',
       templateId: 'classic_pro',
       content: {
         targetRole: 'Stale Architect',
@@ -1004,11 +1010,38 @@ describe('App import flow', () => {
       expect(getLatestResume).toHaveBeenCalled();
     });
 
-    expect(getLatestDraft).not.toHaveBeenCalled();
+    expect(getLatestDraft).toHaveBeenCalled();
     expect(await screen.findByPlaceholderText('First Name')).toHaveValue('');
     expect(screen.queryByDisplayValue('Stale Co')).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('Stale Architect')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('email@example.com')).toHaveValue('');
     expect(await screen.findAllByTestId('empty-live-preview')).not.toHaveLength(0);
+  });
+
+  it('preserves edits through navigation and saves to the same resume', async () => {
+    const user = userEvent.setup();
+    vi.mocked(getLatestResume).mockResolvedValue({
+      id: 'stable-resume', templateId: 'classic_pro', title: 'Stable Resume',
+      createdAt: '2026-01-01', updatedAt: '2026-01-01',
+      content: { role: UserRole.USER, plan: SubscriptionPlan.FREE, targetRole: 'Platform Engineer',
+        personalDetails: { firstName: 'Review', lastName: 'Candidate', email: 'review@example.com',
+          phone: '555-0100', address: '', city: '', state: '', country: 'Canada', postalCode: 'K1A 0B1', summary: '' },
+        experienceItems: [{ id: 'e', role: 'Engineer', company: 'Example', dates: '2022 - Present', description: 'Delivered reliable services.' }] },
+    });
+    render(<App />);
+    const target = await screen.findByDisplayValue('Platform Engineer');
+    await user.clear(target);
+    await user.type(target, 'Changed Engineer');
+    await user.click(screen.getByRole('button', { name: 'All Resumes' }));
+    await user.click(screen.getByRole('button', { name: 'Resume Editor' }));
+    expect(screen.getByPlaceholderText('e.g. Senior Product Designer')).toHaveValue('Changed Engineer');
+    await user.click(screen.getByRole('button', { name: 'Save Resume' }));
+    await waitFor(() => expect(updateResume).toHaveBeenCalledWith('stable-resume', expect.objectContaining({
+      content: expect.objectContaining({ targetRole: 'Changed Engineer' }),
+    })));
+    await user.click(screen.getByRole('button', { name: 'All Resumes' }));
+    await user.click(screen.getByRole('button', { name: 'Resume Editor' }));
+    expect(screen.getByPlaceholderText('e.g. Senior Product Designer')).toHaveValue('Changed Engineer');
+    expect(saveResume).not.toHaveBeenCalled();
   });
 });

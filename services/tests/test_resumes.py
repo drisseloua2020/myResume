@@ -1,7 +1,7 @@
 from time import sleep
 
 def create_user_and_token(client):
-    response = client.post('/auth/signup', json={'name': 'Resume User', 'email': 'resume@example.com', 'password': 'secret123', 'plan': 'free'})
+    response = client.post('/auth/signup', json={'name': 'Resume User', 'email': 'resume@example.com', 'password': 'secure-password-123', 'plan': 'free'})
     assert response.status_code == 201, response.text
     return response.json()['token']
 

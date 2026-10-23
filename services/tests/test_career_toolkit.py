@@ -8,7 +8,7 @@ from app.models.entities import CareerOnboardingProfile, CareerProfileAnalysis
 def _signup(client, email: str = "career@example.com") -> str:
     response = client.post(
         "/auth/signup",
-        json={"name": "Career User", "email": email, "password": "secret123", "plan": "free"},
+        json={"name": "Career User", "email": email, "password": "secure-password-123", "plan": "free"},
     )
     assert response.status_code == 201, response.text
     return response.json()["token"]
@@ -147,10 +147,18 @@ def test_profile_analysis_combines_resume_and_onboarding_profile(client, db_sess
     fetched = client.get("/career/profile-analysis", headers=headers)
     assert fetched.status_code == 200, fetched.text
     assert fetched.json()["analysis"]["id"] == analysis["id"]
+    assert fetched.json()["analysis"]["stale"] is False
+
+    changed = {**_resume(), "targetRole": "Staff Engineer"}
+    assert client.put(f"/resumes/{resume_id}", headers=headers, json={"content": changed}).status_code == 200
+    assert client.get("/career/profile-analysis", headers=headers).json()["analysis"]["stale"] is True
 
     generated_again = client.post("/career/profile-analysis", headers=headers, json={})
     assert generated_again.status_code == 200, generated_again.text
     assert generated_again.json()["analysis"]["id"] == analysis["id"]
+    assert client.get("/career/profile-analysis", headers=headers).json()["analysis"]["stale"] is False
+    client.put("/career/onboarding-profile", headers=headers, json=_onboarding_answers(futureGoal="Lead a team"))
+    assert client.get("/career/profile-analysis", headers=headers).json()["analysis"]["stale"] is True
 
     db_session.expire_all()
     rows = db_session.scalars(select(CareerProfileAnalysis).where(CareerProfileAnalysis.user_id == analysis["userId"])).all()
@@ -302,4 +310,4 @@ def test_linkedin_import_and_feature_catalog_are_deterministic(client):
     features = client.get("/career/features", headers=_headers(token))
     assert features.status_code == 200, features.text
     assert all(item["llmCalls"] is False for item in features.json()["features"])
-    assert any(item["name"] == "Job tracker Kanban" for item in features.json()["features"])
+    assert any(item["name"] == "Job tracker" for item in features.json()["features"])

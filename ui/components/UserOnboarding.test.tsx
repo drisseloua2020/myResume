@@ -10,7 +10,7 @@ const testUser = {
   email: 'resume@example.com',
   role: UserRole.USER,
   plan: SubscriptionPlan.FREE,
-  status: 'Active',
+  status: 'Active' as const,
   createdAt: '2026-05-25T00:00:00Z',
   paidAmount: '$0.00',
 };

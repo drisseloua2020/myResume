@@ -8,13 +8,13 @@ from app.models.entities import OAuthAccount, User
 
 
 def test_signup_login_and_me_flow(client):
-    signup = client.post('/auth/signup', json={'name': 'Alice', 'email': 'alice@example.com', 'password': 'secret123', 'plan': 'free'})
+    signup = client.post('/auth/signup', json={'name': 'Alice', 'email': 'alice@example.com', 'password': 'secure-password-123', 'plan': 'free'})
     assert signup.status_code == 201, signup.text
     token = signup.json()['token']
     me = client.get('/auth/me', headers={'Authorization': f'Bearer {token}'})
     assert me.status_code == 200, me.text
     assert me.json()['user']['email'] == 'alice@example.com'
-    login = client.post('/auth/login', json={'email': 'alice@example.com', 'password': 'secret123'})
+    login = client.post('/auth/login', json={'email': 'alice@example.com', 'password': 'secure-password-123'})
     assert login.status_code == 200, login.text
     assert login.json()['user']['name'] == 'Alice'
 
@@ -56,6 +56,7 @@ def test_oauth_start_uses_configured_public_redirect_base(client, monkeypatch):
 
 
 def test_oauth_start_signs_allowed_return_to_origin(client, monkeypatch):
+    monkeypatch.setattr(settings, 'cors_origins', 'https://myresumes.net')
     monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
     monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
     monkeypatch.setattr(settings, 'oauth_frontend_url', 'https://myresume-rrcy.onrender.com')
@@ -125,6 +126,7 @@ def test_oauth_diagnostics_reports_public_redirect_uri_without_secret(client, mo
 
 
 def test_oauth_callback_prefers_allowed_return_to_origin(client, monkeypatch):
+    monkeypatch.setattr(settings, 'cors_origins', 'https://myresumes.net')
     monkeypatch.setattr(settings, 'google_oauth_client_id', 'google-client')
     monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
     monkeypatch.setattr(settings, 'oauth_frontend_url', 'https://myresume-rrcy.onrender.com')
@@ -151,7 +153,7 @@ def test_oauth_callback_prefers_allowed_return_to_origin(client, monkeypatch):
             return DummyResponse({'access_token': 'provider-access-token', 'expires_in': 3600, 'scope': 'openid profile email'})
 
         async def get(self, url, headers):
-            return DummyResponse({'sub': 'google-return-123', 'email': 'return.oauth@example.com', 'name': 'Return User'})
+            return DummyResponse({'sub': 'google-return-123', 'email': 'return.oauth@example.com', 'name': 'Return User', 'email_verified': True})
 
     import app.services.oauth as oauth_service
     monkeypatch.setattr(oauth_service.httpx, 'AsyncClient', DummyAsyncClient)
@@ -161,7 +163,7 @@ def test_oauth_callback_prefers_allowed_return_to_origin(client, monkeypatch):
     callback = client.get(f'/auth/oauth/google/callback?code=provider-code&state={state}', follow_redirects=False)
 
     assert callback.status_code == 302
-    assert callback.headers['location'].startswith('https://myresumes.net/?')
+    assert callback.headers['location'].startswith('https://myresumes.net/#')
 
 
 def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_session, monkeypatch):
@@ -169,7 +171,7 @@ def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_se
     monkeypatch.setattr(settings, 'google_oauth_client_secret', 'google-secret')
     monkeypatch.setattr(settings, 'oauth_frontend_url', 'http://localhost:4000')
 
-    signup = client.post('/auth/signup', json={'name': 'Existing User', 'email': 'oauth@example.com', 'password': 'secret123', 'plan': 'free'})
+    signup = client.post('/auth/signup', json={'name': 'Existing User', 'email': 'oauth@example.com', 'password': 'secure-password-123', 'plan': 'free'})
     assert signup.status_code == 201, signup.text
 
     class DummyResponse:
@@ -202,7 +204,7 @@ def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_se
         async def get(self, url, headers):
             assert url == 'https://openidconnect.googleapis.com/v1/userinfo'
             assert headers['Authorization'] == 'Bearer provider-access-token'
-            return DummyResponse({'sub': 'google-user-123', 'email': 'oauth@example.com', 'name': 'OAuth User'})
+            return DummyResponse({'sub': 'google-user-123', 'email': 'oauth@example.com', 'name': 'OAuth User', 'email_verified': True})
 
     import app.services.oauth as oauth_service
     monkeypatch.setattr(oauth_service.httpx, 'AsyncClient', DummyAsyncClient)
@@ -213,8 +215,8 @@ def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_se
 
     assert callback.status_code == 302
     redirect = urlparse(callback.headers['location'])
-    redirect_query = parse_qs(redirect.query)
-    assert callback.headers['location'].startswith('http://localhost:4000/?')
+    redirect_query = parse_qs(redirect.fragment)
+    assert callback.headers['location'].startswith('http://localhost:4000/#')
     assert redirect_query['templateId'] == ['classic_pro']
     token = redirect_query['token'][0]
 
@@ -223,7 +225,7 @@ def test_oauth_callback_creates_user_and_allows_form_login_linking(client, db_se
     assert me.json()['user']['email'] == 'oauth@example.com'
     assert me.json()['user']['authProvider'] == 'google'
 
-    password_login = client.post('/auth/login', json={'email': 'oauth@example.com', 'password': 'secret123'})
+    password_login = client.post('/auth/login', json={'email': 'oauth@example.com', 'password': 'secure-password-123'})
     assert password_login.status_code == 200, password_login.text
 
     linked_user = db_session.scalar(select(User).where(User.email == 'oauth@example.com'))
@@ -274,16 +276,16 @@ def test_oauth_callback_creates_new_user_with_selected_plan(client, db_session, 
     callback = client.get(f'/auth/oauth/google/callback?code=new-user-code&state={state}', follow_redirects=False)
 
     assert callback.status_code == 302
-    token = parse_qs(urlparse(callback.headers['location']).query)['token'][0]
+    token = parse_qs(urlparse(callback.headers['location']).fragment)['token'][0]
     me = client.get('/auth/me', headers={'Authorization': f'Bearer {token}'})
     assert me.status_code == 200, me.text
     assert me.json()['user']['email'] == 'new.oauth@example.com'
-    assert me.json()['user']['plan'] == 'yearly'
+    assert me.json()['user']['plan'] == 'free'
     assert me.json()['user']['authProvider'] == 'google'
 
     linked_user = db_session.scalar(select(User).where(User.email == 'new.oauth@example.com'))
     assert linked_user is not None
-    assert linked_user.plan == 'yearly'
+    assert linked_user.plan == 'free'
     account = db_session.scalar(select(OAuthAccount).where(OAuthAccount.user_id == linked_user.id))
     assert account is not None
     assert account.access_token is None

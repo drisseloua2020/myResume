@@ -6,7 +6,7 @@ import re
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
-from xml.etree import ElementTree
+from defusedxml import ElementTree
 
 from pypdf import PdfReader
 
@@ -79,8 +79,13 @@ def _pdf_text_score(text: str) -> int:
 
 def _extract_pdf_text(pdf_bytes: bytes) -> str:
     reader = PdfReader(BytesIO(pdf_bytes))
+    if reader.is_encrypted or len(reader.pages) > 30:
+        raise UnsupportedResumeFileError("Use an unencrypted PDF with at most 30 pages.")
     chunks: list[str] = []
     for page in reader.pages:
+        contents = page.get_contents()
+        if contents is not None and len(contents.get_data()) > 4 * 1024 * 1024:
+            raise UnsupportedResumeFileError("PDF page is too complex to import safely.")
         candidates: list[str] = []
         for mode in ("layout", "plain"):
             try:
@@ -105,12 +110,19 @@ def _limit_resume_text(text: str) -> str:
 
 
 def _decode_upload_data(raw_value: object) -> bytes:
+    if isinstance(raw_value, (bytes, str)) and len(raw_value) > 14 * 1024 * 1024:
+        raise UnsupportedResumeFileError("Resume exceeds the 10 MB file limit.")
     if isinstance(raw_value, bytes):
         return raw_value
     if not isinstance(raw_value, str):
         raise UnsupportedResumeFileError("Uploaded resume file data is invalid.")
     try:
-        return base64.b64decode(raw_value, validate=True)
+        decoded = base64.b64decode(raw_value, validate=True)
+        if len(decoded) > 10 * 1024 * 1024:
+            raise UnsupportedResumeFileError("Resume exceeds the 10 MB file limit.")
+        return decoded
+    except ResumeParseError:
+        raise
     except Exception as exc:
         raise UnsupportedResumeFileError("Uploaded resume file data is invalid.") from exc
 
@@ -132,6 +144,11 @@ def _raise_unreadable_import(kind: str) -> None:
 
 def _extract_docx_text(docx_bytes: bytes) -> str:
     with zipfile.ZipFile(BytesIO(docx_bytes)) as docx:
+        entries = docx.infolist()
+        if len(entries) > 1000 or sum(item.file_size for item in entries) > 20 * 1024 * 1024:
+            raise UnsupportedResumeFileError("Word document expands beyond the safe import limit.")
+        if any(item.file_size > 5 * 1024 * 1024 or item.file_size > max(1, item.compress_size) * 200 for item in entries):
+            raise UnsupportedResumeFileError("Word document compression exceeds the safe import limit.")
         names = [
             "word/document.xml",
             *sorted(name for name in docx.namelist() if name.startswith("word/header") and name.endswith(".xml")),
@@ -2053,6 +2070,8 @@ def _extract_upload_text(file_data: dict[str, object]) -> tuple[str, str, dict[s
     if kind == "pdf":
         try:
             extracted = _extract_pdf_text(decoded)
+        except ResumeParseError:
+            raise
         except Exception as exc:
             raise UnreadableResumeFileError(
                 "Could not extract readable text from this PDF. Please upload a text-based PDF or DOCX file."
@@ -2062,6 +2081,8 @@ def _extract_upload_text(file_data: dict[str, object]) -> tuple[str, str, dict[s
     elif kind == "docx":
         try:
             extracted = _extract_docx_text(decoded)
+        except ResumeParseError:
+            raise
         except Exception as exc:
             raise UnreadableResumeFileError(
                 "Could not extract readable text from this DOCX file. Please upload a text-based PDF or DOCX file."

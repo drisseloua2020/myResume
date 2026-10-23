@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { authService } from '../services/authService';
 import { User, SubscriptionPlan } from '../types';
 import { PLAN_DETAILS } from '../constants';
@@ -11,6 +11,9 @@ import CookiesPage from './CookiesPage';
 import CookiesPrivacyPolicyPage from './CookiesPrivacyPolicyPage';
 import CookiesTermsOfUsePage from './CookiesTermsOfUsePage';
 import { isOAuthCallbackPath } from '../services/oauthRedirect';
+import PasswordRecovery from './PasswordRecovery';
+import { api } from '../services/apiClient';
+import { useDialogFocus } from '../utils/useDialogFocus';
 
 interface AuthScreenProps {
   onLogin: (user: User, initialTemplateId?: string) => void;
@@ -182,8 +185,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 Online Resume Builder
                 </span>
                 <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 leading-[1.1] mb-6">
-                Only 2% of resumes make it past the first round. <br/>
-                <span className="text-[#1a91f0]">Be in the top 2%.</span>
+                MyResumes <br/>
+                <span className="text-[#1a91f0]">Resume Builder</span>
                 </h1>
                 <p className="text-lg text-slate-500 mb-8 max-w-xl mx-auto md:mx-0">
                 Use professional field-tested resume templates that follow the exact "resume rules" employers look for. Easy to use and done within minutes.
@@ -338,7 +341,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   </div>
                   <h3 className="text-xl font-bold text-slate-800 mb-3">2. Customize</h3>
-                  <p className="text-slate-500 leading-relaxed">Fill in your details. Our AI writer will help you find the right words to describe your experience.</p>
+                  <p className="text-slate-500 leading-relaxed">Add your experience, skills, and achievements, then review the finished resume.</p>
                </div>
 
                {/* Step 3 */}
@@ -385,7 +388,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   </li>
                   <li className="flex items-center gap-3 text-sm text-slate-400">
                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                     Includes Ads
+                     Text PDF, DOCX and TXT Exports
                   </li>
                 </ul>
                 <button
@@ -417,11 +420,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   </li>
                    <li className="flex items-center gap-3 text-sm text-slate-700">
                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
-                     Advanced AI Tailoring
+                     Additional tools planned
                   </li>
                   <li className="flex items-center gap-3 text-sm text-slate-700">
                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
-                     Premium Templates
+                     Plan details not yet available
                   </li>
                 </ul>
                 <button
@@ -489,7 +492,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
                <div className="p-6 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
                   <div className="text-3xl font-bold text-white mb-2">Technical</div>
-                  <div className="text-sm text-slate-400">Expertise in AI & Engineering</div>
+                  <div className="text-sm text-slate-400">Built for practical career work</div>
                </div>
                <div className="p-6 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
                   <div className="text-3xl font-bold text-white mb-2">Accessible</div>
@@ -508,7 +511,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
 
         {/* --- Auth Modals --- */}
-        {activeModal !== 'none' && (
+        {activeModal === 'contact' && (
           activeModal === 'contact' ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setActiveModal('none')}></div>
@@ -543,6 +546,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         )}
 
       {/* --- Footer --- */}
+      <PasswordRecovery />
       <footer className="bg-[#2e3d50] text-slate-300 py-16">
           <div className="max-w-6xl mx-auto px-6">
              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
@@ -551,7 +555,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                    <ul className="space-y-2 text-sm">
                       <li><a href="#" className="hover:text-white">Homepage</a></li>
                       <li><a href="#templates" className="hover:text-white">Resume Templates</a></li>
-                      <li><a href="#" className="hover:text-white">Cover Letters</a></li>
+                      <li><button onClick={() => setActiveModal('login')} className="hover:text-white">Cover Letters</button></li>
                    </ul>
                 </div>
                 <div>
@@ -688,7 +692,7 @@ const PricingModal: React.FC<PricingModalProps> = ({ onClose, onSelectPlan }) =>
                    </li>
                    <li className="flex items-center gap-2">
                      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                     AI Tailoring
+                     Additional tools planned
                    </li>
                 </ul>
                 <div className={`w-6 h-6 rounded-full border-2 absolute top-6 right-6 flex items-center justify-center ${selected === SubscriptionPlan.MONTHLY ? 'border-[#1a91f0] bg-[#1a91f0]' : 'border-slate-300'}`}>
@@ -747,6 +751,12 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTemplateId, initialError, onClose, onSwitchMode, onAuthSuccess }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, onClose);
+  const [googleAvailable, setGoogleAvailable] = useState(false);
+  useEffect(() => {
+    api.get<{ providers: Record<string, boolean> }>('/auth/providers').then(result => setGoogleAvailable(Boolean(result.providers.google))).catch(() => setGoogleAvailable(false));
+  }, []);
   const isLogin = mode === 'login';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError || null);
@@ -788,7 +798,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={isLogin ? 'Sign In' : 'Create Account'} className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden animate-fade-in-up">
 
@@ -814,8 +824,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
             <button
               type="button"
               onClick={() => handleOAuthLogin('google')}
-              // Re-enable Google auth by changing this back to disabled={loading}.
-              disabled
+              disabled={loading || !googleAvailable}
+              title={googleAvailable ? 'Sign in with Google' : 'Google sign-in is not configured'}
               className="w-full border border-slate-300 rounded px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-3"
             >
               <span className="w-5 h-5 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm font-bold text-[#4285f4]">G</span>
@@ -868,6 +878,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
               <input
                 type="password"
                 required
+                minLength={isLogin ? 6 : 12}
+                maxLength={256}
                 className="w-full px-4 py-2 border border-slate-300 rounded focus:border-[#1a91f0] focus:ring-1 focus:ring-[#1a91f0] outline-none"
                 placeholder="••••••••"
                 value={formData.password}
@@ -886,6 +898,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
             </button>
           </form>
 
+          {isLogin && <button type="button" className="mt-3 text-sm font-semibold text-blue-700" onClick={() => {
+            onClose(); window.dispatchEvent(new CustomEvent('myresume:password-recovery'));
+          }}>Forgot password?</button>}
+
           <div className="text-center mt-6 text-sm text-slate-500">
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <button
@@ -893,8 +909,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ mode, selectedPlan, selectedTempl
                 setError(null);
                 onSwitchMode(isLogin ? 'signup' : 'login');
               }}
-              // Re-enable account creation by removing this disabled prop.
-              disabled={isLogin}
               className="text-[#1a91f0] font-semibold hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
             >
               {isLogin ? "Sign up" : "Log in"}

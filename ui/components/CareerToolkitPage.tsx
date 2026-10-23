@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { UserInputData } from '../types';
-import { getLatestResume } from '../services/resumeService';
+import { getLatestResume, getResume, saveResume, ResumeRecord } from '../services/resumeService';
+import { api, API_URL } from '../services/apiClient';
 import {
   analyzeCareer,
   CareerAchievement,
@@ -65,9 +66,12 @@ function downloadBase64(name: string, mimeType: string, data: string) {
   link.click();
 }
 
-export default function CareerToolkitPage({ currentResume }: { currentResume?: UserInputData | null }) {
+export default function CareerToolkitPage({ currentResume, resumeId, currentTitle, onOpenResume }: {
+  currentResume?: UserInputData | null; resumeId?: string | null; currentTitle?: string | null; onOpenResume?: (resume: ResumeRecord) => void;
+}) {
   const [resume, setResume] = useState<UserInputData | Record<string, unknown>>(currentResume || {});
-  const [resumeTitle, setResumeTitle] = useState('Latest resume');
+  const [resumeTitle, setResumeTitle] = useState(currentTitle || 'Current resume');
+  const [sourceId, setSourceId] = useState(resumeId || null);
   const [jobDescription, setJobDescription] = useState(sampleJob);
   const [jobUrl, setJobUrl] = useState('');
   const [report, setReport] = useState<CareerAnalysisReport | null>(null);
@@ -77,9 +81,12 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
   const [analytics, setAnalytics] = useState<Record<string, any>>({});
   const [features, setFeatures] = useState<Array<{ group: string; name: string; operation: string; llmCalls: boolean }>>([]);
   const [linkedinText, setLinkedinText] = useState('');
+  const [importPreview, setImportPreview] = useState<{ resume: UserInputData; warnings: string[]; key: string } | null>(null);
   const [achievementText, setAchievementText] = useState('');
+  const [editingAchievement, setEditingAchievement] = useState<CareerAchievement | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [shares, setShares] = useState<Array<{ id: string; slug: string; isPublic: boolean; resumeId: string }>>([]);
 
   async function refreshRecords() {
     const [jobRes, achievementRes, versionRes, analyticsRes, featureRes] = await Promise.all([
@@ -94,17 +101,20 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
     setVersions(versionRes.versions);
     setAnalytics(analyticsRes.analytics);
     setFeatures(featureRes.features);
+    const result = await api.get<{ shares: typeof shares }>('/career/shares');
+    setShares(result.shares);
   }
 
   useEffect(() => {
     let alive = true;
     async function load() {
       try {
-        const latest = await getLatestResume();
+        const latest = currentResume ? null : await getLatestResume();
         if (!alive) return;
         if (latest) {
           setResume(latest.content as any);
           setResumeTitle(latest.title);
+          setSourceId(latest.id);
         }
         await refreshRecords();
       } catch (error: any) {
@@ -134,7 +144,7 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
   async function saveJob(status: CareerJob['status'] = 'saved') {
     setBusy(true);
     try {
-      await createCareerJob({ status, jobDescription, jobUrl, title: report?.job.title, company: report?.job.company || undefined, location: report?.job.location || undefined, salary: report?.job.salary || undefined });
+      await createCareerJob({ status, resumeId: sourceId, jobDescription, jobUrl, title: report?.job.title, company: report?.job.company || undefined, location: report?.job.location || undefined, salary: report?.job.salary || undefined });
       await refreshRecords();
       setMessage('Job saved to tracker.');
     } catch (error: any) {
@@ -148,7 +158,11 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
     if (!achievementText.trim()) return;
     setBusy(true);
     try {
-      await createAchievement({ title: achievementText.split('\n')[0].slice(0, 120), category: 'Resume Bullet', content: achievementText });
+      const payload = { title: achievementText.split('\n')[0].slice(0, 120), category: editingAchievement?.category || 'Resume Bullet', content: achievementText,
+        sourceResumeId: editingAchievement?.sourceResumeId || sourceId || undefined, tags: editingAchievement?.tags || [], metrics: editingAchievement?.metrics || undefined };
+      if (editingAchievement) await api.put(`/career/achievements/${editingAchievement.id}`, payload);
+      else await createAchievement(payload);
+      setEditingAchievement(null);
       setAchievementText('');
       await refreshRecords();
     } catch (error: any) {
@@ -159,9 +173,10 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
   }
 
   async function saveVersion(kind: string) {
+    if (!sourceId) { setMessage('Save this resume in the editor before creating a version.'); return; }
     setBusy(true);
     try {
-      await createResumeVersion({ kind, title: `${resumeTitle} - ${kind}`, content: resume, changeSummary: `Saved from Career Toolkit as ${kind}.` });
+      await createResumeVersion({ resumeId: sourceId, kind, title: `${resumeTitle} - ${kind}`, content: resume, changeSummary: `Saved from Career Toolkit as ${kind}.` });
       await refreshRecords();
       setMessage('Resume version saved.');
     } catch (error: any) {
@@ -171,12 +186,13 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
     }
   }
 
-  async function exportFormats(redactPii = false) {
+  async function exportFormats(redactPii = false, format: 'txt' | 'pdf' | 'docx' = 'txt') {
     setBusy(true);
     try {
-      const res = await exportResumeFormats({ resumeJson: resume, title: resumeTitle, publicProfileUrl: '', redactPii });
-      downloadBase64(`${resumeTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'resume'}.txt`, 'text/plain', res.exports.txtBase64);
-      setMessage(`Export ready. PDF selectable text: ${res.exports.pdfValidation.selectableText ? 'yes' : 'no'}.`);
+      const res = await exportResumeFormats({ resumeJson: resume, title: resumeTitle, publicProfileUrl: '', redactPii, format });
+      const mime = { txt: 'text/plain', pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+      downloadBase64(`${resumeTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'resume'}.${format}`, mime[format], res.exports[`${format}Base64`]);
+      setMessage(`${format.toUpperCase()} export ready.`);
     } catch (error: any) {
       setMessage(error?.message || 'Export failed.');
     } finally {
@@ -189,11 +205,28 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
     setBusy(true);
     try {
       const res = await importLinkedInProfile(linkedinText);
-      setResume(res.resume);
-      setResumeTitle('LinkedIn imported resume');
-      setMessage('LinkedIn text imported into the editor-ready resume shape.');
+      setImportPreview({ resume: res.resume, warnings: res.warnings, key: crypto.randomUUID() });
     } catch (error: any) {
       setMessage(error?.message || 'LinkedIn import failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveImportedProfile() {
+    if (!importPreview) return;
+    setBusy(true);
+    try {
+      const saved = await saveResume({ templateId: 'classic_pro', title: 'LinkedIn imported resume', content: importPreview.resume, idempotencyKey: importPreview.key });
+      setResume(importPreview.resume);
+      setResumeTitle('LinkedIn imported resume');
+      setSourceId(saved.id);
+      setReport(null);
+      setMessage('LinkedIn profile saved to your resume library.');
+      if (onOpenResume) onOpenResume(await getResume(saved.id));
+      setImportPreview(null);
+    } catch (error: any) {
+      setMessage(error?.message || 'Could not save imported profile. Retry without creating another record.');
     } finally {
       setBusy(false);
     }
@@ -233,35 +266,67 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
         <section className="space-y-4">
           <div className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="text-sm font-black uppercase tracking-wide text-slate-700">Analyze Against Job</h3>
-            <input value={jobUrl} onChange={(e) => setJobUrl(e.target.value)} placeholder="Job URL" className="mt-4 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-            <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="mt-3 h-72 w-full rounded border border-slate-300 p-3 text-sm leading-relaxed" />
+            <input disabled={busy} value={jobUrl} onChange={(e) => { setJobUrl(e.target.value); setReport(null); }} placeholder="Job URL" className="mt-4 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
+            <textarea disabled={busy} value={jobDescription} onChange={(e) => { setJobDescription(e.target.value); setReport(null); }} className="mt-3 h-72 w-full rounded border border-slate-300 p-3 text-sm leading-relaxed" />
             <div className="mt-3 flex flex-wrap gap-2">
               <button disabled={busy} onClick={runAnalysis} className="rounded bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Run ATS Analysis</button>
               <button disabled={busy} onClick={() => saveJob('saved')} className="rounded border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Save Job</button>
               <button disabled={busy} onClick={() => exportFormats(false)} className="rounded border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Export TXT</button>
+              <button disabled={busy} onClick={() => exportFormats(false, 'pdf')} className="rounded border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Export PDF</button>
+              <button disabled={busy} onClick={() => exportFormats(false, 'docx')} className="rounded border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Export DOCX</button>
               <button disabled={busy} onClick={() => exportFormats(true)} className="rounded border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Redacted Export</button>
             </div>
           </div>
 
           <div className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="text-sm font-black uppercase tracking-wide text-slate-700">LinkedIn Import</h3>
-            <textarea value={linkedinText} onChange={(e) => setLinkedinText(e.target.value)} placeholder="Paste LinkedIn profile text..." className="mt-4 h-32 w-full rounded border border-slate-300 p-3 text-sm" />
+            <textarea value={linkedinText} onChange={(e) => { setLinkedinText(e.target.value); setImportPreview(null); }} placeholder="Paste LinkedIn profile text..." className="mt-4 h-32 w-full rounded border border-slate-300 p-3 text-sm" />
             <button disabled={busy || !linkedinText.trim()} onClick={importLinkedIn} className="mt-3 rounded bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Import Profile Text</button>
+            {importPreview && <div className="mt-4 space-y-3 border-t pt-3">
+              <h4 className="font-semibold">Imported profile review</h4>
+              {importPreview.warnings.map((warning, index) => <p className="text-sm text-amber-800" key={index}>{warning}</p>)}
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(importPreview.resume, null, 2)}</pre>
+              <button disabled={busy} onClick={saveImportedProfile} className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save and open resume</button>
+            </div>}
           </div>
 
           <div className="rounded border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="text-sm font-black uppercase tracking-wide text-slate-700">Achievement Library</h3>
             <textarea value={achievementText} onChange={(e) => setAchievementText(e.target.value)} placeholder="Paste a strong bullet or accomplishment..." className="mt-4 h-24 w-full rounded border border-slate-300 p-3 text-sm" />
-            <button disabled={busy || !achievementText.trim()} onClick={saveAchievement} className="mt-3 rounded bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Save Achievement</button>
+            <button disabled={busy || !achievementText.trim()} onClick={saveAchievement} className="mt-3 rounded bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{editingAchievement ? 'Update Achievement' : 'Save Achievement'}</button>
             <div className="mt-4 space-y-3">
-              {achievements.slice(0, 5).map((item) => (
+              {achievements.map((item) => (
                 <div key={item.id} className="rounded bg-slate-50 p-3 text-sm">
                   <div className="font-bold text-slate-900">{item.title}</div>
                   <div className="mt-1 text-slate-600">{item.content}</div>
+                  <div className="mt-2 flex gap-3">
+                    <button onClick={() => { setEditingAchievement(item); setAchievementText(item.content); }}>Edit</button>
+                    <button onClick={() => navigator.clipboard.writeText(item.content).then(() => setMessage('Achievement copied')).catch(() => setMessage('Clipboard unavailable'))}>Copy</button>
+                    <button disabled={busy} className="text-red-700" onClick={async () => {
+                      if (!window.confirm('Delete this achievement?')) return;
+                      setBusy(true); try { await api.delete(`/career/achievements/${item.id}`); await refreshRecords(); } catch (error: any) { setMessage(error.message); } finally { setBusy(false); }
+                    }}>Delete</button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+          <section className="space-y-3 border-t py-4">
+            <h3 className="font-bold">Public Text Shares</h3>
+            <p className="text-sm text-slate-600">Links expire after 30 days. Contact fields are redacted; check free-text sections for personal information before publishing.</p>
+            <button className="rounded border px-3 py-2 text-sm font-semibold" disabled={busy || !sourceId} onClick={async () => {
+              if (!window.confirm('Publish the saved resume as a public text link for 30 days? Review free-text sections for personal information first.')) return;
+              setBusy(true);
+              try { await api.post('/career/shares', { resumeId: sourceId, isPublic: true, redactPii: true }); await refreshRecords(); }
+              catch (error: any) { setMessage(error.message); } finally { setBusy(false); }
+            }}>Create public text link</button>
+            {shares.filter(share => share.resumeId === sourceId).map(share => <div className="flex flex-wrap gap-3 text-sm" key={share.id}>
+              {share.isPublic ? <a className="break-all text-blue-700 underline" href={`${API_URL}/career/public/resumes/${encodeURIComponent(share.slug)}`} target="_blank" rel="noreferrer">Open shared resume</a> : <span>Private share</span>}
+              <button disabled={busy} onClick={async () => {
+                setBusy(true); try { await api.delete(`/career/shares/${share.id}`); await refreshRecords(); } catch (error: any) { setMessage(error.message); } finally { setBusy(false); }
+              }}>Revoke</button>
+            </div>)}
+          </section>
         </section>
 
         <section className="space-y-6">
@@ -358,10 +423,11 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
                     <div className="mb-2 text-xs font-black uppercase text-slate-500">{column.label}</div>
                     <div className="space-y-2">
                       {jobs.filter((job) => job.status === column.key).slice(0, 4).map((job) => (
-                        <button key={job.id} onClick={() => updateCareerJob(job.id, { status: column.key === 'saved' ? 'applied' : column.key }).then(refreshRecords)} className="block w-full rounded bg-white p-3 text-left text-xs shadow-sm">
+                        <div key={job.id} className="block w-full rounded bg-white p-3 text-left text-xs shadow-sm">
                           <div className="font-bold text-slate-900">{job.title}</div>
                           <div className="text-slate-500">{job.company || 'Company not set'}</div>
-                        </button>
+                          <select aria-label={`Status for ${job.title}`} value={job.status} onChange={e => updateCareerJob(job.id, { status: e.target.value as CareerJob['status'] }).then(refreshRecords).catch(error => setMessage(error.message))} className="mt-2 w-full border p-1">{statusColumns.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -372,10 +438,24 @@ export default function CareerToolkitPage({ currentResume }: { currentResume?: U
             <div className="rounded border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="text-sm font-black uppercase tracking-wide text-slate-700">Versions & Feature Coverage</h3>
               <div className="mt-4 space-y-3">
-                {versions.slice(0, 4).map((version) => (
+                {versions.filter(version => !sourceId || version.resumeId === sourceId).map((version) => (
                   <div key={version.id} className="rounded bg-slate-50 p-3 text-sm">
                     <div className="font-bold text-slate-900">{version.title}</div>
                     <div className="text-xs text-slate-500">{version.kind} | {new Date(version.createdAt).toLocaleDateString()}</div>
+                    <details className="mt-2"><summary>Compare snapshot</summary>
+                      {Object.keys({ ...resume, ...version.content }).filter(key => JSON.stringify((resume as any)[key]) !== JSON.stringify(version.content[key])).map(key => <div key={key} className="mt-3 border-t pt-2">
+                        <h4 className="font-semibold">{key}</h4><div className="grid gap-3 lg:grid-cols-2">
+                          <div><p className="font-semibold">Current</p><pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify((resume as any)[key] ?? null, null, 2)}</pre></div>
+                          <div><p className="font-semibold">Snapshot</p><pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(version.content[key] ?? null, null, 2)}</pre></div>
+                        </div></div>)}
+                      {JSON.stringify(resume) === JSON.stringify(version.content) && <p className="mt-2">No changes.</p>}
+                    </details>
+                    <button disabled={busy || !version.resumeId} className="mt-2 rounded border px-3 py-1" onClick={async () => {
+                      if (!window.confirm('Restore this version? A backup of the current resume will be saved.')) return;
+                      setBusy(true);
+                      try { await api.post(`/career/resume-versions/${version.id}/restore`); await refreshRecords(); onOpenResume?.(await getResume(version.resumeId)); }
+                      catch (error: any) { setMessage(error.message); } finally { setBusy(false); }
+                    }}>Restore version</button>
                   </div>
                 ))}
               </div>

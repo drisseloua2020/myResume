@@ -4,6 +4,7 @@ import { AVAILABLE_TEMPLATES } from '../constants';
 import LivePreview from './LivePreview';
 import ConfirmNewResumeModal from './ConfirmNewResumeModal';
 import { saveResume, updateResume } from '../services/resumeService';
+import { downloadResumeFile } from '../services/exportService';
 import { locationService } from '../services/locationService';
 import { fetchApiAssetDataUrl } from '../services/apiClient';
 import { uploadProfilePhoto } from '../services/uploadService';
@@ -14,7 +15,9 @@ interface ResumeInputProps {
   onImport: (data: UserInputData) => void;
   onTemplateChange: (templateId: string) => void;
   onNewResume?: () => void;
-  onDraftChange?: (draft: UserInputData) => void;
+  onDraftChange?: (draft: UserInputData) => void | Promise<void>;
+  onWorkspaceChange?: (draft: UserInputData) => void;
+  onSaved?: (id: string, title: string, draft: UserInputData) => void;
   isLoading: boolean;
   role: UserRole;
   userPlan: SubscriptionPlan;
@@ -284,17 +287,6 @@ function slugifyFilename(value: string): string {
     .slice(0, 80) || 'resume';
 }
 
-async function waitForImages(node: HTMLElement): Promise<void> {
-  const images = Array.from(node.querySelectorAll('img'));
-  await Promise.all(images.map((img) => {
-    if (img.complete) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      img.onload = () => resolve();
-      img.onerror = () => resolve();
-    });
-  }));
-}
-
 function imageDataUrlFromProfileData(imageData?: { mimeType: string; data: string }): string | undefined {
   return imageData ? `data:${imageData.mimeType};base64,${imageData.data}` : undefined;
 }
@@ -328,341 +320,13 @@ type PdfPageSlice = {
   topMarginMm: number;
 };
 
-type VerticalRange = {
-  startY: number;
-  endY: number;
-};
-
-const CONTINUATION_PAGE_TOP_MARGIN_MM = 8;
-const PAGE_END_EMPTY_SPACE_MM = 18;
-const MIN_PDF_PAGE_FILL_RATIO = 0.68;
-const PDF_SAFE_CUT_PADDING_PX = 6;
-const JOB_BLOCK_START_GUARD_MM = 28;
-const MODERN_TECH_SIDEBAR_RATIO = 0.32;
-const MODERN_TECH_SIDEBAR_COLOR = '#0f172a';
-
-function getPdfPageHeightPx(canvasWidthPx: number, pageWidthMm: number, usablePageHeightMm: number): number {
-  return Math.floor((canvasWidthPx * usablePageHeightMm) / pageWidthMm);
-}
-
-function collectTextLineRanges(node: HTMLElement): VerticalRange[] {
-  const ranges: VerticalRange[] = [];
-  const rootRect = node.getBoundingClientRect();
-  const doc = node.ownerDocument;
-
-  function visit(child: ChildNode): void {
-    if (child.nodeType === Node.TEXT_NODE) {
-      if (!child.textContent?.trim()) {
-        return;
-      }
-
-      const range = doc.createRange();
-      try {
-        range.selectNodeContents(child);
-        if (typeof range.getClientRects !== 'function') {
-          return;
-        }
-
-        Array.from(range.getClientRects()).forEach((rect) => {
-          if (rect.height <= 0 || rect.width <= 0) {
-            return;
-          }
-
-          ranges.push({
-            startY: Math.max(0, rect.top - rootRect.top - PDF_SAFE_CUT_PADDING_PX),
-            endY: Math.max(0, rect.bottom - rootRect.top + PDF_SAFE_CUT_PADDING_PX),
-          });
-        });
-      } finally {
-        range.detach();
-      }
-      return;
-    }
-
-    child.childNodes.forEach(visit);
-  }
-
-  node.childNodes.forEach(visit);
-  return ranges.sort((a, b) => a.startY - b.startY);
-}
-
-function scaleVerticalRanges(ranges: VerticalRange[], scale: number): VerticalRange[] {
-  if (!Number.isFinite(scale) || scale <= 0) {
-    return [];
-  }
-
-  return ranges.map((range) => ({
-    startY: Math.floor(range.startY * scale),
-    endY: Math.ceil(range.endY * scale),
-  }));
-}
-
-function collectBlockRanges(node: HTMLElement): VerticalRange[] {
-  const rootRect = node.getBoundingClientRect();
-  return Array.from(node.querySelectorAll<HTMLElement>('[data-pdf-block]'))
-    .map((element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        startY: Math.max(0, rect.top - rootRect.top - PDF_SAFE_CUT_PADDING_PX),
-        endY: Math.max(0, rect.bottom - rootRect.top + PDF_SAFE_CUT_PADDING_PX),
-      };
-    })
-    .filter((range) => range.endY > range.startY)
-    .sort((a, b) => a.startY - b.startY);
-}
-
-function findSafeCutBeforeBlocks(
-  blockRanges: VerticalRange[],
-  minEndY: number,
-  idealEndY: number,
-  pageHeightPx: number,
-  guardPx: number
-): number | null {
-  if (!blockRanges.length || idealEndY <= minEndY) {
-    return null;
-  }
-
-  const guardedStartY = Math.max(minEndY, idealEndY - guardPx);
-  const relevantBlock = blockRanges.find((range) => {
-    const crossesPageEnd = range.startY < idealEndY && range.endY > idealEndY;
-    const startsTooLate = range.startY >= guardedStartY && range.startY < idealEndY;
-    const fitsOnNextPage = range.endY - range.startY <= pageHeightPx;
-    return fitsOnNextPage && range.startY > 0 && (crossesPageEnd || startsTooLate);
-  });
-
-  if (!relevantBlock) {
-    return null;
-  }
-
-  const cutY = Math.floor(relevantBlock.startY - PDF_SAFE_CUT_PADDING_PX);
-  if (cutY > minEndY) {
-    return cutY;
-  }
-
-  return null;
-}
-
-function findDomSafeCut(
-  blockedRanges: VerticalRange[],
-  minEndY: number,
-  idealEndY: number
-): number | null {
-  if (!blockedRanges.length || idealEndY <= minEndY) {
-    return null;
-  }
-
-  const relevantRanges = blockedRanges.filter((range) => range.endY >= minEndY && range.startY <= idealEndY);
-  if (!relevantRanges.length) {
-    return idealEndY;
-  }
-
-  for (let cutY = idealEndY; cutY >= minEndY; cutY -= 1) {
-    const intersectsText = relevantRanges.some((range) => cutY >= range.startY && cutY <= range.endY);
-    if (!intersectsText) {
-      return cutY;
-    }
-  }
-
-  return null;
-}
-
-function findQuietHorizontalCut(
-  canvas: HTMLCanvasElement,
-  minEndY: number,
-  idealEndY: number
-): number | null {
-  if (typeof canvas.getContext !== 'function' || idealEndY <= minEndY) {
-    return null;
-  }
-
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) {
-    return null;
-  }
-
-  const searchHeight = idealEndY - minEndY;
-  const sampleStep = Math.max(2, Math.floor(canvas.width / 420));
-  const quietBandHeight = Math.max(6, Math.floor(canvas.width / 180));
-  const maxTransitionsPerRow = Math.max(10, Math.floor((canvas.width / sampleStep) * 0.035));
-
-  if (searchHeight < quietBandHeight) {
-    return null;
-  }
-
-  let imageData: ImageData;
-  try {
-    imageData = context.getImageData(0, minEndY, canvas.width, searchHeight);
-  } catch {
-    return null;
-  }
-
-  const rowScores: number[] = [];
-  for (let y = 0; y < searchHeight; y += 1) {
-    let transitions = 0;
-    let previousLum: number | null = null;
-
-    for (let x = 0; x < canvas.width; x += sampleStep) {
-      const index = ((y * canvas.width) + x) * 4;
-      const alpha = imageData.data[index + 3];
-      if (alpha < 20) {
-        continue;
-      }
-
-      const lum = (
-        imageData.data[index] * 0.299 +
-        imageData.data[index + 1] * 0.587 +
-        imageData.data[index + 2] * 0.114
-      );
-
-      if (previousLum !== null && Math.abs(lum - previousLum) > 34) {
-        transitions += 1;
-      }
-      previousLum = lum;
-    }
-
-    rowScores.push(transitions);
-  }
-
-  for (let y = searchHeight - quietBandHeight; y >= 0; y -= 1) {
-    const bandScore = rowScores
-      .slice(y, y + quietBandHeight)
-      .reduce((sum, score) => sum + score, 0);
-    const averageTransitions = bandScore / quietBandHeight;
-
-    if (averageTransitions <= maxTransitionsPerRow) {
-      return minEndY + y + Math.floor(quietBandHeight / 2);
-    }
-  }
-
-  return null;
-}
-
-function createPdfPageSlices(
-  canvas: HTMLCanvasElement,
-  pageWidthMm: number,
-  pageHeightMm: number,
-  options: { blockRanges?: VerticalRange[]; textRanges?: VerticalRange[] } = {}
-): PdfPageSlice[] {
-  const slices: PdfPageSlice[] = [];
-  let sourceY = 0;
-
-  while (sourceY < canvas.height) {
-    const pageIndex = slices.length;
-    const topMarginMm = pageIndex > 0 ? CONTINUATION_PAGE_TOP_MARGIN_MM : 0;
-    const usablePageHeightMm = pageHeightMm - topMarginMm - PAGE_END_EMPTY_SPACE_MM;
-    const pageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, usablePageHeightMm);
-
-    if (pageHeightPx <= 0) {
-      throw new Error('The resume preview could not be paginated.');
-    }
-
-    const remainingHeightPx = canvas.height - sourceY;
-    if (remainingHeightPx <= pageHeightPx) {
-      slices.push({ sourceY, heightPx: remainingHeightPx, topMarginMm });
-      break;
-    }
-
-    const idealEndY = sourceY + pageHeightPx;
-    const minEndY = sourceY + Math.floor(pageHeightPx * MIN_PDF_PAGE_FILL_RATIO);
-    const guardPx = getPdfPageHeightPx(canvas.width, pageWidthMm, JOB_BLOCK_START_GUARD_MM);
-    const blockCutY = findSafeCutBeforeBlocks(options.blockRanges || [], minEndY, idealEndY, pageHeightPx, guardPx);
-    const quietCutY = blockCutY
-      ?? findDomSafeCut([...(options.blockRanges || []), ...(options.textRanges || [])], minEndY, idealEndY)
-      ?? findQuietHorizontalCut(canvas, minEndY, idealEndY);
-    const cutY = quietCutY && quietCutY > sourceY ? quietCutY : idealEndY;
-
-    slices.push({ sourceY, heightPx: cutY - sourceY, topMarginMm });
-    sourceY = cutY;
-  }
-
-  return slices;
-}
-
-function addTemplateBackgroundToPage(
-  context: CanvasRenderingContext2D,
-  templateId: string | undefined,
-  pageWidthPx: number,
-  pageHeightPx: number
-): void {
-  context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, pageWidthPx, pageHeightPx);
-
-  if (templateId === 'modern_tech') {
-    context.fillStyle = MODERN_TECH_SIDEBAR_COLOR;
-    context.fillRect(0, 0, Math.round(pageWidthPx * MODERN_TECH_SIDEBAR_RATIO), pageHeightPx);
-  }
-}
-
-function addCanvasToPdfPages(
-  pdf: any,
-  canvas: HTMLCanvasElement,
-  pageWidthMm: number,
-  pageHeightMm: number,
-  options: { templateId?: string; blockRanges?: VerticalRange[]; textRanges?: VerticalRange[] } = {}
-): void {
-  const pageSlices = createPdfPageSlices(canvas, pageWidthMm, pageHeightMm, {
-    blockRanges: options.blockRanges,
-    textRanges: options.textRanges,
-  });
-  const fullPageHeightPx = getPdfPageHeightPx(canvas.width, pageWidthMm, pageHeightMm);
-
-  if (fullPageHeightPx <= 0) {
-    throw new Error('The resume preview could not be paginated.');
-  }
-
-  pageSlices.forEach(({ sourceY, heightPx, topMarginMm }, pageIndex) => {
-    const pageCanvas = document.createElement('canvas');
-    pageCanvas.width = canvas.width;
-    pageCanvas.height = fullPageHeightPx;
-
-    const context = pageCanvas.getContext('2d');
-    if (!context) {
-      throw new Error('The resume PDF page could not be prepared.');
-    }
-
-    const topMarginPx = Math.round((canvas.width * topMarginMm) / pageWidthMm);
-    addTemplateBackgroundToPage(context, options.templateId, pageCanvas.width, pageCanvas.height);
-    if (options.templateId === 'modern_tech' && pageIndex > 0) {
-      const sidebarWidthPx = Math.round(canvas.width * MODERN_TECH_SIDEBAR_RATIO);
-      context.drawImage(
-        canvas,
-        sidebarWidthPx,
-        sourceY,
-        canvas.width - sidebarWidthPx,
-        heightPx,
-        sidebarWidthPx,
-        topMarginPx,
-        canvas.width - sidebarWidthPx,
-        heightPx
-      );
-    } else {
-      context.drawImage(
-        canvas,
-        0,
-        sourceY,
-        canvas.width,
-        heightPx,
-        0,
-        topMarginPx,
-        canvas.width,
-        heightPx
-      );
-    }
-    const imageData = pageCanvas.toDataURL('image/jpeg', 0.98);
-
-    if (pageIndex > 0) {
-      pdf.addPage();
-    }
-
-    pdf.addImage(imageData, 'JPEG', 0, 0, pageWidthMm, pageHeightMm);
-  });
-}
-
 const ResumeInput: React.FC<ResumeInputProps> = ({ 
   onImport,
   onTemplateChange,
   onNewResume,
   onDraftChange,
+  onWorkspaceChange,
+  onSaved,
   isLoading, 
   role, 
   userPlan, 
@@ -679,7 +343,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
-  const resumeExportRef = useRef<HTMLDivElement>(null);
+  // Parent echoes can arrive after a newer edit; none should rehydrate stale fields.
+  const emittedWorkspaceDataRef = useRef(new WeakSet<object>());
+  const draftGenerationRef = useRef(0);
+  const [draftStatus, setDraftStatus] = useState('');
   
   // Saved resume (library) state
   const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
@@ -720,6 +387,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
   // Handle Prefilled Data (e.g. from Import)
   useEffect(() => {
+    if (prefilledData && emittedWorkspaceDataRef.current.has(prefilledData)) return;
     if (prefilledData) {
       setTargetRole(prefilledData.targetRole || '');
       setJobDescription(prefilledData.jobDescription || '');
@@ -929,7 +597,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/heic'];
+      const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
       if (!validTypes.includes(file.type)) {
         alert("Please upload a valid image file.");
         return;
@@ -1009,7 +677,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       }
 
       if (field === 'postalCode') {
-        return { ...prev, postalCode: value.replace(/\D/g, '').slice(0, 5) };
+        return { ...prev, postalCode: value.slice(0, 20) };
       }
 
       return { ...prev, [field]: value };
@@ -1027,79 +695,13 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
   };
 
   const handleDownloadPdf = async () => {
-    const exportNode = resumeExportRef.current;
-    if (!exportNode) {
-      setPdfMsg('Resume preview is still loading. Try again in a moment.');
-      return;
-    }
-
     setIsDownloadingPdf(true);
     setPdfMsg(null);
-
-    const resumePage = exportNode.querySelector<HTMLElement>('.resume-page');
-    const previousInlineStyle = resumePage?.getAttribute('style') || '';
-
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
-
-      if (resumePage) {
-        resumePage.style.boxShadow = 'none';
-        resumePage.style.margin = '0';
-        resumePage.style.transform = 'none';
-        resumePage.style.width = '210mm';
-        resumePage.style.maxWidth = '210mm';
-        resumePage.style.minHeight = '297mm';
-      }
-
-      await waitForImages(exportNode);
-      const keepTogetherRanges = collectBlockRanges(exportNode);
-      const textLineRanges = collectTextLineRanges(exportNode);
-      const exportWidth = Math.ceil(Math.max(
-        exportNode.scrollWidth,
-        resumePage?.scrollWidth || 0,
-        exportNode.getBoundingClientRect().width
-      ));
-      const exportHeight = Math.ceil(Math.max(
-        exportNode.scrollHeight,
-        resumePage?.scrollHeight || 0,
-        exportNode.getBoundingClientRect().height
-      ));
-
-      const canvas = await html2canvas(exportNode, {
-        backgroundColor: '#ffffff',
-        scale: Math.max(2, window.devicePixelRatio || 1),
-        useCORS: true,
-        logging: false,
-        width: exportWidth,
-        height: exportHeight,
-        windowWidth: exportWidth,
-        windowHeight: exportHeight,
-      });
-
-      if (!canvas.width || !canvas.height) {
-        throw new Error('The resume preview could not be captured.');
-      }
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const canvasScale = canvas.width / exportWidth;
-      addCanvasToPdfPages(pdf, canvas, pageWidth, pageHeight, {
-        templateId: selectedTemplateId,
-        blockRanges: scaleVerticalRanges(keepTogetherRanges, canvasScale),
-        textRanges: scaleVerticalRanges(textLineRanges, canvasScale),
-      });
-
-      pdf.save(`${slugifyFilename(computeResumeTitle({ role, plan: userPlan, targetRole, personalDetails }))}.pdf`);
-    } catch (err: any) {
-      setPdfMsg(err?.message || 'Could not generate the resume PDF.');
+      await downloadResumeFile(currentData, computeResumeTitle(currentData), 'pdf');
+    } catch (error: any) {
+      setPdfMsg(error?.message || 'PDF export failed. Please retry.');
     } finally {
-      if (resumePage) {
-        resumePage.setAttribute('style', previousInlineStyle);
-      }
       setIsDownloadingPdf(false);
     }
   };
@@ -1171,7 +773,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
     if (!selectedTemplateId) missing.push('Template');
 
-    if (hasText(personalDetails.postalCode) && !/^\d{5}$/.test(personalDetails.postalCode)) {
+    if (personalDetails.country === 'United States' && hasText(personalDetails.postalCode) && !/^\d{5}(-\d{4})?$/.test(personalDetails.postalCode)) {
       missing.push('5-digit zip code');
     }
 
@@ -1282,8 +884,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
       if (!savedResumeId) {
         const res = await saveResume({ templateId: selectedTemplateId, title, content: payload });
         setSavedResumeId(res.id);
+        onSaved?.(res.id, title, payload);
       } else {
         await updateResume(savedResumeId, { templateId: selectedTemplateId, title, content: payload });
+        onSaved?.(savedResumeId, title, payload);
       }
       setSaveMsg('Saved');
       window.setTimeout(() => setSaveMsg(null), 2500);
@@ -1341,19 +945,23 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
   // Autosave workspace draft while editing (debounced)
   useEffect(() => {
-    if (!onDraftChange) return;
     if (activeTab !== 'create') return;
     if (isLoading) return;
+    const draft = { ...currentData, profileImageData: profileImageUrl ? undefined : legacyProfileImageData, templateId: selectedTemplateId };
+    emittedWorkspaceDataRef.current.add(draft);
+    onWorkspaceChange?.(draft);
+    if (!onDraftChange) return;
+    const generation = ++draftGenerationRef.current;
+    setDraftStatus('Unsaved draft');
 
-    const t = window.setTimeout(() => {
+    const t = window.setTimeout(async () => {
+      setDraftStatus('Saving draft...');
       try {
-        onDraftChange({
-          ...currentData,
-          profileImageData: profileImageUrl ? undefined : legacyProfileImageData,
-          templateId: selectedTemplateId,
-        });
-      } catch {
-        // ignore autosave errors at this layer
+        await onDraftChange(draft);
+        if (generation === draftGenerationRef.current) setDraftStatus('Draft saved');
+      } catch (error: any) {
+        if (generation === draftGenerationRef.current) setDraftStatus('Draft not saved');
+        setSaveMsg(error?.message ? `Draft not saved: ${error.message}` : 'Draft not saved. Use Save Resume to retry.');
       }
     }, 1200);
 
@@ -1361,10 +969,12 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeTab,
+    savedResumeId,
     isLoading,
     selectedTemplateId,
     targetRole,
     jobDescription,
+    jobUrl,
     preferences,
     profileImageUrl,
     profilePhotoName,
@@ -1382,6 +992,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
 
   return (
     <div className="relative space-y-4">
+      {draftStatus && <p aria-live="polite" className="text-xs text-slate-600">{draftStatus}</p>}
       <div className="no-print flex justify-center lg:justify-end">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
           {[
@@ -1426,13 +1037,14 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
              >
               Import File
              </button>
+             <button type="button" onClick={() => setActiveTab('cover_letter')} className={`flex-1 whitespace-nowrap rounded px-3 py-2 text-xs font-semibold ${activeTab === 'cover_letter' ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>Cover Letter</button>
           </div>
 
           <div className="relative z-20 w-full sm:w-auto sm:flex-shrink-0">
              <button 
                 type="button"
                 onClick={() => setShowTemplateSelector(!showTemplateSelector)}
-                className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-slate-200 hidden sm:flex hover:border-blue-300 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 transition-colors"
               >
                 {activeTemplate ? (
                     <>
@@ -1645,10 +1257,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                                className="w-full bg-[#f7f9fa] p-2 border border-slate-300 rounded mt-1 text-sm"
                                placeholder="e.g. 94105"
                                autoComplete="postal-code"
-                               inputMode="numeric"
-                               maxLength={5}
-                               pattern="\d{5}"
-                               title="Enter a 5-digit zip code"
+                               maxLength={20}
                              />
                          </div>
                       </div>
@@ -2066,6 +1675,7 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
                <button 
                  type="button"
                  onClick={handleDownloadPdf}
+                 title="Download an ATS-oriented selectable-text PDF"
                  disabled={isDownloadingPdf}
                  className={`bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 transition-colors ${isDownloadingPdf ? 'opacity-70 cursor-not-allowed' : 'hover:bg-slate-700'}`}
                >
@@ -2086,23 +1696,10 @@ const ResumeInput: React.FC<ResumeInputProps> = ({
             </div>
 
             <div className="mt-4 text-[10px] text-slate-400 text-center max-w-md flex-shrink-0">
-               {pdfMsg || 'Tip: This preview scrolls independently. The downloaded PDF is generated from the full-size A4 resume.'}
+                {pdfMsg}
             </div>
          </div>
          
-         {/* Full-size export target for client-side PDF generation. It is not displayed or printed. */}
-         <div
-            ref={resumeExportRef}
-            aria-hidden="true"
-            className="absolute top-0 bg-white pointer-events-none overflow-visible"
-            style={{ left: '-10000px', width: '210mm', minHeight: '297mm', height: 'auto', overflow: 'visible' }}
-         >
-            {isResumeViewerEmpty ? (
-              <EmptyResumePreview />
-            ) : (
-              <LivePreview data={currentData} user={user} templateId={selectedTemplateId} />
-            )}
-         </div>
       </div>
       )}
     {showNewResumeConfirm && (

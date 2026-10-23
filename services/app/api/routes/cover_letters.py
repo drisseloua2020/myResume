@@ -292,21 +292,11 @@ def _infer_job_title(job_description: str, fallback_url: str | None = None) -> s
 
 def _fetch_job_description_from_url(job_url: str) -> tuple[str, str]:
     clean_url = _validate_job_url(job_url)
+    from app.services.safe_fetch import fetch_public_text
     try:
-        response = httpx.get(
-            clean_url,
-            follow_redirects=True,
-            timeout=10.0,
-            headers={"User-Agent": "ResumeForgeBot/1.0 (+https://resumeforge.local)"},
-        )
-    except httpx.RequestError as exc:
+        raw, content_type = fetch_public_text(clean_url, MAX_JOB_SOURCE_CHARS)
+    except (OSError, ValueError) as exc:
         raise ValueError(JOB_URL_ERROR) from exc
-
-    if response.status_code >= 400:
-        raise ValueError(JOB_URL_ERROR)
-
-    content_type = response.headers.get("content-type", "").lower()
-    raw = response.text[:MAX_JOB_SOURCE_CHARS]
     if "html" in content_type or "<html" in raw[:1000].lower():
         text = _html_to_text(raw)
     else:
@@ -350,62 +340,8 @@ def _pdf_escape(value: str) -> str:
 
 
 def _build_cover_letter_pdf(title: str, body: str) -> bytes:
-    body_lines: list[str] = []
-    for paragraph in (body or "").splitlines():
-        if not paragraph.strip():
-            body_lines.append("")
-            continue
-        body_lines.extend(textwrap.wrap(paragraph.strip(), width=88) or [""])
-
-    lines = [title.strip() or "Cover Letter", ""] + body_lines
-    max_lines_per_page = 48
-    pages = [lines[index:index + max_lines_per_page] for index in range(0, len(lines), max_lines_per_page)] or [[]]
-
-    objects: list[bytes] = []
-
-    def add_object(content: bytes) -> int:
-        objects.append(content)
-        return len(objects)
-
-    add_object(b"<< /Type /Catalog /Pages 2 0 R >>")
-    add_object(b"")
-    add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-
-    page_refs: list[str] = []
-    for page_lines in pages:
-        commands: list[str] = []
-        y = 790
-        for index, line in enumerate(page_lines):
-            size = 16 if index == 0 else 11
-            line_height = 24 if index == 0 else 15
-            commands.append(f"BT /F1 {size} Tf 1 0 0 1 54 {y} Tm ({_pdf_escape(line)}) Tj ET")
-            y -= line_height
-        stream = "\n".join(commands).encode("latin-1", errors="replace")
-        content_object = add_object(b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream")
-        page_object = add_object(
-            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_object} 0 R >>".encode("ascii")
-        )
-        page_refs.append(f"{page_object} 0 R")
-
-    objects[1] = f"<< /Type /Pages /Kids [{' '.join(page_refs)}] /Count {len(page_refs)} >>".encode("ascii")
-
-    pdf = bytearray(b"%PDF-1.4\n")
-    offsets = [0]
-    for number, content in enumerate(objects, start=1):
-        offsets.append(len(pdf))
-        pdf.extend(f"{number} 0 obj\n".encode("ascii"))
-        pdf.extend(content)
-        pdf.extend(b"\nendobj\n")
-
-    xref_offset = len(pdf)
-    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-    pdf.extend(b"0000000000 65535 f \n")
-    for offset in offsets[1:]:
-        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-    pdf.extend(
-        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii")
-    )
-    return bytes(pdf)
+    from app.services.pdf_export import text_pdf
+    return text_pdf(f"{title}\n\n{body}", title)
 
 
 def _resume_highlights(resume_context) -> list[str]:

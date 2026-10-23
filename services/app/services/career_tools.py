@@ -177,10 +177,12 @@ def resume_to_text(resume: dict[str, Any], *, redact_pii: bool = False) -> str:
     if name:
         lines.append("[REDACTED NAME]" if redact_pii else name)
     contact = []
-    for key, label in (("email", "Email"), ("phone", "Phone"), ("links", "Links")):
+    if resume.get("targetRole"):
+        lines.append(_clean(resume.get("targetRole")))
+    for key, label in (("email", "Email"), ("phone", "Phone"), ("links", "Links"), ("address", "Address"), ("city", "City"), ("state", "State"), ("postalCode", "Postal code"), ("country", "Country")):
         value = _clean(personal.get(key))
         if value:
-            contact.append(f"{label}: {'[REDACTED]' if redact_pii and key in {'email', 'phone'} else value}")
+            contact.append(f"{label}: {'[REDACTED]' if redact_pii else value}")
     if contact:
         lines.append(" | ".join(contact))
     if _clean(personal.get("summary")):
@@ -210,6 +212,11 @@ def resume_to_text(resume: dict[str, Any], *, redact_pii: bool = False) -> str:
                 line = " - ".join(part for part in [_clean(item.get("degree")), _clean(item.get("school")), _clean(item.get("location")), _clean(item.get("dates"))] if part)
                 if line:
                     lines.append(line)
+    if resume.get("certificationItems"):
+        lines.extend(["", "CERTIFICATIONS"])
+        for item in resume.get("certificationItems") or []:
+            if isinstance(item, dict):
+                lines.append(" - ".join(_clean(item.get(key)) for key in ("name", "issuer", "date") if _clean(item.get(key))))
     if resume.get("additionalSections"):
         for item in resume.get("additionalSections") or []:
             if isinstance(item, dict):
@@ -715,53 +722,23 @@ def _pdf_escape(text: str) -> str:
 
 
 def _pdf_base64(text: str) -> str:
-    objects: list[bytes] = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    ]
-    page_refs: list[str] = []
-    for page_lines in [text.splitlines()[i:i + 45] for i in range(0, len(text.splitlines()) or 1, 45)]:
-        commands = ["BT /F1 10 Tf 1 0 0 1 54 790 Tm"]
-        y = 790
-        for raw in page_lines:
-            for line in textwrap.wrap(raw, width=92) or [""]:
-                commands.append(f"1 0 0 1 54 {y} Tm ({_pdf_escape(line)}) Tj")
-                y -= 15
-        commands.append("ET")
-        stream = "\n".join(commands).encode("latin-1", errors="replace")
-        objects.append(b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream")
-        content_object = len(objects)
-        objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_object} 0 R >>".encode("ascii"))
-        page_refs.append(f"{len(objects)} 0 R")
-    objects[1] = f"<< /Type /Pages /Kids [{' '.join(page_refs)}] /Count {len(page_refs)} >>".encode("ascii")
-    pdf = bytearray(b"%PDF-1.4\n")
-    offsets = [0]
-    for number, obj in enumerate(objects, start=1):
-        offsets.append(len(pdf))
-        pdf.extend(f"{number} 0 obj\n".encode("ascii"))
-        pdf.extend(obj)
-        pdf.extend(b"\nendobj\n")
-    xref = len(pdf)
-    pdf.extend(f"xref\n0 {len(objects)+1}\n0000000000 65535 f \n".encode("ascii"))
-    for offset in offsets[1:]:
-        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-    pdf.extend(f"trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode("ascii"))
-    return base64.b64encode(bytes(pdf)).decode("ascii")
+    from app.services.pdf_export import text_pdf
+    return base64.b64encode(text_pdf(text)).decode("ascii")
 
 
-def create_resume_exports(resume: dict[str, Any], title: str | None = None, public_url: str | None = None, *, redact_pii: bool = False) -> dict[str, Any]:
+def create_resume_exports(resume: dict[str, Any], title: str | None = None, public_url: str | None = None, *, redact_pii: bool = False, format: str = "all") -> dict[str, Any]:
+    from app.services.pdf_export import validate_pdf
     text = resume_to_text(resume, redact_pii=redact_pii)
     if public_url:
         text = f"{text}\n\nPUBLIC PROFILE\n{public_url}".strip()
-    pdf = _pdf_base64(text)
+    pdf = _pdf_base64(text) if format in {"all", "pdf"} else None
     return {
         "title": title or "resume",
         "txtBase64": base64.b64encode(text.encode("utf-8")).decode("ascii"),
         "atsText": text,
         "docxBase64": _docx_base64(text),
         "pdfBase64": pdf,
-        "pdfValidation": {"selectableText": True, "imageOnly": False, "method": "Generated with PDF text operators"},
+        "pdfValidation": validate_pdf(base64.b64decode(pdf)) if pdf else {"selectableText": False, "method": "PDF not requested"},
         "qrPayload": public_url or "",
         "redactPii": redact_pii,
     }
@@ -781,19 +758,18 @@ def import_linkedin_profile(profile_text: str) -> dict[str, Any]:
         "skillItems": [{"id": "linkedin-skills", "category": "LinkedIn Skills", "items": ", ".join(normalize_skills(skills)["normalized"])}] if skills else [],
         "experienceItems": [],
         "educationItems": [],
-        "additionalSections": [{"id": "linkedin-import", "title": "LinkedIn Import Notes", "items": "\n".join(lines[2:20])}],
+        "additionalSections": [{"id": "linkedin-import", "title": "LinkedIn Import Notes", "items": "\n".join(lines[2:])}],
     }
     return {"resume": resume, "checklist": linkedin_checklist(resume), "warnings": ["Review imported text before saving. LinkedIn import is deterministic and text-based."]}
 
 
 def feature_catalog() -> list[dict[str, Any]]:
     groups = {
-        "ATS and Resume Quality": ["ATS score", "Missing keyword detector", "Section-level match report", "Bullet quality checker", "Resume risk scanner", "Resume completeness score", "Accessibility checks"],
-        "Documents and Versions": ["Base resume and tailored versions", "Version history and restore", "Bullet toggles per job", "Achievement library", "PDF/DOCX/TXT/ATS text exports", "Selectable PDF validation", "Multi-language version workflow", "Country-specific formats"],
-        "Job Search CRM": ["Job tracker Kanban", "Application reminders", "Analytics", "Contact CRM", "Application packets", "Saved repeated answers", "CSV import/export plan"],
-        "Profile and Sharing": ["LinkedIn import", "LinkedIn optimizer checklist", "Personal resume website shares", "QR payloads", "PII redaction", "Data export/delete controls"],
-        "Business and Admin": ["Admin dashboards", "Review comments workflow", "Career-coach workflow", "University mode", "Team templates", "White-label configuration", "Parser API", "Webhooks", "Template marketplace", "Professional review add-on", "Resume audit purchase", "Subscription entitlements", "Referral program", "SEO content hub"],
-        "Browser Extension": ["Job clipper manifest plan", "Autofill profile schema", "Supported-sites mapping plan"],
+        "ATS and Resume Quality": ["ATS score", "Missing keyword detector", "Section-level match report", "Bullet quality checker", "Resume risk scanner", "Resume completeness score"],
+        "Documents and Versions": ["Base resume and tailored versions", "Version history and restore", "Achievement library", "PDF/DOCX/TXT/ATS text exports", "Selectable PDF validation"],
+        "Job Search CRM": ["Job tracker", "Analytics", "Application packet snapshots", "Human review decisions"],
+        "Profile and Sharing": ["LinkedIn text import", "LinkedIn optimizer checklist", "Expiring text shares", "Contact-field redaction", "Account export and deletion"],
+        "Business and Admin": ["Admin dashboards", "Account status management", "Support messages", "Parser API", "Source catalog visibility"],
     }
     features = []
     for group, names in groups.items():

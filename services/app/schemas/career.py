@@ -35,6 +35,7 @@ class ExportResumeIn(StrictModel):
     title: str | None = Field(default="resume", max_length=200)
     publicProfileUrl: str | None = Field(default=None, max_length=2000)
     redactPii: bool = False
+    format: Literal["all", "pdf", "txt", "docx"] = "all"
 
 
 class ExportResumeOut(StrictModel):
@@ -78,6 +79,7 @@ class GenerateCareerProfileAnalysisIn(StrictModel):
 
 
 class CareerProfileAnalysisOut(StrictModel):
+    stale: bool = False
     id: str
     userId: str
     onboardingProfileId: str | None
@@ -188,7 +190,7 @@ class AchievementsEnvelope(StrictModel):
 
 
 class CreateResumeVersionIn(StrictModel):
-    resumeId: str | None = Field(default=None, max_length=64)
+    resumeId: str = Field(min_length=1, max_length=64)
     jobApplicationId: str | None = Field(default=None, max_length=64)
     kind: str = Field(default="base", max_length=40)
     title: str = Field(min_length=1, max_length=200)

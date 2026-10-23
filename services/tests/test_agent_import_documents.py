@@ -13,7 +13,7 @@ PDF_MIME = "application/pdf"
 def _signup(client) -> str:
     response = client.post(
         "/auth/signup",
-        json={"name": "Import User", "email": "import@example.com", "password": "secret123", "plan": "free"},
+        json={"name": "Import User", "email": "import@example.com", "password": "secure-password-123", "plan": "free"},
     )
     assert response.status_code == 201, response.text
     return response.json()["token"]

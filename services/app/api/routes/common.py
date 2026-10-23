@@ -13,7 +13,7 @@ def format_paid_amount(value: Decimal | float | int | str | None) -> str:
     return f"${amount:.2f}"
 
 def to_user_out(user) -> UserOut:
-    return UserOut(id=user.id, name=user.name, email=user.email, role=user.role, plan=user.plan, status=user.status, createdAt=user.created_at, paidAmount=format_paid_amount(user.paid_amount), authProvider=user.auth_provider)
+    return UserOut(id=user.id, hasPassword=bool(user.password_hash), name=user.name, email=user.email, role=user.role, plan=user.plan, status=user.status, createdAt=user.created_at, paidAmount=format_paid_amount(user.paid_amount), authProvider=user.auth_provider)
 
 def to_activity_log_out(log) -> ActivityLogOut:
     return ActivityLogOut(id=log.id, userId=log.user_id, userName=log.user_name, action=log.action, details=log.details, timestamp=log.timestamp)
@@ -31,7 +31,7 @@ def to_resume_out(resume) -> ResumeOut:
     return ResumeOut(id=resume.id, templateId=resume.template_id, title=resume.title, content=resume.content, createdAt=resume.created_at, updatedAt=resume.updated_at)
 
 def to_resume_draft_out(draft) -> ResumeDraftOut:
-    return ResumeDraftOut(id=draft.id, templateId=draft.template_id, content=draft.content, createdAt=draft.created_at, updatedAt=draft.updated_at)
+    return ResumeDraftOut(id=draft.id, resumeId=draft.resume_id, templateId=draft.template_id, content=draft.content, createdAt=draft.created_at, updatedAt=draft.updated_at)
 
 def to_cover_letter_out(cover_letter) -> CoverLetterOut:
     content = cover_letter.content

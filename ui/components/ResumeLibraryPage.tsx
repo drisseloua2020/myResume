@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AVAILABLE_TEMPLATES } from '../constants';
 import { SubscriptionPlan, User, UserRole } from '../types';
 import { deleteResume, getResume, listResumes, ResumeListItem } from '../services/resumeService';
+import { downloadResumeFile } from '../services/exportService';
 import type { ResumeRecord } from '../services/resumeService';
 import ConfirmDeleteResumeModal from './ConfirmDeleteResumeModal';
 import LivePreview from './LivePreview';
@@ -121,45 +122,13 @@ export default function ResumeLibraryPage({ onLoadResume, onResumeDeleted, user 
   }
 
   async function handleDownloadPdf() {
-    const node = exportRef.current;
-    if (!node || !selectedResume) return;
-
+    if (!selectedResume) return;
     setDownloadingPdf(true);
     setError(null);
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
-
-      const canvas = await html2canvas(node, {
-        backgroundColor: '#ffffff',
-        scale: Math.max(2, window.devicePixelRatio || 1),
-        useCORS: true,
-        logging: false,
-      });
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imageHeight = (canvas.height * pageWidth) / canvas.width;
-      const imageData = canvas.toDataURL('image/png');
-
-      let remainingHeight = imageHeight;
-      let y = 0;
-      pdf.addImage(imageData, 'PNG', 0, y, pageWidth, imageHeight);
-      remainingHeight -= pageHeight;
-
-      while (remainingHeight > 0) {
-        y -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imageData, 'PNG', 0, y, pageWidth, imageHeight);
-        remainingHeight -= pageHeight;
-      }
-
-      pdf.save(`${safeFilename(selectedResume.title)}.pdf`);
-    } catch (e: any) {
-      setError(e?.message || 'PDF download failed');
+      await downloadResumeFile(selectedResume.content, selectedResume.title, 'pdf');
+    } catch (error: any) {
+      setError(error?.message || 'PDF download failed');
     } finally {
       setDownloadingPdf(false);
     }

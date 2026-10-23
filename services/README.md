@@ -1,6 +1,6 @@
-# ResumeForge Services - Production Python Port
+# ResumeForge Services
 
-This is a second-pass FastAPI conversion of the original TypeScript services. It upgrades the first port with SQLAlchemy 2.0 ORM models, Alembic migrations, stricter Pydantic v2 schemas, pytest coverage, and a cleaner service layout.
+FastAPI backend using Python 3.13, SQLAlchemy, Alembic and Pydantic. See the [implementation status](../docs/implementation-status.md) and [production runbook](../docs/production-runbook.md) before deployment. Unconfigured integrations remain unavailable.
 
 ## Quick start
 
@@ -8,7 +8,7 @@ This is a second-pass FastAPI conversion of the original TypeScript services. It
 cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --require-hashes -r requirements-dev.lock
 alembic upgrade head
 uvicorn app.main:app --reload --port 3000
 ```
@@ -16,8 +16,10 @@ uvicorn app.main:app --reload --port 3000
 ## Run tests
 
 ```bash
-pytest
+python -m pytest -q
 ```
+
+Production images install only `requirements.lock` with hash verification. The development lock adds test dependencies. `/health` is liveness; `/ready` also checks database connectivity and migration revision. Never run the destructive test fixtures against an application database; the fixture enforces an isolated SQLite target.
 
 ## SSO setup
 
@@ -48,8 +50,10 @@ Use your deployed API origin instead of `http://localhost:3000` in production, a
 For Render, do not add local development ports to HTTPS public service URLs. Use the browser-visible origins, and keep the real values in Render environment variables or a private runbook:
 
 ```bash
-# UI static site / web service
+# UI static site (build time)
 VITE_API_URL=<API_ORIGIN>
+# UI container (runtime; /api uses the Nginx proxy)
+API_PUBLIC_URL=<API_ORIGIN>
 
 # Backend web service
 OAUTH_FRONTEND_URL=<FRONTEND_ORIGIN>
