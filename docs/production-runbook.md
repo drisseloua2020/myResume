@@ -65,6 +65,26 @@ Run migrations as a single pre-deploy job using the migration credential. Start 
 
 The current required revision is `0007_mock_provider_operations`. Migration `0005_sessions_and_drafts` is forward-only because merging distinct drafts would lose data. Rollback means redeploying a compatible application image or restoring a verified backup into a replacement database, not dropping columns on live data.
 
+## Login Fails After Upgrade
+
+Distinguish a failed preflight from a failed login response. A successful `OPTIONS /auth/login` followed by a 500 POST with no CORS header is a server exception being hidden by the browser, not another missing origin. CORS now wraps the API's server-error middleware too. Database exceptions return a sanitized 503 with request ID and CORS headers, without logging SQL parameters or connection credentials.
+
+From the API's own working directory in the hosting shell, run the read-only diagnostic:
+
+```bash
+python -m app.db.diagnostics --auth-summary
+```
+
+This reports connectivity, migration revision, missing user columns and aggregate password-format/status counts. It never changes the schema, passwords or account records, and does not print account identifiers, credential values or the database URL. It exits nonzero when connectivity/authentication-schema checks fail. It is a diagnostic aid, not a complete schema or data-integrity audit.
+
+- If `connection` is unavailable, verify the API's database URL, service availability, network access, TLS and database credentials in the hosting secret store. An internal database hostname might work from the API host but not a developer workstation.
+- If `missingUserColumns` includes `token_version`, migration `0005_sessions_and_drafts` has not been applied correctly. The redesigned ORM requires this column even before a password can be checked.
+- If a tracked older revision is reported, take a verified backup and run `python -m alembic upgrade head` as a separate pre-deploy job using the migration role. Restart the API and require `/ready` to return 200 before opening the release to users.
+- If tables already exist but migration metadata is absent, do not blindly stamp `head` or recreate the users table. Compare the actual schema with the baseline and plan a reviewed adoption/migration first.
+- After connectivity and schema are healthy, investigate any remaining 401 separately. `other` password-format counts are not proof of plaintext storage; inspect formats securely before choosing a compatibility migration. Do not submit stored hashes as passwords or disable verification.
+
+The Render deploy-hook workflow requests a deployment but does not itself apply database migrations or prove readiness. Configure the migration pre-deploy step and readiness checks in the API service. Do not fix this failure by deleting/re-registering existing users.
+
 ## Release Gates
 
 - Backend tests, UI tests, TypeScript check, production build and dependency audits must pass on the locked dependencies.

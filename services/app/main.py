@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.admin import router as admin_router
@@ -15,7 +15,8 @@ from app.api.routes.profile import router as profile_router
 from app.api.routes.providers import router as providers_router
 from app.api.routes.resumes import router as resumes_router
 from app.api.routes.uploads import router as uploads_router
-from app.core.config import settings
+from app.core.config import DATABASE_SCHEMA_REVISION, settings
+from app.db.diagnostics import database_error_code
 from app.db.session import configure_engine, dispose_engine, get_engine
 from app.core.middleware import RequestPolicyMiddleware
 from app.schemas.common import HealthResponse
@@ -28,13 +29,30 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         dispose_engine()
-app = FastAPI(title="ResumeForge API - Python", version="2.0.0", lifespan=lifespan)
+class ApiApplication(FastAPI):
+    def build_middleware_stack(self):
+        # CORS must also wrap server errors, not only successful route responses.
+        return CORSMiddleware(super().build_middleware_stack(), allow_origins=settings.allowed_origins,
+                              allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+app = ApiApplication(title="ResumeForge API - Python", version="2.0.0", lifespan=lifespan)
 app.add_middleware(RequestPolicyMiddleware)
-app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.exception_handler(IntegrityError)
 async def record_conflict(_, __):
     return JSONResponse({"detail": "Record conflict. Reload and retry."}, status_code=409)
+
+@app.exception_handler(SQLAlchemyError)
+async def database_failure(request, error):
+    import logging
+    code = database_error_code(error)
+    logging.getLogger("myresume.database").error(
+        "database_request_failed request_id=%s error_type=%s sqlstate=%s",
+        getattr(request.state, "request_id", "unavailable"), type(error).__name__, code or "unknown")
+    detail = "Database temporarily unavailable. Please try again later."
+    if code in {"42703", "42P01"}:
+        detail = "Database schema is not up to date. An administrator must apply the database migrations."
+    return JSONResponse({"detail": detail}, status_code=503)
 @app.get('/health', response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status='ok')
@@ -45,7 +63,7 @@ def ready():
         with get_engine().connect() as connection:
             connection.execute(text("SELECT 1"))
             revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            if revision != "0007_mock_provider_operations":
+            if revision != DATABASE_SCHEMA_REVISION:
                 raise RuntimeError("Pending migrations")
     except Exception as exc:
         raise HTTPException(503, "Database unavailable or migrations pending") from exc
