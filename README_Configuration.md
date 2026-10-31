@@ -116,6 +116,8 @@ Invoke-WebRequest -Method Options -Uri 'https://api.myresumes.net/auth/login' -H
 
 Expect 200 and `Access-Control-Allow-Origin` matching the requested origin. Do not add `*`, remove authentication, or reset passwords to work around a preflight failure.
 
+If preflight succeeds but the login POST returns 500 without that header, the browser is masking a backend exception. Check API logs and `/ready`, then run `python -m app.db.diagnostics --auth-summary` in the API hosting shell. See [upgrade/login recovery](docs/production-runbook.md#login-fails-after-upgrade) for connection failures, missing `users.token_version` and safe migration steps. Never drop/recreate existing users to resolve this.
+
 For the UI Docker image, use runtime `API_PUBLIC_URL=<API_ORIGIN>` instead. With a same-origin proxy use `API_PUBLIC_URL=/api` and `API_UPSTREAM=<PRIVATE_API_ORIGIN>`. Restart the container after changing these values; no frontend rebuild is needed. These settings are public configuration, not a place for credentials.
 
 Secrets must stay outside Git. Store these in Render environment variables or a secret manager, not in documentation:

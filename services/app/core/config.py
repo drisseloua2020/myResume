@@ -10,6 +10,7 @@ MYRESUMES_FRONTEND_ORIGINS = (
     "https://www.myresumes.net",
     "https://myresume-rrcy.onrender.com",
 )
+DATABASE_SCHEMA_REVISION = "0007_mock_provider_operations"
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

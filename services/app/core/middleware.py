@@ -20,6 +20,7 @@ class RequestPolicyMiddleware:
             return await self.app(scope, receive, send)
         started = monotonic()
         request_id = uuid4().hex
+        scope.setdefault("state", {})["request_id"] = request_id
         headers = dict(scope["headers"])
         async def reject(code, detail):
             response_headers = {"X-Request-ID": request_id, "X-Content-Type-Options": "nosniff",
