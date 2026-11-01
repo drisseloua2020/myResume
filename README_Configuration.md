@@ -4,6 +4,8 @@ This document records the production domain, DNS, Render, and Google OAuth confi
 
 Do not commit OAuth client secrets, API keys, database URLs with credentials, JWT secrets, SMTP passwords, or private Render service identifiers.
 
+Production releases must follow the [main-only deployment policy](docs/deployment-policy.md). Set both production Render services to branch `main` and disable their independent Auto-Deploy when GitHub Actions hooks control releases. Workflow guards alone cannot disable Render's branch-triggered auto-deploys.
+
 Read the [production runbook](docs/production-runbook.md) for secrets rotation, database roles, migrations, private storage, backup/restore and launch evidence. Live profile sync, billing, job discovery/submission and scheduled delivery remain disabled for the core release.
 
 ## Placeholders

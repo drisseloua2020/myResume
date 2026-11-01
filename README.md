@@ -486,7 +486,9 @@ GitHub Actions are split into reusable workflow pieces:
 - `deploy-images.yml`
 - `deploy-render.yml`
 
-The top-level `CI-CD` workflow tests pull requests and pushes to `main`, `stage`, and version tags. It includes locked backend/UI tests, TypeScript/build checks, PostgreSQL migration checks and security audits. PRs do not publish images. Only pushes to `main` invoke the production Render hooks, behind the GitHub `production` environment. Configure required environment reviewers in GitHub. Hook acceptance alone does not prove deployment; status polling, smoke checks and rollback remain operator gates.
+The top-level `CI-CD` workflow tests pull requests and pushes to `main`, `stage`, `feature_dev`, and version tags. It includes locked backend/UI tests, TypeScript/build checks, PostgreSQL migration checks and security audits. Only successful pushes to `main` can publish images or invoke production Render hooks, behind the GitHub `production` environment. Reusable workflows enforce the same restriction, and deploy requests pin the tested main commit. Configure required environment reviewers in GitHub. Hook acceptance alone does not prove deployment; status polling, smoke checks and rollback remain operator gates.
+
+Follow the [main-only deployment policy](docs/deployment-policy.md) to disable Render's independent feature-branch auto-deploys: production API/UI services must use branch `main` with Auto-Deploy off when Actions hooks control releases.
 
 Production configuration details are documented in [README_Configuration.md](README_Configuration.md), including:
 

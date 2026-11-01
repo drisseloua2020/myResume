@@ -10,6 +10,7 @@ permissions:
 jobs:
   version-images:
     name: Version UI and API Images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -45,7 +46,7 @@ jobs:
             type=ref,event=tag
             type=semver,pattern={{version}}
             type=sha,format=short,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push API image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
@@ -68,7 +69,7 @@ jobs:
             type=ref,event=tag
             type=semver,pattern={{version}}
             type=sha,format=short,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push UI image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8

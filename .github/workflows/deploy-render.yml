@@ -14,16 +14,21 @@ permissions:
 jobs:
   deployment:
     name: Deployment
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
+    concurrency:
+      group: render-production
+      cancel-in-progress: false
 
     steps:
-      - name: Deploy Backend to Render
-        env:
-          DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
-        run: curl --fail-with-body --silent --show-error --retry 2 -X POST "$DEPLOY_HOOK"
+      - name: Checkout tested main commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
 
-      - name: Deploy UI to Render
+      - name: Request production deploys for tested main commit
         env:
-          DEPLOY_HOOK: ${{ secrets.RENDER_UI_DEPLOY_HOOK }}
-        run: curl --fail-with-body --silent --show-error --retry 2 -X POST "$DEPLOY_HOOK"
+          RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+          RENDER_UI_DEPLOY_HOOK: ${{ secrets.RENDER_UI_DEPLOY_HOOK }}
+        run: python3 .github/scripts/deploy_render.py
