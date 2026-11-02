@@ -1,14 +1,14 @@
 name: CI-CD
 
 on:
-  pull_request:
   push:
-    branches: [main, stage, feature_dev]
+    branches: [main, stage]
     tags:
       - "v*.*.*"
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   setup:
@@ -32,7 +32,6 @@ jobs:
 
   version-images:
     name: Version UI and API Images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: appsec-check
     permissions:
       contents: read
@@ -42,7 +41,7 @@ jobs:
   deployment:
     name: Deployment
     needs: version-images
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref_type == 'branch'
     uses: ./.github/workflows/deploy-render.yml
     secrets:
       RENDER_API_DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}

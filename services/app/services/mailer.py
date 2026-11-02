@@ -12,14 +12,17 @@ def send_support_email(*, to: str, subject: str, text: str) -> None:
     message["Subject"] = subject
     message.set_content(text)
     if settings.smtp_secure:
-        with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=15) as server:
+        with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port) as server:
             if settings.smtp_user:
                 server.login(settings.smtp_user, settings.smtp_pass)
             server.send_message(message)
     else:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
             server.ehlo()
-            server.starttls(); server.ehlo()
+            try:
+                server.starttls(); server.ehlo()
+            except smtplib.SMTPException:
+                pass
             if settings.smtp_user:
                 server.login(settings.smtp_user, settings.smtp_pass)
             server.send_message(message)

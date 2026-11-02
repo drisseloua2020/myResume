@@ -1,7 +1,5 @@
 # MyResume Functionality Review
 
-Historical baseline review. For subsequent fixes and remaining limitations, see the [implementation status](implementation-status.md).
-
 Browser/API checks performed October 19, 2026. Source rechecked and review finalized October 22, 2026, against unchanged commit `6cd7ebc`.
 
 This complements the [production-readiness review](production-readiness-review.md). It evaluates whether user journeys work, whether controls perform their advertised actions, and whether state survives normal navigation. It does not implement fixes.

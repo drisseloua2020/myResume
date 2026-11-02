@@ -221,7 +221,7 @@ const JobsTab: React.FC<{ report: CareerProfileAnalysisReport }> = ({ report }) 
   );
 };
 
-const CareerProfileAnalysisPage: React.FC<{ resumeId?: string | null }> = ({ resumeId }) => {
+const CareerProfileAnalysisPage: React.FC = () => {
   const [analysis, setAnalysis] = useState<CareerProfileAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState<AnalysisTab>('profile');
   const [isLoading, setIsLoading] = useState(true);
@@ -237,8 +237,7 @@ const CareerProfileAnalysisPage: React.FC<{ resumeId?: string | null }> = ({ res
     setIsLoading(true);
     setError(null);
     try {
-      const saved = await getCareerProfileAnalysis();
-      setAnalysis(!resumeId || saved?.resumeId === resumeId ? saved : null);
+      setAnalysis(await getCareerProfileAnalysis());
     } catch (err: any) {
       setError(err?.message || 'Could not load your profile analysis.');
     } finally {
@@ -250,7 +249,7 @@ const CareerProfileAnalysisPage: React.FC<{ resumeId?: string | null }> = ({ res
     setIsLoading(true);
     setError(null);
     try {
-      setAnalysis(await generateCareerProfileAnalysis({ resumeId }));
+      setAnalysis(await generateCareerProfileAnalysis());
       setActiveTab('profile');
     } catch (err: any) {
       setError(err?.message || 'Could not run your profile analysis.');
@@ -298,8 +297,6 @@ const CareerProfileAnalysisPage: React.FC<{ resumeId?: string | null }> = ({ res
             <p className="mt-4 text-xs font-semibold text-slate-300">Generated {generatedAt}</p>
           )}
         </header>
-
-        {analysis?.stale && <p role="status" className="mt-4 border-l-4 border-amber-500 bg-amber-50 p-3 text-sm">This analysis is out of date. Save your resume and refresh analysis.</p>}
 
         {error && (
           <p className="mt-5 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">
