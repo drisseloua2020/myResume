@@ -16,7 +16,7 @@ from app.schemas.agent import (
     GenerateResumeIn,
     GenerateResumeOut,
 )
-from app.services.profile_sync import ensure_default_sources
+from app.services.profile_sync import create_mock_agent_updates, ensure_default_sources
 from app.services.resume_parser import (
     ResumeParseError,
     build_legacy_resume_parse_response,
@@ -52,9 +52,7 @@ def toggle_source(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found")
 
-    if not row.is_connected:
-        raise HTTPException(501, "Profile synchronization is not configured. Import profile text manually.")
-    row.is_connected = False
+    row.is_connected = not row.is_connected
     if row.is_connected:
         row.last_sync = datetime.now(timezone.utc)
 
@@ -69,6 +67,7 @@ def check(
     db: Session = Depends(get_db),
 ) -> AgentUpdatesEnvelope:
     ensure_default_sources(db, current_user.id)
+    create_mock_agent_updates(db, current_user.id)
     db.commit()
     rows = db.scalars(
         select(AgentUpdate)

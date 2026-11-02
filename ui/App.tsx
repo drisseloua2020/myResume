@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import ResumeInput from './components/ResumeInput';
@@ -24,27 +24,19 @@ import UserOnboarding, { type CareerOnboardingSubmission } from './components/Us
 import CareerBlogPage from './components/CareerBlogPage';
 import ResumeGuidePage from './components/ResumeGuidePage';
 import ResumeExamplesPage from './components/ResumeExamplesPage';
-const CareerToolkitPage = lazy(() => import('./components/CareerToolkitPage'));
-const ProviderDemoPage = lazy(() => import('./components/ProviderDemoPage'));
-import { getProviderCapabilities } from './services/providerService';
+import CareerToolkitPage from './components/CareerToolkitPage';
 import AgentReviewModal from './components/AgentReviewModal';
 import ConfirmNewResumeModal from './components/ConfirmNewResumeModal';
 import { authService } from './services/authService';
 import { setSession, clearSession, SESSION_EXPIRED_EVENT } from './services/apiClient';
 import { getOAuthBackendCallbackRedirect, isOAuthCallbackPath } from './services/oauthRedirect';
 import { agentService } from './services/agentService';
-import { saveDraft, getLatestDraft, getLatestResume, parseResumeUpload, saveResume } from './services/resumeService';
+import { saveDraft, getLatestResume, parseResumeUpload, saveResume } from './services/resumeService';
 import type { ResumeRecord } from './services/resumeService';
 import { generateCareerProfileAnalysis, getCareerOnboardingProfile, saveCareerOnboardingProfile } from './services/onboardingService';
 import { UserInputData, UserRole, User, SubscriptionPlan, AgentUpdate, ExperienceItem, EducationItem, SkillItem, AdditionalSectionItem, PersonalDetails } from './types';
 
 const IMPORT_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
-
-const resumeFingerprint = (value: object) => {
-  const { role, plan, templateId, ...content } = value as Record<string, unknown>;
-  return JSON.stringify(content, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
-    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
-};
 
 const cleanImportedText = (value: unknown): string => {
   if (value === null || value === undefined) return '';
@@ -707,24 +699,7 @@ const computeImportedResumeTitle = (content: Partial<UserInputData>): string => 
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [demoProviders, setDemoProviders] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    setDemoProviders(false);
-    if (currentUser) getProviderCapabilities().then(result => { if (alive) setDemoProviders(result.demoEnabled); }).catch(() => {});
-    return () => { alive = false; };
-  }, [currentUser?.id]);
-  const [activeTab, updateActiveTab] = useState<string>(() => new URLSearchParams(window.location.hash.slice(1)).get('view') || 'workspace');
-  const setActiveTab = (tab: string) => {
-    updateActiveTab(tab);
-    window.history.pushState({}, '', `#view=${encodeURIComponent(tab)}`);
-  };
-  useEffect(() => {
-    const syncRoute = () => updateActiveTab(new URLSearchParams(window.location.hash.slice(1)).get('view') || 'workspace');
-    window.addEventListener('popstate', syncRoute);
-    window.addEventListener('hashchange', syncRoute);
-    return () => { window.removeEventListener('popstate', syncRoute); window.removeEventListener('hashchange', syncRoute); };
-  }, []);
+  const [activeTab, setActiveTab] = useState<string>('workspace');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -740,9 +715,6 @@ const App: React.FC = () => {
   const [loadedResumeId, setLoadedResumeId] = useState<string | null>(null);
   const [loadedResumeTitle, setLoadedResumeTitle] = useState<string | null>(null);
   const initialResumeLoadUserRef = useRef<string | null>(null);
-  const passwordResetRef = useRef(new URLSearchParams(window.location.hash.slice(1)).has('resetToken'));
-  const importAttemptRef = useRef<{ signature: string; key: string } | null>(null);
-  const [importReview, setImportReview] = useState<{ warnings: string[]; confidence: Record<string, unknown> } | null>(null);
   const onboardingStateRequestRef = useRef(0);
   const emptyVisibleEditorDataRef = useRef<Partial<UserInputData>>(emptyEditorData());
   const visibleEditorData = editorData ?? emptyVisibleEditorDataRef.current;
@@ -790,11 +762,8 @@ const App: React.FC = () => {
   const [showAgentModal, setShowAgentModal] = useState<boolean>(false);
   const [showNewResumeConfirm, setShowNewResumeConfirm] = useState(false);
   const [workspaceResetKey, setWorkspaceResetKey] = useState(0);
-  const workspaceGenerationRef = useRef(workspaceResetKey);
-  workspaceGenerationRef.current = workspaceResetKey;
 
   const openResumeInWorkspace = (resume: ResumeRecord) => {
-    setImportReview(null);
     const resumeContent = resume.content && typeof resume.content === 'object' && !Array.isArray(resume.content)
       ? resume.content as Partial<UserInputData>
       : {};
@@ -851,22 +820,10 @@ const App: React.FC = () => {
         if (cancelled) return;
 
         if (latestResume) {
-          const draft = await getLatestDraft(undefined, latestResume.id);
-          if (cancelled) return;
-          const different = draft && (draft.templateId !== latestResume.templateId || resumeFingerprint(draft.content || {}) !== resumeFingerprint(latestResume.content || {}));
-          const recover = different && new Date(draft.updatedAt) > new Date(latestResume.updatedAt)
-            && window.confirm('A newer autosaved draft is available. Recover it?');
-          openResumeInWorkspace(recover ? { ...latestResume, templateId: draft.templateId, content: draft.content } : latestResume);
+          openResumeInWorkspace(latestResume);
           return;
         }
 
-        const newDraft = await getLatestDraft();
-        if (cancelled) return;
-        if (newDraft && !newDraft.resumeId && window.confirm('Recover your autosaved unsaved resume?')) {
-          setEditorData(newDraft.content);
-          setSelectedTemplateId(newDraft.templateId || undefined);
-          setWorkspaceResetKey(k => k + 1);
-        }
         setLoadedResumeId(null);
         setLoadedResumeTitle(null);
       } catch {
@@ -879,11 +836,10 @@ const App: React.FC = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, activeTab]);
+  }, [currentUser, activeTab, editorData, selectedTemplateId]);
 
   // Check for existing session on load
   useEffect(() => {
-    if (passwordResetRef.current) { clearSession(); return; }
     const backendCallbackRedirect = getOAuthBackendCallbackRedirect(window.location);
     if (backendCallbackRedirect) {
       window.location.replace(backendCallbackRedirect);
@@ -891,11 +847,10 @@ const App: React.FC = () => {
     }
 
     // OAuth callback: backend redirects to frontend with ?token=JWT
-    const params = new URLSearchParams(window.location.hash.includes('token=') ? window.location.hash.slice(1) : window.location.search);
+    const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const templateIdFromOAuth = params.get('templateId') || undefined;
     if (token) {
-      window.history.replaceState({}, document.title, window.location.pathname);
       // cache token temporarily, then refresh user
       setSession(token, { id: '', name: '', email: '', role: 'user', plan: 'free', paidAmount: '$0.00', status: 'Active' });
       authService.refreshMe()
@@ -950,8 +905,9 @@ const App: React.FC = () => {
   }, []);
 
   const checkAgentUpdates = async () => {
-    setAgentUpdates([]);
-    setShowAgentModal(false);
+    // In real world, this happens in bg, here we simulate a fetch
+    const updates = await agentService.checkForUpdates();
+    setAgentUpdates(updates);
   };
 
   const applyCareerOnboardingState = (user: User) => {
@@ -1041,15 +997,10 @@ const App: React.FC = () => {
         fileData: resumeFileData,
       }, 'Importing onboarding resume to Editor');
       await saveCareerOnboardingProfile(answers);
-      try {
-        await generateCareerProfileAnalysis({ resumeId: importedResume?.id });
-      } catch (analysisError: any) {
-        setError(`Resume and preferences saved. Analysis can be retried from Analysis: ${analysisError.message}`);
-      }
+      await generateCareerProfileAnalysis({ resumeId: importedResume?.id });
       setShowUserOnboarding(false);
       setShowCareerObjectiveReminder(false);
       setActiveTab('profile_analysis');
-      importAttemptRef.current = null;
       setGeneratorTab('create');
     } catch (err: any) {
       setUserOnboardingError(err?.message || 'Could not complete your career profile setup.');
@@ -1411,10 +1362,6 @@ const App: React.FC = () => {
 
   const importResumeFileToWorkspace = async (data: UserInputData, activityDetails = 'Importing document to Editor') => {
     if (!currentUser) return;
-    const generation = workspaceGenerationRef.current;
-    const signature = `${currentUser.id}:${data.fileData?.mimeType}:${data.fileData?.data}`;
-    if (importAttemptRef.current?.signature !== signature) importAttemptRef.current = { signature, key: crypto.randomUUID() };
-    const idempotencyKey = importAttemptRef.current.key;
 
     authService.logActivity(currentUser.id, currentUser.name, 'RESUME_PARSE', activityDetails);
     const parsedResults = await parseResumeUpload({
@@ -1434,15 +1381,11 @@ const App: React.FC = () => {
           templateId,
         };
         const importedTitle = computeImportedResumeTitle(importedContent);
-        if (workspaceGenerationRef.current !== generation) throw new Error('Workspace changed during import. Retry from the active editor.');
         const saved = await saveResume({
-          idempotencyKey,
           templateId,
           title: importedTitle,
           content: importedContent,
         });
-        if (workspaceGenerationRef.current !== generation) throw new Error('Workspace changed. The imported resume is in its original account library.');
-        setImportReview({ warnings: parsedResults.warnings, confidence: parsedResults.confidence });
         setSelectedTemplateId(templateId);
         setEditorData(mappedData);
         setLoadedResumeId(saved.id);
@@ -1450,10 +1393,8 @@ const App: React.FC = () => {
         setWorkspaceResetKey((k) => k + 1);
         await saveDraft({
           templateId,
-          resumeId: saved.id,
           content: importedContent,
-        }).catch(() => setError('Resume saved. Draft sync failed; your library copy is available.'));
-        if (parsedResults.warnings.length) setError(`Import review: ${parsedResults.warnings.join(' ')}`);
+        });
         setGeneratorTab('create');
         return {
           id: saved.id,
@@ -1472,7 +1413,6 @@ const App: React.FC = () => {
     setError(null);
     try {
         await importResumeFileToWorkspace(data);
-        importAttemptRef.current = null;
     } catch (err: any) {
         setError(err.message || "Failed to import resume.");
     } finally {
@@ -1488,7 +1428,10 @@ const App: React.FC = () => {
 
   // Agent Modal Handlers
   const handleAgentApprove = (id: string) => {
-    setError('Profile synchronization is unavailable. Import profile text from Career Tools.');
+    setAgentUpdates(prev => prev.map(u => u.id === id ? { ...u, status: 'approved' } : u));
+    // In a real app, this would inject data into the ResumeInput state
+    // For visual feedback only in this demo:
+    alert("Content added to your profile! (Simulation)");
   };
 
   const handleAgentReject = (id: string) => {
@@ -1501,7 +1444,6 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
-    if (activeTab === 'provider_demo') return <Suspense fallback={<p role="status" className="p-6">Loading provider demo...</p>}><ProviderDemoPage /></Suspense>;
     // NOTE: The editor is the primary resume creation experience.
     // Dashboard is kept for legacy/demo but not shown in user tabs.
 
@@ -1545,13 +1487,13 @@ const App: React.FC = () => {
     if (activeTab === 'cover_letters') {
       return (
         <div className="mx-auto w-full max-w-[96rem] py-8 px-4 lg:px-6">
-          <CoverLettersPage currentResume={visibleEditorData as UserInputData} resumeId={loadedResumeId} />
+          <CoverLettersPage />
         </div>
       );
     }
 
     if (activeTab === 'career_tools') {
-      return <CareerToolkitPage currentResume={visibleEditorData as UserInputData} resumeId={loadedResumeId} currentTitle={loadedResumeTitle} onOpenResume={openResumeInWorkspace} />;
+      return <CareerToolkitPage currentResume={visibleEditorData as UserInputData} />;
     }
 
     if (activeTab === 'resume_improvements') {
@@ -1565,7 +1507,7 @@ const App: React.FC = () => {
     }
 
     if (activeTab === 'profile_analysis') {
-      return <CareerProfileAnalysisPage resumeId={loadedResumeId} />;
+      return <CareerProfileAnalysisPage />;
     }
 
     if (activeTab === 'jobs_to_apply') {
@@ -1625,6 +1567,9 @@ const App: React.FC = () => {
     if (activeTab === 'admin_contacts') {
       return <AdminContactMessagesPage />;
     }
+    if (activeTab === 'admin_users') {
+      return <AdminUsersPage />;
+    }
     if (activeTab === 'admin_resumes') {
       return <AdminResumesPage />;
     }
@@ -1641,7 +1586,6 @@ const App: React.FC = () => {
             <AccountSettings 
             user={currentUser} 
             onPlanUpdate={handlePlanUpdate} 
-            onUserUpdated={setCurrentUser}
             />
         </div>
       );
@@ -1656,26 +1600,14 @@ const App: React.FC = () => {
     // Editor View - FULL WIDTH for Split Screen
     return (
       <div className="w-full px-4 lg:px-8 py-8 space-y-4">
-        {importReview && <section className="space-y-3 border-l-4 border-amber-500 bg-amber-50 p-4 text-sm">
-          <div className="flex items-center justify-between gap-3"><h2 className="font-bold">Import Review</h2><button onClick={() => setImportReview(null)} className="font-semibold">Dismiss</button></div>
-          {importReview.warnings.length ? <ul>{importReview.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p>No parser warnings.</p>}
-          <details><summary className="cursor-pointer font-semibold">Field confidence</summary><dl className="mt-2 grid gap-2 sm:grid-cols-2">{Object.entries(importReview.confidence).map(([key, value]) => <div key={key}><dt className="font-semibold">{key}</dt><dd className="break-words">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl></details>
-        </section>}
         <ResumeInput 
           key={`resume-input-${workspaceResetKey}`}
           onImport={handleImport}
           onTemplateChange={setSelectedTemplateId}
           onNewResume={() => setShowNewResumeConfirm(true)}
-          onWorkspaceChange={setEditorData}
-          onSaved={(id, title, content) => {
-            if (workspaceGenerationRef.current !== workspaceResetKey) return;
-            setLoadedResumeId(id);
-            setLoadedResumeTitle(title);
-            setEditorData(existing => !existing || resumeFingerprint(existing) === resumeFingerprint(content) ? content : existing);
-          }}
           onDraftChange={async (draft) => {
             // Persist workspace edits as the user types
-            await saveDraft({ templateId: draft.templateId ?? selectedTemplateId, resumeId: loadedResumeId, content: draft });
+            await saveDraft({ templateId: draft.templateId ?? selectedTemplateId, content: draft });
           }}
           prefilledData={visibleEditorData}
           isLoading={isLoading} 
@@ -1697,9 +1629,7 @@ const App: React.FC = () => {
         onLogout={handleLogout}
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        demoProviders={demoProviders}
       />
-      {demoProviders && <aside className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950">Demo providers enabled. Simulations are not live integrations.</aside>}
       
       <main className="flex-1">
         {error && (
@@ -1739,7 +1669,7 @@ const App: React.FC = () => {
                 </button>
               </div>
             )}
-            <Suspense fallback={<p className="p-6" role="status">Loading workspace...</p>}>{renderContent()}</Suspense>
+            {renderContent()}
           </>
         )}
       </main>

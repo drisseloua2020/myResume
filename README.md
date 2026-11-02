@@ -2,8 +2,6 @@
 
 ResumeForge, surfaced in the UI as MyResume, is a full-stack resume and career workspace. It lets users import ATS-friendly resumes, edit structured resume content, generate deterministic cover-letter and career artifacts, track job applications, manage profile sources, and administer users, resumes, messages, and activity logs.
 
-**Release scope:** a free core workspace with live integrations deferred. An opt-in [mock-provider sandbox](docs/mock-providers.md) supports synthetic provider workflows in development/test; production rejects mock mode. See the [implementation status](docs/implementation-status.md) for completed work and remaining limitations, and the [production runbook](docs/production-runbook.md) for mandatory launch gates. Repository checks alone do not establish production readiness.
-
 The application is intentionally built around deterministic backend logic. Resume parsing, ATS scoring, career analysis, exports, and cover-letter generation are implemented in local Python services and do not depend on LLM or agentic-AI API calls.
 
 ## Table of Contents
@@ -33,9 +31,9 @@ ResumeForge is a career operating system centered on structured resume data:
 - Render multiple resume templates from one structured content model.
 - Generate cover letters from deterministic scripts and stored resume context.
 - Score resumes against job descriptions with keyword gaps, risk checks, section-level reporting, and bullet-quality feedback.
-- Track manually entered jobs, reviewable application packets, achievements, and saved application answers.
+- Track jobs, packets, reminders, achievements, and saved application answers.
 - Manage onboarding answers and generate profile/category analysis.
-- Import pasted profile text; live profile connectors remain unavailable.
+- Sync profile-source placeholders and review generated updates.
 - Support email/password auth plus OAuth callback plumbing for Google, Microsoft, and LinkedIn.
 - Provide admin views for users, resumes, activity logs, agent updates, contact messages, templates, and profile sources.
 
@@ -56,7 +54,7 @@ The frontend stores only session state and editor state in the browser. Durable 
 ### Runtime Flow
 
 1. The user signs up or logs in through `/auth/*`.
-2. The React app stores the JWT in tab-scoped `sessionStorage` and sends it as a bearer token. Logout and password changes revoke existing sessions on the server.
+2. The React app stores the JWT in `localStorage` and sends it as a bearer token.
 3. Resume imports call `POST /resumes/parse-upload` with base64 document bytes.
 4. The backend extracts text, validates or normalizes ATS sections, and returns structured parser JSON.
 5. The UI maps parser JSON into editor JSON and saves it with `POST /resumes` plus draft autosaves through `POST /resumes/draft`.
@@ -101,19 +99,19 @@ For a deeper resume-import walkthrough, see [docs/resume-import-data-flow.md](do
 | Layer | Technology |
 | --- | --- |
 | Frontend | React 19, TypeScript, Vite, Vitest, Testing Library |
-| Backend | Python 3.13, FastAPI, Starlette, Uvicorn |
+| Backend | Python 3.13-ready FastAPI, Starlette, Uvicorn |
 | Data | SQLAlchemy 2, Alembic, SQLite for simple local use, PostgreSQL for production-like deployments |
 | Auth | JWT, Argon2 password hashing, OAuth callback support |
 | Documents | PDF/DOC/DOCX resume import support via backend parser utilities |
-| Export | Backend selectable-text PDF, DOCX and TXT exports |
+| Export | Browser-side PDF tooling plus backend ATS-safe export payloads |
 | Deployment | Render static/web services, Docker, GitHub Actions |
 
 ## Local Development
 
 ### Prerequisites
 
-- Python 3.13 for the backend.
-- Node.js 24 for the frontend.
+- Python 3.13 or a compatible Python 3 version for the backend.
+- Node.js 20+ for the frontend.
 - PostgreSQL if you want production-like local development. SQLite works with the default backend configuration.
 
 ### 1. Clone and Enter the Repo
@@ -147,7 +145,7 @@ source .venv/bin/activate
 Install dependencies and run migrations:
 
 ```bash
-python -m pip install --require-hashes -r requirements-dev.lock
+pip install -r requirements.txt
 alembic upgrade head
 ```
 
@@ -175,7 +173,7 @@ In a second terminal:
 
 ```bash
 cd ui
-npm ci
+npm install
 npm run dev
 ```
 
@@ -191,7 +189,7 @@ The frontend API client defaults to `http://localhost:3000`. To override it, cre
 VITE_API_URL=http://localhost:3000
 ```
 
-Vite bakes `VITE_*` variables into static builds, so restart/rebuild after changing them. The Docker image also supports non-secret startup configuration through `API_PUBLIC_URL`; see the runbook. Development defaults to localhost; production defaults to same-origin `/api`, never a visitor's localhost.
+Vite bakes `VITE_*` variables into the built bundle, so restart/rebuild the UI after changing them.
 
 ## Environment Variables
 
@@ -206,18 +204,12 @@ The backend reads `.env` from the `services/` working directory via Pydantic set
 | `JWT_SECRET` | `change-me` | Signing secret for JWT auth. Must be changed outside local throwaway use. |
 | `JWT_EXPIRES_IN` | `15m` | Token lifetime string used by auth helpers. |
 | `PORT` | `3000` in settings, container defaults to `10000` | API port, depending on runner. |
-| `CORS_ORIGINS` | Local development origins | Explicit comma-separated allowed frontend origins; HTTPS-only in production. |
-| `INCLUDE_LEGACY_FRONTEND_ALIASES` | `true` | When a MyResumes production origin is listed, also allow its existing apex/www/Render aliases. Set `false` for an exact allowlist. |
+| `CORS_ORIGINS` | Localhost plus deployed origins | Comma-separated allowed frontend origins. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | Empty | Optional contact-message reply email transport. |
 | `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Empty / `admin@myresume.net` | Optional support email credentials and sender. |
 | `UPLOAD_DIR` | `protected_uploads` | Private upload storage root. |
 | `UPLOAD_URL_PREFIX` | `/uploads` | URL prefix for protected uploaded assets. |
 | `MAX_PROFILE_PHOTO_BYTES` | `5242880` | Profile photo size limit. |
-| `MAX_REQUEST_BYTES` | `15728640` | Maximum API request body size. |
-| `AUTH_REQUESTS_PER_MINUTE` | `20` | Per-process, per-client authentication/contact attempt limit. |
-| `FREE_RESUMES_PER_DAY` | `10` | New free-plan resumes per UTC day; editing existing records is not charged. |
-| `MOCK_PROVIDERS_ENABLED` | `false` | Enable the authenticated Provider Demo sandbox in development/test only. Production rejects `true`. |
-| `FORWARDED_ALLOW_IPS` | `127.0.0.1` | Trusted reverse proxy addresses; never use `*` in production. |
 | `OAUTH_FRONTEND_URL` | `http://localhost:4000` | Frontend redirect target after OAuth. |
 | `OAUTH_REDIRECT_BASE_URL` | Empty | Public backend origin for OAuth callbacks. |
 | `OAUTH_COOKIE_SECURE` | `false` | Set `true` when OAuth callback is served over HTTPS. |
@@ -247,9 +239,7 @@ DATABASE_URL=postgresql+psycopg://app_user:app_password@localhost:5432/myresumes
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `VITE_API_URL` | Localhost in development, `/api` in production | Build-time API URL for static hosting. |
-| `API_PUBLIC_URL` | `/api` in the UI image | Non-secret runtime API URL written by the container startup script. |
-| `API_UPSTREAM` | `http://api:3000` in the UI image | Nginx same-origin API proxy target. |
+| `VITE_API_URL` | `http://localhost:3000` | Backend API origin used by the UI service clients. |
 
 ## Database and Migrations
 
@@ -288,8 +278,6 @@ Resume editor content is stored as JSON in `resumes.content` and `resume_drafts.
 - Multi-template resume builder with template IDs such as `classic_pro`, `modern_tech`, `ats_single_column`, `data_science`, `product_manager`, `academic_cv`, and more.
 - Structured editor fields for personal details, target role, job details, experience, education, certifications, skills, additional sections, preferences, and profile media.
 - Latest resume loading, library browsing, edit flows, draft autosave, and protected profile-photo upload.
-- Per-resume drafts, recovery prompts, explicit save status, and retry-safe imports.
-- ATS-oriented selectable-text PDF export. Preview templates are not pixel-identical PDF layouts; unsupported font characters produce a clear error with TXT/DOCX alternatives.
 
 ### ATS Resume Import
 
@@ -315,7 +303,7 @@ The `/career/*` backend module supports deterministic career workflows:
 - Application packet metadata.
 - Achievement library.
 - Resume versioning and restore.
-- Expiring, revocable public text shares with contact-field redaction. Free-text content still needs manual privacy review.
+- Share-link metadata with PII redaction flags.
 - User data export and career-data deletion.
 - No-LLM feature catalog.
 
@@ -325,9 +313,7 @@ Cover-letter routes generate and store deterministic cover-letter records tied t
 
 ### Profile Sync and Agent Review
 
-Live career-source connections and syncing are unavailable in this release. Routes do not fabricate updates or connection success. OAuth sign-in configuration does not enable profile syncing. Job discovery, external application submission, billing and scheduled reminder delivery are also disabled. Approved packets are downloadable for manual handoff, not submitted externally.
-
-For testing before vendor integration, enable **Provider Demo** as described in [mock providers](docs/mock-providers.md). It mimics job-board, profile, billing, email and application operations with explicit mock labels, failure scenarios and replay-safe history. It never grants paid entitlements, edits a resume with synthetic history, or claims real external delivery.
+Profile and agent routes model connected career sources and reviewable updates. Current local behavior uses deterministic/mock update generation rather than external automation.
 
 ### Admin Console
 
@@ -350,7 +336,6 @@ The backend OpenAPI app title is `ResumeForge API - Python`, version `2.0.0`.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/health` | Runtime health check. |
-| `GET` | `/ready` | Database connectivity and expected Alembic revision check. |
 
 ### Auth
 
@@ -359,13 +344,8 @@ The backend OpenAPI app title is `ResumeForge API - Python`, version `2.0.0`.
 | `POST` | `/auth/signup` | Create an email/password user and return a JWT. |
 | `POST` | `/auth/login` | Authenticate and return a JWT. |
 | `GET` | `/auth/me` | Return the current user. |
-| `POST` | `/auth/logout` | Revoke all current sessions. |
-| `PATCH` | `/auth/me` | Update the account name. |
-| `POST` | `/auth/me/password` | Change password and revoke sessions. |
-| `POST` | `/auth/forgot-password`, `/auth/reset-password` | Single-use recovery flow; email delivery requires SMTP. |
-| `GET` | `/auth/me/data` | Export owned account data and current profile photos. |
-| `POST` | `/auth/me/delete` | Confirm permanent active-account deletion. |
-| `GET` | `/auth/providers` | Report configured sign-in providers without exposing secrets. |
+| `POST` | `/auth/logout` | Client-friendly logout acknowledgement. |
+| `PATCH` | `/auth/me/plan` | Select the current user's plan. |
 | `POST` | `/auth/activity` | Record an authenticated activity event. |
 | `POST` | `/auth/contact` | Store a contact/support message. |
 | `GET` | `/auth/oauth/{provider}/start` | Start OAuth for supported providers. |
@@ -379,8 +359,8 @@ The backend OpenAPI app title is `ResumeForge API - Python`, version `2.0.0`.
 | `POST` | `/resumes/` | Create a saved resume. |
 | `GET` | `/resumes/` | List current user's resume summaries. |
 | `GET` | `/resumes/latest` | Fetch current user's latest full resume. |
-| `POST` | `/resumes/draft` | Save a draft scoped to a saved resume or new-document template. |
-| `GET` | `/resumes/latest-draft` | Fetch latest draft, optionally by resume or template. |
+| `POST` | `/resumes/draft` | Save or update the latest draft for a template. |
+| `GET` | `/resumes/latest-draft` | Fetch latest draft, optionally by template. |
 | `POST` | `/resumes/parse-upload` | Parse uploaded PDF/DOC/DOCX resume data. |
 | `GET` | `/resumes/{resume_id}` | Fetch one full resume. |
 | `PUT` | `/resumes/{resume_id}` | Update title, template, or content. |
@@ -398,14 +378,11 @@ The backend OpenAPI app title is `ResumeForge API - Python`, version `2.0.0`.
 | `GET` | `/career/features` | Return the no-LLM feature catalog. |
 | `POST` / `GET` | `/career/jobs` | Create and list job tracker records. |
 | `PATCH` / `DELETE` | `/career/jobs/{job_id}` | Update or delete a job tracker record. |
-| `POST` | `/career/jobs/{job_id}/prepare`, `/career/jobs/{job_id}/decision` | Snapshot an application packet and persist its human decision. |
 | `GET` | `/career/jobs/analytics` | Summarize job tracker analytics. |
 | `POST` / `GET` | `/career/achievements` | Create and list achievements. |
 | `POST` / `GET` | `/career/resume-versions` | Create and list resume versions. |
 | `POST` | `/career/resume-versions/{version_id}/restore` | Restore a stored version to a resume. |
 | `POST` | `/career/shares` | Create share metadata for a resume. |
-| `GET` / `DELETE` | `/career/shares`, `/career/shares/{share_id}` | List or revoke owned shares. |
-| `GET` | `/career/public/resumes/{slug}` | Read an unexpired public text share. |
 | `GET` | `/career/data-export` | Export current user's career-toolkit data. |
 | `DELETE` | `/career/data` | Delete current user's career-toolkit data. |
 
@@ -432,12 +409,10 @@ http://localhost:3000/docs
 Run from `services/`:
 
 ```bash
-python -m pytest -q
+pytest
 ```
 
 The backend tests cover authentication, resume persistence, resume imports, career toolkit behavior, cover-letter job-source handling, agent import compatibility, and Postman-style E2E checks.
-
-Tests only permit `APP_ENV=test` with the dedicated `sqlite+pysqlite:///./test.db` target before destructive fixture setup. They refuse other database URLs. PostgreSQL migration validation is a separate CI job.
 
 ### Frontend
 
@@ -445,7 +420,6 @@ Run from `ui/`:
 
 ```bash
 npm test
-npm run build
 ```
 
 The UI tests use Vitest and Testing Library and cover key components and service behavior such as OAuth redirects, resume input, templates, library flows, cover letters, onboarding, and career pages.
@@ -467,13 +441,31 @@ Useful manual smoke path:
 
 ## Docker
 
-The canonical stack is `services/docker-compose.yml`: PostgreSQL, a one-shot migration job, a non-root API with private upload storage, and a non-root Nginx UI. Copy `services/.env.example` into a private `.env` and supply its required values. For Compose, the database host in `DATABASE_URL` must be `db`, not localhost.
+### Backend Image
+
+From `services/`:
 
 ```bash
-docker compose -f services/docker-compose.yml --env-file services/.env up --build
+docker build -t resumeforge-api .
+docker run --rm -p 3000:10000 -e PORT=10000 -e JWT_SECRET=local-dev-secret resumeforge-api
 ```
 
-Images build from `services/Dockerfile` and `ui/Dockerfile`. Legacy Compose entry points include the canonical file; obsolete legacy Dockerfiles were removed. Previously committed credentials must be rotated, even though their current values have been removed. See the runbook for separate migration/runtime roles and staging checks.
+Add `DATABASE_URL` if you want PostgreSQL instead of the default SQLite database inside the container.
+
+### Frontend Image
+
+From `ui/`:
+
+```bash
+docker build -t resumeforge-ui .
+docker run --rm -p 4000:8080 -e PORT=8080 resumeforge-ui
+```
+
+The frontend image serves the built Vite app with Nginx.
+
+### Compose Notes
+
+There are compose files under `services/` and `services/docker/`. Treat them as local/deployment scaffolding and replace any committed example credentials before use. New secrets should live in private environment files, Render settings, or a secret manager, not in Git.
 
 ## CI/CD and Deployment
 
@@ -486,9 +478,7 @@ GitHub Actions are split into reusable workflow pieces:
 - `deploy-images.yml`
 - `deploy-render.yml`
 
-The top-level `CI-CD` workflow tests pull requests and pushes to `main`, `stage`, `feature_dev`, and version tags. It includes locked backend/UI tests, TypeScript/build checks, PostgreSQL migration checks and security audits. Only successful pushes to `main` can publish images or invoke production Render hooks, behind the GitHub `production` environment. Reusable workflows enforce the same restriction, and deploy requests pin the tested main commit. Configure required environment reviewers in GitHub. Hook acceptance alone does not prove deployment; status polling, smoke checks and rollback remain operator gates.
-
-Follow the [main-only deployment policy](docs/deployment-policy.md) to disable Render's independent feature-branch auto-deploys: production API/UI services must use branch `main` with Auto-Deploy off when Actions hooks control releases.
+The top-level `CI-CD` workflow runs on pushes to `main`, `stage`, and version tags. It performs setup, backend E2E tests, UI tests, appsec checks, image versioning, and branch deployments through Render deploy hooks.
 
 Production configuration details are documented in [README_Configuration.md](README_Configuration.md), including:
 
@@ -503,7 +493,6 @@ Minimum production environment:
 
 ```text
 Backend:
-APP_ENV=production
 DATABASE_URL=<postgres-url>
 JWT_SECRET=<long-random-secret>
 CORS_ORIGINS=<frontend-origin>,<root-origin>
@@ -511,11 +500,7 @@ OAUTH_FRONTEND_URL=<frontend-origin>
 OAUTH_REDIRECT_BASE_URL=<api-origin>
 OAUTH_COOKIE_SECURE=true
 
-Frontend container:
-API_PUBLIC_URL=<api-origin-or-/api>
-API_UPSTREAM=<private-api-origin>
-
-Frontend static host:
+Frontend:
 VITE_API_URL=<api-origin>
 ```
 
@@ -528,8 +513,6 @@ VITE_API_URL=<api-origin>
 - OAuth redirect URIs must match the provider configuration exactly, including scheme, host, path, and absence or presence of ports.
 - Career Toolkit features are deterministic and expose a no-LLM feature catalog through `/career/features`.
 - `/career/data-export` and `/career/data` support user-facing data portability and deletion for career-toolkit records.
-- `/auth/me/data` and `/auth/me/delete` cover the active account and current private photos. Provider backups and support mail follow separately managed retention policies.
-- New passwords require at least 12 characters. Email ownership verification and email-address changes are not implemented; choose the launch policy explicitly.
 
 ## Troubleshooting
 
@@ -548,7 +531,7 @@ The frontend clears local session state when an API request returns `401`. Check
 
 - `JWT_SECRET` is stable between backend restarts.
 - The token has not expired.
-- Browser session storage does not contain an old token from another environment.
+- Browser local storage does not contain an old token from another environment.
 
 ### Alembic Cannot Connect
 
@@ -557,8 +540,6 @@ Check:
 - `DATABASE_URL` is visible in the `services/` shell.
 - PostgreSQL is running if you are using a PostgreSQL URL.
 - The URL uses the SQLAlchemy driver form, for example `postgresql+psycopg://...`.
-
-For `permission denied for schema public` (SQLSTATE `42501`), use a dedicated migration role with schema `USAGE, CREATE`, not the restricted runtime account. See the [database provisioning instructions](docs/production-runbook.md#database-roles-and-the-public-schema-error). Do not restore a destructive old dump over live data or stamp missing migrations as complete.
 
 ### OAuth Redirect Errors
 

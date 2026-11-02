@@ -1,6 +1,4 @@
-@import "tailwindcss";
-@config "./tailwind.config.cjs";
-
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800;900&display=swap");
 
 :root {
   --rf-brand-rgb: 46 61 80;
@@ -208,5 +206,3 @@ textarea {
     border-bottom: 0;
   }
 }
-
-* { letter-spacing: 0 !important; }

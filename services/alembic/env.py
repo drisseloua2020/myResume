@@ -5,6 +5,10 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from app.core.config import settings
+from app.db.base import Base
+from app.models.entities import *  # noqa: F401,F403
+
 import sys
 from pathlib import Path
 
@@ -12,14 +16,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.core.config import settings
-from app.db.base import Base
-from app.db.session import _normalize_database_url
-from app.models.entities import *  # noqa: F401,F403
-
 config = context.config
-settings.validate_runtime_settings()
-config.set_main_option("sqlalchemy.url", _normalize_database_url(settings.database_url).replace("%", "%%"))
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

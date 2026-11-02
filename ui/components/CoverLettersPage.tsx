@@ -10,7 +10,6 @@ import {
   listCoverLetters,
 } from '../services/coverLetterService';
 import { getLatestDraft, ResumeDraft } from '../services/resumeService';
-import { UserInputData } from '../types';
 
 function templateName(id: string | null) {
   if (!id) return 'N/A';
@@ -46,7 +45,7 @@ function jobPreview(value: string): string {
 type JobSourceMode = 'url' | 'paste';
 type CoverLetterTab = 'generate' | 'viewer';
 
-export default function CoverLettersPage({ currentResume, resumeId }: { currentResume?: UserInputData; resumeId?: string | null }) {
+export default function CoverLettersPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<CoverLetterListItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -85,11 +84,6 @@ export default function CoverLettersPage({ currentResume, resumeId }: { currentR
   async function loadLatestDraft(): Promise<ResumeDraft | null> {
     setDraftLoading(true);
     try {
-      if (currentResume) {
-        const draft = { id: resumeId || 'workspace', templateId: currentResume.templateId || '', content: currentResume, createdAt: '', updatedAt: '' };
-        setLatestDraft(draft);
-        return draft;
-      }
       const draft = await getLatestDraft();
       setLatestDraft(draft);
       return draft;

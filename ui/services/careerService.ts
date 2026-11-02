@@ -88,7 +88,6 @@ export function exportResumeFormats(payload: {
   title?: string;
   publicProfileUrl?: string;
   redactPii?: boolean;
-  format?: 'all' | 'pdf' | 'txt' | 'docx';
 }): Promise<{ exports: Record<string, any> }> {
   return api.post('/career/exports/resume', payload);
 }

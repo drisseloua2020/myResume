@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import { User, SubscriptionPlan } from '../types';
 import { PLAN_DETAILS } from '../constants';
 import { authService } from '../services/authService';
-import AccountLifecycle from './AccountLifecycle';
 
 interface AccountSettingsProps {
   user: User;
   onPlanUpdate: (newPlan: SubscriptionPlan) => void;
-  onUserUpdated?: (user: User) => void;
 }
 
-const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onPlanUpdate, onUserUpdated }) => {
+const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onPlanUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -122,7 +120,6 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({ user, onPlanUpdate, o
            </div>
         </div>
       </div>
-      <AccountLifecycle user={user} onUserUpdated={onUserUpdated} />
     </div>
   );
 };

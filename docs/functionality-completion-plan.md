@@ -1,7 +1,5 @@
 # MyResume Functionality Completion Plan
 
-Historical review backlog. Current implementation progress and release boundaries are tracked in [implementation status](implementation-status.md).
-
 Prepared October 22, 2026. Baseline: commit `6cd7ebc`.
 
 This is a proposed implementation backlog based on the [functionality review](functionality-review.md). It defines the work still required; it does not imply that those changes have been implemented. Deployment, security, database recovery, and operational gates are documented separately in the [production-readiness review](production-readiness-review.md).

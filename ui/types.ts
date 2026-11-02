@@ -20,7 +20,6 @@ export interface User {
   createdAt: string;
   paidAmount: string;
   authProvider?: 'email' | 'google' | 'linkedin' | 'microsoft' | 'github';
-  hasPassword?: boolean;
 }
 
 export interface ActivityLog {

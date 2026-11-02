@@ -4,10 +4,6 @@ This document records the production domain, DNS, Render, and Google OAuth confi
 
 Do not commit OAuth client secrets, API keys, database URLs with credentials, JWT secrets, SMTP passwords, or private Render service identifiers.
 
-Production releases must follow the [main-only deployment policy](docs/deployment-policy.md). Set both production Render services to branch `main` and disable their independent Auto-Deploy when GitHub Actions hooks control releases. Workflow guards alone cannot disable Render's branch-triggered auto-deploys.
-
-Read the [production runbook](docs/production-runbook.md) for secrets rotation, database roles, migrations, private storage, backup/restore and launch evidence. Live profile sync, billing, job discovery/submission and scheduled delivery remain disabled for the core release.
-
 ## Placeholders
 
 | Placeholder | Meaning |
@@ -80,47 +76,19 @@ Render must show the custom domains as verified/active before OAuth testing. A `
 Backend service:
 
 ```text
-APP_ENV=production
-DATABASE_URL=<POSTGRES_RUNTIME_URL>
-JWT_SECRET=<RANDOM_SECRET_AT_LEAST_32_CHARACTERS>
 OAUTH_FRONTEND_URL=<FRONTEND_ORIGIN>
 OAUTH_REDIRECT_BASE_URL=<API_ORIGIN>
 CORS_ORIGINS=<FRONTEND_ORIGIN>,<ROOT_ORIGIN>
 OAUTH_COOKIE_SECURE=true
 ```
 
-Frontend static service (build time):
+Frontend service:
 
 ```text
 VITE_API_URL=<API_ORIGIN>
 ```
 
 After changing `VITE_API_URL`, redeploy/rebuild the frontend because Vite bakes environment variables into the compiled bundle.
-
-If users also open the existing Render UI directly, include its origin in the **backend** service's environment:
-
-```text
-CORS_ORIGINS=https://myresumes.net,https://www.myresumes.net,https://myresume-rrcy.onrender.com
-```
-
-Restart/redeploy the API after changing this setting. `INCLUDE_LEGACY_FRONTEND_ALIASES=true` (default) preserves these exact three aliases when at least one is configured; no other Render hosts are trusted. Set it to `false` when only the explicitly listed origins should be accepted. Custom deployments on unrelated domains are not expanded.
-
-An `OPTIONS /auth/login` response of `400 Disallowed CORS origin` blocks the browser before credential validation. It is not evidence that the database password is incorrect. Verify preflight independently of login:
-
-```powershell
-$headers = @{
-  Origin = 'https://myresume-rrcy.onrender.com'
-  'Access-Control-Request-Method' = 'POST'
-  'Access-Control-Request-Headers' = 'content-type'
-}
-Invoke-WebRequest -Method Options -Uri 'https://api.myresumes.net/auth/login' -Headers $headers
-```
-
-Expect 200 and `Access-Control-Allow-Origin` matching the requested origin. Do not add `*`, remove authentication, or reset passwords to work around a preflight failure.
-
-If preflight succeeds but the login POST returns 500 without that header, the browser is masking a backend exception. Check API logs and `/ready`, then run `python -m app.db.diagnostics --auth-summary` in the API hosting shell. See [upgrade/login recovery](docs/production-runbook.md#login-fails-after-upgrade) for connection failures, missing `users.token_version` and safe migration steps. Never drop/recreate existing users to resolve this.
-
-For the UI Docker image, use runtime `API_PUBLIC_URL=<API_ORIGIN>` instead. With a same-origin proxy use `API_PUBLIC_URL=/api` and `API_UPSTREAM=<PRIVATE_API_ORIGIN>`. Restart the container after changing these values; no frontend rebuild is needed. These settings are public configuration, not a place for credentials.
 
 Secrets must stay outside Git. Store these in Render environment variables or a secret manager, not in documentation:
 
@@ -201,7 +169,6 @@ Check API health:
 
 ```powershell
 curl.exe <API_ORIGIN>/health
-curl.exe <API_ORIGIN>/ready
 ```
 
 Expected result:
@@ -233,4 +200,3 @@ Expected important values:
 - If Google shows `403 Forbidden` before returning to the app, check OAuth consent publishing/test-user status and confirm the exact redirect URI is registered.
 - If Google shows `redirect_uri_mismatch`, the Google OAuth client does not contain the exact callback URI used by the backend.
 - If the frontend still calls an old API domain, redeploy the frontend after setting `VITE_API_URL=<API_ORIGIN>`.
-- If using the UI image, check its generated `/runtime-config.js` and restart with the intended `API_PUBLIC_URL` instead.

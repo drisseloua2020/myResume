@@ -1,7 +1,5 @@
 # MyResume Production Readiness Review
 
-Historical baseline review. See the [implementation status](implementation-status.md) for repository fixes and the [production runbook](production-runbook.md) for outstanding operator gates.
-
 Review date: October 19, 2026 (America/New_York).
 
 Reviewed baseline: commit `6cd7ebc`. Scope: backend, frontend, migrations, container builds, GitHub Actions, existing tests, and the supplied Adminer SQL dump. No live database, Render settings, DNS configuration, production logs, or backup service was inspected. Credentials and resume contents are intentionally omitted.
