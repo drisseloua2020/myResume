@@ -3,13 +3,12 @@ name: CI-CD
 on:
   pull_request:
   push:
-    branches: [main, stage]
+    branches: [main, stage, feature_dev]
     tags:
       - "v*.*.*"
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   setup:
@@ -33,7 +32,7 @@ jobs:
 
   version-images:
     name: Version UI and API Images
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: appsec-check
     permissions:
       contents: read

@@ -23,3 +23,6 @@ jobs:
           test -f ui/package-lock.json
           test -f services/Dockerfile
           test -f ui/Dockerfile
+
+      - name: Verify production deployment safeguards
+        run: python3 -m unittest discover -s .github/scripts -p "test_*.py"
